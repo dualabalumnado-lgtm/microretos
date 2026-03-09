@@ -6,22 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Modulo extends Model
 {
-    protected $table = 'dualnueva_modulos_angel';
-    public $timestamps = false;
+    protected $table = 'modulos';
 
-    protected $fillable = [
-        'idAreaSC', 'idcicloformativo', 'codigoBOE', 'nombre', 'curso', 'horastotales'
-    ];
-
-    // Relación inversa: Un Módulo pertenece a un Ciclo
-    public function ciclo()
+    // Un Módulo pertenece a un Ciclo
+    public function cicloFormativo()
     {
-        return $this->belongsTo(CicloFormativo::class, 'idcicloformativo', 'id');
+        return $this->belongsTo(CicloFormativo::class, 'idcicloformativo');
     }
 
-    // Relación: Un Módulo tiene muchos RA
-    public function resultadosAprendizaje()
+    // Un Módulo tiene muchos Resultados de Aprendizaje (RA)
+    public function ras()
     {
-        return $this->hasMany(ResultadoAprendizaje::class, 'idmodulo', 'id');
+        return $this->hasMany(ResultadoAprendizaje::class, 'idmodulo');
     }
 }
