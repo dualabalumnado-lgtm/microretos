@@ -6,16 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class CriterioEvaluacion extends Model
 {
-    protected $table = 'dualnueva_modulosRACE_angel';
-    public $timestamps = false;
+    protected $table = 'criterios_evaluacion';
 
-    protected $fillable = [
-        'idmoduloRA', 'ce'
-    ];
-
-    // Relación inversa: Un CE pertenece a un RA
+    // Un CE pertenece a un RA
     public function resultadoAprendizaje()
     {
-        return $this->belongsTo(ResultadoAprendizaje::class, 'idmoduloRA', 'id');
+        return $this->belongsTo(ResultadoAprendizaje::class, 'idmoduloRA');
     }
 }
