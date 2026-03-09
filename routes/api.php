@@ -23,6 +23,13 @@ Route::get('/familias/{familia}/ciclos', [DatosFPController::class, 'getCiclos']
 Route::get('/ciclos/{idCiclo}/modulos', [DatosFPController::class, 'getModulos']);
 Route::get('/modulos/{idModulo}/ra-ce', [DatosFPController::class, 'getRaCe']); // Se llama ra-ce en URL, getRaCe en método
 
+// Crear nueva empresa
+Route::post('/empresas', [\App\Http\Controllers\DatosFPController::class, 'guardarEmpresa']);
+
+// Actualizar información de empresa existente
+Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);
+
+
 
 // Actualizar información faltante de la empresa 
 Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);

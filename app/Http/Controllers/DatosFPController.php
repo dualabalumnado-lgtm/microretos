@@ -89,12 +89,52 @@ class DatosFPController extends Controller
         return response()->json($ras);
     }
 
+    // ==========================================
+    // ENDPOINTS DE GUARDADO Y ACTUALIZACIÓN
+    // ==========================================
+
+    // NUEVO: Para guardar una empresa que NO existe
+    public function guardarEmpresa(Request $request)
+    {
+        $consecuenciasTexto = is_array($request->consecuencias) 
+            ? implode(', ', $request->consecuencias) 
+            : $request->consecuencias;
+
+        // 1. Creamos la empresa
+        $empresa = Empresa::create([
+            'nombre_comercial'  => $request->nombreComercial, // Asegúrate de pedir este campo en el frontend
+            'centro_educativo'  => $request->centroEducativo,
+            'sector'            => $request->sector,
+            'tamano'            => $request->tamano,
+            'web'               => $request->web,
+            'dia_a_normal'      => $request->diaANormal,
+            'friccion_area'     => $request->friccionArea,
+            'friccion_problema' => $request->friccionProblema,
+            'consecuencias'     => $consecuenciasTexto,
+            'restricciones'     => $request->restricciones,
+            'lo_que_no_quieren' => $request->loQueNoQuieren,
+        ]);
+
+        // 2. Si nos mandan la familia desde el frontend, la guardamos en la tabla pivote
+        if ($request->filled('familia')) {
+            DB::table('empresa_familia')->insert([
+                'empresa_id' => $empresa->id,
+                'familia'    => $request->familia
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Empresa creada correctamente', 
+            'empresa' => $empresa
+        ]);
+    }
+
+    // MODIFICADO: Actualiza empresa existente Y su familia
     public function actualizarEmpresa(Request $request, $id)
     {
         $empresa = Empresa::find($id);
         
         if ($empresa) {
-        
             $consecuenciasTexto = is_array($request->consecuencias) 
                 ? implode(', ', $request->consecuencias) 
                 : $request->consecuencias;
@@ -104,8 +144,6 @@ class DatosFPController extends Controller
                 'sector'            => $request->sector,
                 'tamano'            => $request->tamano,
                 'web'               => $request->web,
-                
-                
                 'dia_a_normal'      => $request->diaANormal,
                 'friccion_area'     => $request->friccionArea,
                 'friccion_problema' => $request->friccionProblema,
@@ -114,8 +152,19 @@ class DatosFPController extends Controller
                 'lo_que_no_quieren' => $request->loQueNoQuieren,
             ]);
             
-            return response()->json(['message' => 'Empresa y diagnóstico actualizados correctamente']);
+            // Actualizamos o insertamos la familia en la tabla pivote
+            if ($request->filled('familia')) {
+                DB::table('empresa_familia')->updateOrInsert(
+                    ['empresa_id' => $id],
+                    ['familia'    => $request->familia]
+                );
+            }
+            
+            return response()->json(['message' => 'Empresa actualizada correctamente']);
         }
         return response()->json(['error' => 'Empresa no encontrada'], 404);
     }
+
+
+    
 }
