@@ -17,7 +17,7 @@ const buscadorEmpresa = ref('');
 const mostrarDropdownEmpresas = ref(false);
 const empresaDetalle = ref(null); 
 
-// --- NUEVO: FILTRO DE COLEGIOS ---
+// --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
 const centrosDisponibles = computed(() => {
   const centros = empresas.value.map(e => e.centro_educativo).filter(Boolean);
@@ -56,11 +56,11 @@ const modulosDelCurso = computed(() => {
   return modulos.value.filter(m => m.curso == seleccion.value.cursoSeleccionado);
 });
 
-const microretoGenerado = ref(null);
+// MODIFICADO: Ahora es un array para guardar múltiples retos
+const microretosGenerados = ref([]);
 const cargando = ref(false);
 const actualizandoCRM = ref(false);
 const crmActualizado = ref(false);
-const guardadoExitoso = ref(false);
 const diagnosticoRecuperado = ref(false);
 
 const consecuenciasOpciones = [
@@ -79,26 +79,11 @@ const abrirPopup = (tipo, id) => { popupActivo.value = { tipo, id }; };
 const cerrarPopup = () => { popupActivo.value = null; };
 
 const ayudas = {
-  1: {
-    info: "Describe la actividad principal y la estructura humana para dimensionar la solución.",
-    ejemplo: "Somos una empresa de servicios informáticos especializada en mantenimiento para pymes. En nuestro día a día, gestionamos de forma remota incidencias de software, reparamos equipos físicos en nuestro taller y realizamos despliegues de redes locales en las sedes de nuestros clientes."
-  },
-  2: {
-    info: "Identifica el 'cuello de botella' actual sin pensar aún en la solución técnica.",
-    ejemplo: "La gestión de albaranes de entrada. Se pierde mucho tiempo comprobando manualmente que el material recibido coincide con el pedido."
-  },
-  3: {
-    info: "Describe qué ha fallado antes o qué barreras físicas/económicas existen.",
-    ejemplo: "Intentamos usar una App gratuita pero no permitía escaneo de códigos. Limitación: No podemos comprar terminales nuevos, deben usar los suyos."
-  },
-  4: {
-    info: "¿Qué impacto inmediato tendría solucionar este problema?",
-    ejemplo: "Eliminar errores de stock que provocan retrasos en las reparaciones y malestar en el cliente."
-  },
-  5: {
-    info: "Define qué tipo de entregable esperas que el alumno desarrolle.",
-    ejemplo: "Espero que diseñe un flujo de trabajo digital y proponga una herramienta que permita automatizar la lectura de albaranes."
-  }
+  1: { info: "Describe la actividad principal y la estructura humana...", ejemplo: "Somos una empresa..." },
+  2: { info: "Identifica el 'cuello de botella' actual...", ejemplo: "La gestión de albaranes..." },
+  3: { info: "Describe qué ha fallado antes o qué barreras existen.", ejemplo: "Intentamos usar una App..." },
+  4: { info: "¿Qué impacto inmediato tendría solucionar este problema?", ejemplo: "Eliminar errores de stock..." },
+  5: { info: "Define qué tipo de entregable esperas.", ejemplo: "Espero que diseñe un flujo de trabajo..." }
 };
 
 const getDatosPaso2Preparados = () => {
@@ -124,6 +109,21 @@ const seleccionarEmpresa = (emp) => {
   seleccion.value.empresaId = emp.id;
   buscadorEmpresa.value = emp.nombre_comercial;
   mostrarDropdownEmpresas.value = false;
+};
+
+const limpiarFormulario = () => {
+  seleccion.value = {
+    empresaId: '', empresaNombre: '', empresaCentro: '', empresaSector: '', empresaUbicacion: '', empresaTamano: '', empresaWeb: '',
+    diaANormal: '', friccionArea: '', friccionProblema: '', restricciones: [], otraLimitacion: '', loQueNoQuieren: '', consecuencias: [], otraConsecuencia: '', expectativasAlumno: '', 
+    familia: '', cicloId: '', cursoSeleccionado: 2, duracion: '1 a 2 semanas', nivelGrupo: 'Medio',
+  };
+  buscadorEmpresa.value = '';
+  empresaDetalle.value = null;
+  pasoActual.value = 1;
+  crmActualizado.value = false;
+  diagnosticoRecuperado.value = false;
+  modulosSeleccionados.value = [];
+  microretosGenerados.value = []; // Vaciamos la lista de retos
 };
 
 const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.value.empresaSector && seleccion.value.empresaTamano);
@@ -178,10 +178,7 @@ watch(() => seleccion.value.familia, async (val) => {
 
   const res = await api.get(url);
   ciclos.value = res.data;
-  
-  seleccion.value.cicloId = ''; 
-  modulos.value = []; 
-  modulosSeleccionados.value = [];
+  seleccion.value.cicloId = ''; modulos.value = []; modulosSeleccionados.value = [];
 });
 
 watch(() => seleccion.value.cicloId, async (val) => {
@@ -199,79 +196,81 @@ const avanzarPaso = () => { if (pasoActual.value < totalPasos) pasoActual.value+
 const retrocederPaso = () => { if (pasoActual.value > 1) pasoActual.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
 const guardarInfoEmpresa = async () => {
-  if (!seleccion.value.empresaId) return;
   actualizandoCRM.value = true;
   const datosP2 = getDatosPaso2Preparados();
-  try {
-    await api.put(`/empresas/${seleccion.value.empresaId}`, {
-      centroEducativo: seleccion.value.empresaCentro, 
-      sector: seleccion.value.empresaSector, tamano: seleccion.value.empresaTamano, web: seleccion.value.empresaWeb,
-      diaANormal: seleccion.value.diaANormal, friccionArea: seleccion.value.friccionArea, friccionProblema: seleccion.value.friccionProblema,
-      consecuencias: datosP2.consecuenciasStr, restricciones: datosP2.restriccionesStr, loQueNoQuieren: seleccion.value.loQueNoQuieren
-    });
-    
-    const emp = empresas.value.find(e => e.id === seleccion.value.empresaId);
-    if(emp) {
-      emp.centro_educativo = seleccion.value.empresaCentro;
-      emp.sector = seleccion.value.empresaSector;
-      emp.tamano = seleccion.value.empresaTamano;
-      emp.web = seleccion.value.empresaWeb;
-      emp.dia_a_normal = seleccion.value.diaANormal;
-      emp.friccion_area = seleccion.value.friccionArea;
-      emp.friccion_problema = seleccion.value.friccionProblema;
-      emp.consecuencias = datosP2.consecuenciasStr;
-      emp.restricciones = datosP2.restriccionesStr;
-      emp.lo_que_no_quieren = seleccion.value.loQueNoQuieren;
-    }
+  
+  const payload = {
+    nombreComercial: seleccion.value.empresaNombre, centroEducativo: seleccion.value.empresaCentro, sector: seleccion.value.empresaSector, tamano: seleccion.value.empresaTamano, web: seleccion.value.empresaWeb,
+    diaANormal: seleccion.value.diaANormal, friccionArea: seleccion.value.friccionArea, friccionProblema: seleccion.value.friccionProblema, consecuencias: datosP2.consecuenciasStr, restricciones: datosP2.restriccionesStr, loQueNoQuieren: seleccion.value.loQueNoQuieren,
+    familia: seleccion.value.familia
+  };
 
+  try {
+    if (seleccion.value.empresaId) {
+      await api.put(`/empresas/${seleccion.value.empresaId}`, payload);
+      const emp = empresas.value.find(e => e.id === seleccion.value.empresaId);
+      if(emp) Object.assign(emp, { ...payload, centro_educativo: payload.centroEducativo, dia_a_normal: payload.diaANormal, friccion_area: payload.friccionArea, friccion_problema: payload.friccionProblema, lo_que_no_quieren: payload.loQueNoQuieren });
+    } else {
+      const res = await api.post('/empresas', payload);
+      seleccion.value.empresaId = res.data.empresa.id;
+      empresas.value.push(res.data.empresa);
+    }
     crmActualizado.value = true;
     setTimeout(() => crmActualizado.value = false, 3000); 
-  } catch(e) { alert("Error al actualizar la empresa en la BD."); } finally { actualizandoCRM.value = false; }
+  } catch(e) { alert("Error al procesar la empresa en la BD."); } finally { actualizandoCRM.value = false; }
 };
 
+// MODIFICADO: Añade el nuevo reto al array en lugar de reemplazarlo
 const generarReto = async () => {
   cargando.value = true;
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => {
-      return modulos.value.find(m => m.id === id)?.nombre;
-    }).filter(Boolean); 
-
-    const moduloNombreTxt = nombresModulosSeleccionados.length > 0 
-      ? nombresModulosSeleccionados.join(' y ') : `A determinar por IA (${seleccion.value.cursoSeleccionado}º Curso)`;
-
+    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean); 
+    const moduloNombreTxt = nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : `A determinar por IA (${seleccion.value.cursoSeleccionado}º Curso)`;
     const datosP2 = getDatosPaso2Preparados();
+    
     const res = await api.post('/generar-microreto', {
-      ...seleccion.value,
-      restricciones: datosP2.restriccionesStr,
-      consecuencias: datosP2.consecuenciasArray,
-      ciclo_nombre: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
-      modulo_nombre: moduloNombreTxt,
-      ciclo_id: seleccion.value.cicloId,
-      modulo_id: modulosSeleccionados.value.length > 0 ? modulosSeleccionados.value : null,
-      nivelGrupo: seleccion.value.nivelGrupo,
-      expectativasAlumno: seleccion.value.expectativasAlumno,
-      cursoSeleccionado: seleccion.value.cursoSeleccionado 
+      ...seleccion.value, restricciones: datosP2.restriccionesStr, consecuencias: datosP2.consecuenciasArray,
+      ciclo_nombre: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre, modulo_nombre: moduloNombreTxt,
+      ciclo_id: seleccion.value.cicloId, modulo_id: modulosSeleccionados.value.length > 0 ? modulosSeleccionados.value : null,
+      nivelGrupo: seleccion.value.nivelGrupo, expectativasAlumno: seleccion.value.expectativasAlumno, cursoSeleccionado: seleccion.value.cursoSeleccionado 
     });
-    microretoGenerado.value = res.data;
-    setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 100);
+
+    if (res.data && res.data.microretos) {
+        res.data.microretos.forEach(reto => {
+            microretosGenerados.value.push({
+                ...reto,
+                _ui_guardado: false,
+                _ui_guardando: false
+            });
+        });
+    }
+
+    setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 300);
   } catch (e) { console.error(e); alert("Error al contactar con la IA"); } finally { cargando.value = false; }
 };
 
-const guardar = async () => {
+// MODIFICADO: Recibe el índice del reto a guardar
+const guardar = async (index) => {
+  const reto = microretosGenerados.value[index];
+  reto._ui_guardando = true;
+  
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => {
-      return modulos.value.find(m => m.id === id)?.nombre;
-    }).filter(Boolean);
+    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean);
 
     await api.post('/guardar-microreto-bd', { 
-      ...microretoGenerado.value, 
+      ...reto, 
       ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
       modulo: nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : 'Transversal',
       duracion: seleccion.value.duracion,
       nivel_grupo: seleccion.value.nivelGrupo
     });
-    guardadoExitoso.value = true;
-  } catch (e) { alert("Error al guardar"); }
+    
+    reto._ui_guardado = true;
+  } catch (e) { 
+    alert("Error al guardar este microreto"); 
+  } finally {
+    reto._ui_guardando = false;
+  }
 };
 </script>
 
@@ -280,24 +279,18 @@ const guardar = async () => {
     <div class="max-w-6xl mx-auto">
       
       <header class="mb-10 text-center">
-        
         <div class="inline-flex items-center mb-8 bg-white dark:bg-slate-900 py-4 pr-10 pl-6 rounded-[3rem] shadow-sm border border-slate-200 dark:border-slate-800">
-          
           <img src="../assets/logo.png" alt="Logo DuaLab" class="h-32 md:h-40 w-auto object-contain -mr-4 md:-mr-8 relative z-10" />
-          
           <span class="font-black text-4xl md:text-5xl tracking-tighter uppercase dark:text-white italic relative z-20">
             DuaLab <span class="text-emerald-500 not-italic text-lg md:text-xl ml-1">Studio Tool</span>
           </span>
-          
         </div>
-        
         <h1 class="text-5xl font-black tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-500 dark:from-white dark:to-slate-400">
           Factoría de Micro-Retos
         </h1>
         <p class="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto text-base leading-relaxed italic">
           Convierte problemas empresariales reales en retos educativos clasificados por el currículo oficial.
         </p>
-        
       </header>
 
       <div class="max-w-3xl mx-auto mb-16 relative">
@@ -320,15 +313,21 @@ const guardar = async () => {
       </div>
 
       <main class="min-h-[400px]">
-        
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div class="flex items-center gap-4 mb-8">
-                <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-500">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  </div>
+                  <h2 class="text-2xl font-black uppercase tracking-tight">Buscar en CRM DuaLab</h2>
                 </div>
-                <h2 class="text-2xl font-black uppercase tracking-tight">Buscar en CRM DuaLab</h2>
+                <button @click="limpiarFormulario" class="px-5 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full font-bold text-xs tracking-widest uppercase transition-colors flex items-center gap-2 border border-red-200 dark:border-red-800 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                  Limpiar / Añadir Nueva
+                </button>
               </div>
               
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -345,12 +344,7 @@ const guardar = async () => {
                   <div class="absolute inset-y-0 left-5 top-[28px] flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                   </div>
-                  <input 
-                    v-model="buscadorEmpresa" 
-                    @focus="mostrarDropdownEmpresas = true"
-                    class="input-style pl-14 text-lg border-emerald-200" 
-                    placeholder="Ej: Fundación Sergio Alonso..." 
-                  />
+                  <input v-model="buscadorEmpresa" @focus="mostrarDropdownEmpresas = true" class="input-style pl-14 text-lg border-emerald-200" placeholder="Ej: Fundación Sergio Alonso..." />
                   
                   <div v-if="mostrarDropdownEmpresas && empresasFiltradasBusqueda.length > 0" class="absolute w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl max-h-64 overflow-y-auto">
                     <button v-for="emp in empresasFiltradasBusqueda" :key="emp.id" @click="seleccionarEmpresa(emp)" class="w-full text-left px-6 py-4 border-b border-slate-100 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors last:border-0">
@@ -398,25 +392,11 @@ const guardar = async () => {
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
-                <div v-if="!seleccion.empresaId" class="absolute inset-0 bg-white/50 dark:bg-slate-900/50 z-10 rounded-2xl flex items-center justify-center backdrop-blur-[2px]">
-                  <span class="bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest shadow-xl">Busca una empresa arriba 👆</span>
-                </div>
-
-                <div class="col-span-2">
-                  <label class="label-style">Nombre Comercial *</label>
-                  <input v-model="seleccion.empresaNombre" class="input-style bg-slate-100 dark:bg-slate-800" readonly />
-                </div>
-
-                <div class="col-span-2 md:col-span-1">
-                  <label class="label-style text-blue-500">Colegio / Centro Educativo</label>
-                  <input v-model="seleccion.empresaCentro" class="input-style border-blue-200" placeholder="Ej: IES Ana Luisa de Benítez..." />
-                </div>
                 
                 <div>
                   <label class="label-style" :class="!seleccion.empresaSector && seleccion.empresaId ? 'text-red-500' : ''">Sector de Actividad *</label>
                   <input v-model="seleccion.empresaSector" class="input-style" :class="!seleccion.empresaSector && seleccion.empresaId ? 'border-red-500 bg-red-50 placeholder:text-red-300 focus:border-red-600 animate-pulse' : ''" placeholder="¡FALTA INFO! Rellénalo por favor..." />
                 </div>
-
                 <div>
                   <label class="label-style" :class="!seleccion.empresaTamano && seleccion.empresaId ? 'text-red-500' : ''">Tamaño de la Empresa *</label>
                   <select v-model="seleccion.empresaTamano" class="input-style" :class="!seleccion.empresaTamano && seleccion.empresaId ? 'border-red-500 bg-red-50 text-red-500 focus:border-red-600 animate-pulse' : ''">
@@ -427,7 +407,6 @@ const guardar = async () => {
                     <option value="Grande (+250)">Grande (Más de 250 empleados)</option>
                   </select>
                 </div>
-
                 <div class="col-span-2">
                   <label class="label-style">Web (Opcional)</label>
                   <input v-model="seleccion.empresaWeb" class="input-style" placeholder="https://..." />
@@ -440,9 +419,7 @@ const guardar = async () => {
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 2" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
              <section class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-              <div class="absolute top-0 right-0 bg-amber-500/10 text-amber-600 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-bl-3xl">
-                Entrevista de Diagnóstico
-              </div>
+              <div class="absolute top-0 right-0 bg-amber-500/10 text-amber-600 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-bl-3xl">Entrevista de Diagnóstico</div>
               <div class="flex items-center gap-4 mb-8">
                 <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-500">
                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
@@ -456,9 +433,7 @@ const guardar = async () => {
                 </div>
                 <div>
                   <h4 class="font-black text-blue-900 dark:text-blue-300 uppercase tracking-widest text-xs mb-2">Información Previa Detectada</h4>
-                  <p class="text-sm text-blue-700 dark:text-blue-400 leading-relaxed font-medium">
-                    Hemos recuperado las respuestas de una sesión anterior. Puedes mantenerlas para generar nuevas variantes del reto o editarlas si la situación ha cambiado.
-                  </p>
+                  <p class="text-sm text-blue-700 dark:text-blue-400 leading-relaxed font-medium">Hemos recuperado las respuestas de una sesión anterior. Puedes mantenerlas para generar nuevas variantes del reto o editarlas si la situación ha cambiado.</p>
                 </div>
               </div>
 
@@ -466,8 +441,7 @@ const guardar = async () => {
                 <div>
                   <div class="flex items-center gap-2 mb-3">
                     <label class="label-style !mb-0 text-slate-500 flex items-center gap-2">
-                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">1</span>
-                      ¿Qué ofrece su empresa y qué hace en su día a día?
+                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">1</span> ¿Qué ofrece su empresa y qué hace en su día a día?
                     </label>
                     <button @click="abrirPopup('info', 1)" class="text-slate-300 hover:text-blue-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 1)" class="text-slate-300 hover:text-amber-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
@@ -479,8 +453,7 @@ const guardar = async () => {
                   <div>
                     <div class="flex items-center gap-2 mb-3">
                       <label class="label-style !mb-0 text-slate-500 flex items-center gap-2">
-                        <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2</span>
-                        ¿Qué tarea da más trabajo del que debería?
+                        <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2</span> ¿Qué tarea da más trabajo del que debería?
                       </label>
                       <button @click="abrirPopup('info', 2)" class="text-slate-300 hover:text-blue-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                       <button @click="abrirPopup('ejemplo', 2)" class="text-slate-300 hover:text-amber-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
@@ -489,8 +462,7 @@ const guardar = async () => {
                   </div>
                   <div>
                     <label class="label-style text-slate-500 flex items-center gap-2 mb-3">
-                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2b</span>
-                      ¿Por qué? Cuéntanos qué ocurre hoy
+                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2b</span> ¿Por qué? Cuéntanos qué ocurre hoy
                     </label>
                     <textarea v-model="seleccion.friccionProblema" class="input-style h-24" placeholder="Se pierde mucho tiempo porque... hay errores cuando..."></textarea>
                   </div>
@@ -499,8 +471,7 @@ const guardar = async () => {
                 <div>
                   <div class="flex items-center gap-2 mb-4">
                     <label class="label-style !mb-0 text-slate-500 flex items-center gap-2">
-                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3</span>
-                      ¿Han probado solucionarlo? ¿Qué limitaciones tienen?
+                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3</span> ¿Han probado solucionarlo? ¿Qué limitaciones tienen?
                     </label>
                     <button @click="abrirPopup('info', 3)" class="text-slate-300 hover:text-blue-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 3)" class="text-slate-300 hover:text-amber-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
@@ -510,17 +481,14 @@ const guardar = async () => {
                     <button v-for="opt in limitacionesOpciones" :key="opt" 
                       @click="seleccion.restricciones.includes(opt) ? seleccion.restricciones = seleccion.restricciones.filter(c => c !== opt) : seleccion.restricciones.push(opt)"
                       :class="seleccion.restricciones.includes(opt) ? 'bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'"
-                      class="px-5 py-2.5 rounded-2xl border text-[10px] font-black uppercase transition-all">
-                      {{ opt }}
-                    </button>
+                      class="px-5 py-2.5 rounded-2xl border text-[10px] font-black uppercase transition-all">{{ opt }}</button>
                   </div>
                   <textarea v-model="seleccion.otraLimitacion" class="input-style h-20" placeholder="Describe aquí otros intentos de solución o detalles de las limitaciones..."></textarea>
                 </div>
 
                 <div>
                   <label class="label-style text-slate-500 flex items-center gap-2 mb-3">
-                    <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3b</span>
-                    ¿Qué NO quieren bajo ningún concepto?
+                    <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3b</span> ¿Qué NO quieren bajo ningún concepto?
                   </label>
                   <input v-model="seleccion.loQueNoQuieren" class="input-style" placeholder="Ej: Nada que requiera suscripción mensual..." />
                 </div>
@@ -528,8 +496,7 @@ const guardar = async () => {
                 <div>
                   <div class="flex items-center gap-2 mb-4">
                     <label class="label-style !mb-0 text-slate-500 flex items-center gap-2">
-                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">4</span>
-                      Si pudieran mejorar algo YA mismo...
+                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">4</span> Si pudieran mejorar algo YA mismo...
                     </label>
                     <button @click="abrirPopup('info', 4)" class="text-slate-300 hover:text-blue-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 4)" class="text-slate-300 hover:text-amber-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
@@ -539,9 +506,7 @@ const guardar = async () => {
                     <button v-for="opt in consecuenciasOpciones" :key="opt" 
                       @click="seleccion.consecuencias.includes(opt) ? seleccion.consecuencias = seleccion.consecuencias.filter(c => c !== opt) : seleccion.consecuencias.push(opt)"
                       :class="seleccion.consecuencias.includes(opt) ? 'bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'"
-                      class="px-5 py-2.5 rounded-2xl border text-[10px] font-black uppercase transition-all">
-                      {{ opt }}
-                    </button>
+                      class="px-5 py-2.5 rounded-2xl border text-[10px] font-black uppercase transition-all">{{ opt }}</button>
                   </div>
                   <input v-model="seleccion.otraConsecuencia" class="input-style" placeholder="Otra mejora específica (Opcional)..." />
                 </div>
@@ -549,15 +514,13 @@ const guardar = async () => {
                 <div class="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
                   <div class="flex items-center gap-2 mb-3">
                     <label class="label-style !mb-0 text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">5</span>
-                      Si tuvieras a un alumno aquí, ¿qué esperas que realice?
+                      <span class="bg-slate-200 text-slate-600 w-5 h-5 flex items-center justify-center rounded-full text-[10px]">5</span> Si tuvieras a un alumno aquí, ¿qué esperas que realice?
                     </label>
                     <button @click="abrirPopup('info', 5)" class="text-slate-300 hover:text-blue-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 5)" class="text-slate-300 hover:text-amber-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
                   <textarea v-model="seleccion.expectativasAlumno" class="input-style h-24" placeholder="Ej: Que investigue herramientas gratuitas y proponga un prototipo sencillo..."></textarea>
                 </div>
-
               </div>
             </section>
           </div>
@@ -570,9 +533,7 @@ const guardar = async () => {
                 <div class="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500">
                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                 </div>
-                <div>
-                  <h2 class="text-2xl font-black uppercase tracking-tight">Match Académico</h2>
-                </div>
+                <div><h2 class="text-2xl font-black uppercase tracking-tight">Match Académico</h2></div>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -595,19 +556,13 @@ const guardar = async () => {
 
                 <div class="col-span-2 mt-4">
                   <label class="label-style !mb-4">Ciclo Formativo Implicado *</label>
-                  
                   <div v-if="ciclos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                     <button v-for="c in ciclos" :key="c.id" 
-                        @click="seleccion.cicloId = c.id"
-                        :class="seleccion.cicloId === c.id 
-                            ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' 
-                            : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-200 hover:border-emerald-300'"
+                     <button v-for="c in ciclos" :key="c.id" @click="seleccion.cicloId = c.id"
+                        :class="seleccion.cicloId === c.id ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-200 hover:border-emerald-300'"
                         class="text-left px-5 py-4 rounded-2xl border-2 transition-all duration-200 flex items-center gap-3 relative overflow-hidden group">
-                        
                         <div class="shrink-0 transition-transform" :class="seleccion.cicloId === c.id ? 'scale-100' : 'scale-0 opacity-0'">
                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                         </div>
-                        
                         <div class="flex-1" :class="seleccion.cicloId !== c.id && 'pl-2'">
                             <span class="text-sm font-bold leading-tight">{{ c.nombre }}</span>
                         </div>
@@ -621,16 +576,8 @@ const guardar = async () => {
                 <div class="col-span-2 mt-6">
                   <label class="label-style !mb-3">Curso del Alumnado *</label>
                   <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-full md:w-1/2">
-                    <button @click="seleccion.cursoSeleccionado = 1" 
-                      :class="seleccion.cursoSeleccionado === 1 ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-black' : 'text-slate-500'" 
-                      class="flex-1 py-3 rounded-xl text-sm transition-all">
-                      1º Curso
-                    </button>
-                    <button @click="seleccion.cursoSeleccionado = 2" 
-                      :class="seleccion.cursoSeleccionado === 2 ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-black' : 'text-slate-500'" 
-                      class="flex-1 py-3 rounded-xl text-sm transition-all">
-                      2º Curso
-                    </button>
+                    <button @click="seleccion.cursoSeleccionado = 1" :class="seleccion.cursoSeleccionado === 1 ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-black' : 'text-slate-500'" class="flex-1 py-3 rounded-xl text-sm transition-all">1º Curso</button>
+                    <button @click="seleccion.cursoSeleccionado = 2" :class="seleccion.cursoSeleccionado === 2 ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 font-black' : 'text-slate-500'" class="flex-1 py-3 rounded-xl text-sm transition-all">2º Curso</button>
                   </div>
                 </div>
 
@@ -640,14 +587,12 @@ const guardar = async () => {
                       <label class="label-style text-blue-600 !mb-0 !ml-0">Forzar Módulo Específico (Opcional)</label>
                       <span class="text-xs text-slate-400 italic">Si no eliges, la IA cruzará con todos.</span>
                     </div>
-                    
                     <select v-model="modulosSeleccionados" multiple :disabled="modulosDelCurso.length === 0" class="input-style border-white shadow-sm min-h-[120px]">
                       <option v-for="m in modulosDelCurso" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                     </select>
                     <p v-if="modulosDelCurso.length === 0 && seleccion.cicloId" class="text-xs text-red-400 mt-2 italic">No hay módulos cargados para este curso.</p>
                   </div>
                 </div>
-
               </div>
             </section>
           </div>
@@ -656,21 +601,18 @@ const guardar = async () => {
       </main>
 
       <div class="mt-16 flex flex-col items-center gap-6">
-        
-        <div v-if="pasoActual === totalPasos && seleccion.empresaId && !crmActualizado" class="bg-amber-50 border border-amber-200 shadow-md rounded-2xl p-5 flex items-start md:items-center gap-4 w-full max-w-4xl animate-in slide-in-from-bottom-2">
+        <div v-if="pasoActual === totalPasos && !crmActualizado" class="bg-amber-50 border border-amber-200 shadow-md rounded-2xl p-5 flex items-start md:items-center gap-4 w-full max-w-4xl animate-in slide-in-from-bottom-2">
           <div class="bg-amber-100 text-amber-600 p-2 rounded-full shrink-0">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
           <div class="flex-1">
             <h4 class="text-amber-800 font-black text-sm uppercase tracking-widest mb-1">¡No pierdas tu trabajo!</h4>
-            <p class="text-amber-700 text-sm font-medium">Si has modificado el Sector, el Tamaño o el contexto del Problema, haz clic en <strong class="font-black text-amber-900">Actualizar Empresa</strong> antes de generar el reto para guardarlo en la base de datos.</p>
+            <p class="text-amber-700 text-sm font-medium">Si has añadido o modificado la información (Sector, Tamaño, Problema), haz clic en el botón de guardar para enviarla a la base de datos antes de generar el reto.</p>
           </div>
         </div>
 
         <div class="flex flex-wrap md:flex-nowrap gap-4 w-full max-w-4xl">
-          <button v-if="pasoActual > 1" @click="retrocederPaso" class="flex-1 min-w-[150px] px-10 py-6 bg-slate-200 dark:bg-slate-800 rounded-full font-black text-xs tracking-widest transition-all hover:bg-slate-300 active:scale-95">
-            VOLVER
-          </button>
+          <button v-if="pasoActual > 1" @click="retrocederPaso" class="flex-1 min-w-[150px] px-10 py-6 bg-slate-200 dark:bg-slate-800 rounded-full font-black text-xs tracking-widest transition-all hover:bg-slate-300 active:scale-95">VOLVER</button>
           
           <button v-if="pasoActual < totalPasos" @click="avanzarPaso" 
             :disabled="(pasoActual === 1 && !paso1Valido) || (pasoActual === 2 && !paso2Valido)"
@@ -681,27 +623,16 @@ const guardar = async () => {
           <button v-if="pasoActual === totalPasos" @click="guardarInfoEmpresa" :disabled="actualizandoCRM || crmActualizado"
             class="flex-1 min-w-[200px] px-6 py-6 border-2 border-slate-300 text-slate-700 bg-white rounded-full font-black text-xs tracking-widest transition-all hover:bg-slate-50 active:scale-95 flex items-center justify-center gap-2"
             :class="crmActualizado ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : ''">
-            <template v-if="actualizandoCRM">
-              <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg>
-              GUARDANDO...
-            </template>
-            <template v-else-if="crmActualizado">
-              <span class="text-emerald-600 flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                INFO GUARDADA
-              </span>
-            </template>
-            <template v-else>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-              ACTUALIZAR EMPRESA
-            </template>
+            <template v-if="actualizandoCRM"><svg class="animate-spin w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg> GUARDANDO...</template>
+            <template v-else-if="crmActualizado"><span class="text-emerald-600 flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg> INFO GUARDADA</span></template>
+            <template v-else><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> {{ seleccion.empresaId ? 'ACTUALIZAR INFORMACIÓN' : 'GUARDAR INFORMACIÓN' }}</template>
           </button>
 
           <button v-if="pasoActual === totalPasos" @click="generarReto" :disabled="!paso3Valido || cargando"
             class="flex-[2] min-w-[250px] px-8 py-6 bg-emerald-600 text-white rounded-full font-black text-lg shadow-[0_20px_50px_rgba(16,185,129,0.3)] hover:shadow-[0_25px_60px_rgba(16,185,129,0.5)] transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-30 flex items-center justify-center gap-3">
             <template v-if="!cargando">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-              <span class="uppercase tracking-wide">Procesar con IA</span>
+              <span class="uppercase tracking-wide">{{ microretosGenerados.length > 0 ? 'Generar Otra Variante' : 'Procesar con IA' }}</span>
             </template>
             <template v-else>
               <div class="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -711,37 +642,46 @@ const guardar = async () => {
         </div>
       </div>
 
-      <transition name="fade-up">
-        <div v-if="microretoGenerado" class="mt-24 pb-20 space-y-8 font-sans">
+      <div v-if="microretosGenerados.length > 0" class="mt-24 pb-20 space-y-32 font-sans">
+        
+        <div v-for="(reto, index) in microretosGenerados" :key="index" class="relative animate-in slide-in-from-bottom-8 duration-700">
           
-          <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div v-if="index > 0" class="absolute -top-16 left-0 w-full flex items-center justify-center">
+            <div class="w-full h-0.5 bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700 to-transparent"></div>
+            <span class="absolute px-6 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
+              Variante #{{ index + 1 }}
+            </span>
+          </div>
+
+          <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
             <div>
-              <h3 class="text-lg font-black text-slate-800">Previsualización de la Ficha Técnica</h3>
+              <h3 class="text-lg font-black text-slate-800">Previsualización de la Ficha Técnica #{{ index + 1 }}</h3>
               <p class="text-sm text-slate-500">Formato oficial de archivo.</p>
             </div>
-            <button @click="guardar" :disabled="guardadoExitoso" class="btn-save" :class="guardadoExitoso ? 'bg-emerald-600' : ''">
-              {{ guardadoExitoso ? '✓ PUBLICADO EN BD' : 'GUARDAR EN BIBLIOTECA' }}
+            <button @click="guardar(index)" :disabled="reto._ui_guardado || reto._ui_guardando" class="btn-save" :class="reto._ui_guardado ? 'bg-emerald-600' : ''">
+              <span v-if="reto._ui_guardando">GUARDANDO...</span>
+              <span v-else-if="reto._ui_guardado">✓ PUBLICADO EN BD</span>
+              <span v-else>GUARDAR ESTA VERSIÓN</span>
             </button>
           </div>
           
           <div class="bg-white rounded-xl shadow-2xl mx-auto max-w-5xl overflow-hidden border border-slate-200">
-            
             <div class="bg-slate-50 border-b border-slate-200 p-10 md:px-16 pt-12">
               <p class="text-slate-500 font-bold text-[10px] tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 DuaLab · Ficha de Microreto
               </p>
               <h1 class="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-2">
-                {{ microretoGenerado.titulo }}
+                {{ reto.titulo }}
               </h1>
               <h2 class="text-lg md:text-xl text-slate-500 font-medium leading-relaxed mb-8">
-                {{ microretoGenerado.subtitulo }}
+                {{ reto.subtitulo }}
               </h2>
               
               <div class="flex flex-wrap gap-3">
                 <span class="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-wider">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                  {{ microretoGenerado.empresa_nombre }}
+                  {{ reto.empresa_nombre }}
                 </span>
                 <span class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-md text-xs font-bold uppercase tracking-wider">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -755,21 +695,20 @@ const guardar = async () => {
             </div>
 
             <div class="p-10 md:p-16 space-y-12">
-              
               <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div>
                   <h3 class="flex items-center gap-2 text-slate-800 font-bold uppercase text-xs tracking-widest border-b border-slate-200 pb-2 mb-4">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
-                    ¿Quién es {{ microretoGenerado.empresa_nombre }}?
+                    ¿Quién es {{ reto.empresa_nombre }}?
                   </h3>
-                  <p class="text-slate-600 text-sm leading-relaxed">{{ microretoGenerado.quien_es }}</p>
+                  <p class="text-slate-600 text-sm leading-relaxed">{{ reto.quien_es }}</p>
                 </div>
                 <div>
                   <h3 class="flex items-center gap-2 text-slate-800 font-bold uppercase text-xs tracking-widest border-b border-slate-200 pb-2 mb-4">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Su día a día
                   </h3>
-                  <p class="text-slate-600 text-sm leading-relaxed">{{ microretoGenerado.dia_a_dia }}</p>
+                  <p class="text-slate-600 text-sm leading-relaxed">{{ reto.dia_a_dia }}</p>
                 </div>
               </div>
 
@@ -779,20 +718,15 @@ const guardar = async () => {
                   Dificultades
                 </h3>
                 <ul class="space-y-2 pl-2">
-                  <li v-for="(item, i) in microretoGenerado.dificultades" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
-                    <span class="text-amber-500 font-black mt-0.5">•</span>
-                    <span>{{ item }}</span>
+                  <li v-for="(item, i) in reto.dificultades" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
+                    <span class="text-amber-500 font-black mt-0.5">•</span><span>{{ item }}</span>
                   </li>
                 </ul>
               </div>
 
               <div class="bg-slate-50 border-l-4 border-emerald-500 p-8 rounded-r-xl">
-                <h3 class="text-emerald-600 font-black uppercase text-[10px] tracking-[0.2em] mb-2 flex items-center gap-2">
-                  Pregunta del Reto
-                </h3>
-                <p class="text-xl md:text-2xl font-bold text-slate-900 leading-snug">
-                  {{ microretoGenerado.pregunta_reto }}
-                </p>
+                <h3 class="text-emerald-600 font-black uppercase text-[10px] tracking-[0.2em] mb-2 flex items-center gap-2">Pregunta del Reto</h3>
+                <p class="text-xl md:text-2xl font-bold text-slate-900 leading-snug">{{ reto.pregunta_reto }}</p>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -802,9 +736,8 @@ const guardar = async () => {
                     Qué necesitan
                   </h3>
                   <ul class="space-y-2 pl-2">
-                    <li v-for="(item, i) in microretoGenerado.que_necesitan" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
-                      <span class="text-emerald-500 font-black mt-0.5">•</span>
-                      <span>{{ item }}</span>
+                    <li v-for="(item, i) in reto.que_necesitan" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
+                      <span class="text-emerald-500 font-black mt-0.5">•</span><span>{{ item }}</span>
                     </li>
                   </ul>
                 </div>
@@ -814,9 +747,8 @@ const guardar = async () => {
                     Limitaciones
                   </h3>
                   <ul class="space-y-2 pl-2">
-                    <li v-for="(item, i) in microretoGenerado.limitaciones" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
-                      <span class="text-red-500 font-black mt-0.5">•</span>
-                      <span>{{ item }}</span>
+                    <li v-for="(item, i) in reto.limitaciones" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
+                      <span class="text-red-500 font-black mt-0.5">•</span><span>{{ item }}</span>
                     </li>
                   </ul>
                 </div>
@@ -829,9 +761,8 @@ const guardar = async () => {
                     Ejemplos de Prototipos
                   </h3>
                   <ul class="space-y-2 pl-2">
-                    <li v-for="(item, i) in microretoGenerado.prototipos" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
-                      <span class="text-blue-500 font-black mt-0.5">•</span>
-                      <span>{{ item }}</span>
+                    <li v-for="(item, i) in reto.prototipos" :key="i" class="flex items-start gap-3 text-sm text-slate-600">
+                      <span class="text-blue-500 font-black mt-0.5">•</span><span>{{ item }}</span>
                     </li>
                   </ul>
                 </div>
@@ -841,9 +772,7 @@ const guardar = async () => {
                     ODS Sugeridos
                   </h3>
                   <ul class="space-y-2 pl-2">
-                    <li v-for="ods in microretoGenerado.ods_sugeridos" :key="ods" class="text-sm font-semibold text-slate-700">
-                      {{ ods }}
-                    </li>
+                    <li v-for="ods in reto.ods_sugeridos" :key="ods" class="text-sm font-semibold text-slate-700">{{ ods }}</li>
                   </ul>
                 </div>
               </div>
@@ -855,19 +784,15 @@ const guardar = async () => {
                 </h3>
                 
                 <div class="space-y-6">
-                  <div v-for="evalObj in microretoGenerado.evaluacion_oficial" :key="evalObj.modulo" class="bg-white border border-slate-200 p-6 rounded-xl">
+                  <div v-for="evalObj in reto.evaluacion_oficial" :key="evalObj.modulo" class="bg-white border border-slate-200 p-6 rounded-xl">
                     <p class="text-xs uppercase font-bold text-slate-400 mb-1">Módulo</p>
                     <p class="font-black text-slate-800 text-lg mb-4">{{ evalObj.modulo }}</p>
-                    
                     <div class="mb-4">
                       <p class="text-xs uppercase font-bold text-emerald-600 mb-1 flex items-center gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/></svg> Resultado de Aprendizaje
                       </p>
-                      <p class="text-sm font-semibold text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        {{ evalObj.ra }}
-                      </p>
+                      <p class="text-sm font-semibold text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">{{ evalObj.ra }}</p>
                     </div>
-
                     <div class="mb-4">
                       <p class="text-xs uppercase font-bold text-slate-500 mb-2">Criterios de Evaluación:</p>
                       <ul class="space-y-2">
@@ -876,39 +801,30 @@ const guardar = async () => {
                         </li>
                       </ul>
                     </div>
-
                     <div class="mt-4 pt-4 border-t border-slate-100">
-                      <p class="text-sm text-slate-500 italic">
-                        <span class="font-bold not-italic text-slate-700">Aplicación:</span> {{ evalObj.aplicacion }}
-                      </p>
+                      <p class="text-sm text-slate-500 italic"><span class="font-bold not-italic text-slate-700">Aplicación:</span> {{ evalObj.aplicacion }}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div v-if="microretoGenerado.variantes && microretoGenerado.variantes.length > 0">
+              <div v-if="reto.variantes && reto.variantes.length > 0">
                 <h3 class="flex items-center gap-2 text-slate-800 font-bold uppercase text-xs tracking-widest border-b border-slate-200 pb-2 mb-4">
                   <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                   Variantes
                 </h3>
                 <ul class="space-y-3">
-                  <li v-for="(varItem, i) in microretoGenerado.variantes" :key="i" class="text-sm text-slate-600 bg-purple-50 border border-purple-100 p-4 rounded-lg">
-                    <strong v-if="varItem.includes(':')" class="text-purple-800 block mb-1">
-                      {{ varItem.split(':')[0] }}
-                    </strong>
+                  <li v-for="(varItem, i) in reto.variantes" :key="i" class="text-sm text-slate-600 bg-purple-50 border border-purple-100 p-4 rounded-lg">
+                    <strong v-if="varItem.includes(':')" class="text-purple-800 block mb-1">{{ varItem.split(':')[0] }}</strong>
                     <span>{{ varItem.includes(':') ? varItem.substring(varItem.indexOf(':') + 1).trim() : varItem }}</span>
                   </li>
                 </ul>
               </div>
-
             </div>
           </div> 
           
           <div class="bg-slate-900 text-slate-200 p-10 md:p-16 rounded-xl shadow-2xl mx-auto max-w-5xl border border-slate-800 relative mt-16">
-            <div class="absolute top-0 right-0 bg-slate-800 text-slate-300 px-6 py-2 font-bold text-xs tracking-widest uppercase rounded-bl-xl border-b border-l border-slate-700">
-              Uso Exclusivo Docente
-            </div>
-            
+            <div class="absolute top-0 right-0 bg-slate-800 text-slate-300 px-6 py-2 font-bold text-xs tracking-widest uppercase rounded-bl-xl border-b border-l border-slate-700">Uso Exclusivo Docente</div>
             <h2 class="text-2xl font-black text-white mb-2 mt-2 flex items-center gap-3">
               <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
               Guía de Implementación
@@ -916,7 +832,7 @@ const guardar = async () => {
             <p class="text-slate-400 text-sm mb-12">Recomendaciones pedagógicas para dinamizar el reto.</p>
             
             <div class="grid grid-cols-1 gap-6">
-              <div v-for="(tip, i) in microretoGenerado.tips_profesorado" :key="i" class="bg-slate-800/50 p-6 rounded-lg border border-slate-700/50">
+              <div v-for="(tip, i) in reto.tips_profesorado" :key="i" class="bg-slate-800/50 p-6 rounded-lg border border-slate-700/50">
                 <div class="text-sm text-slate-300 leading-relaxed">
                   <strong v-if="tip.includes(':')" class="text-amber-400 block mb-2 uppercase tracking-wider text-xs">
                     <svg class="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -925,17 +841,13 @@ const guardar = async () => {
                     </svg>
                     {{ tip.split(':')[0] }}
                   </strong>
-                  <span class="block text-slate-400">
-                    {{ tip.includes(':') ? tip.substring(tip.indexOf(':') + 1).trim() : tip }}
-                  </span>
+                  <span class="block text-slate-400">{{ tip.includes(':') ? tip.substring(tip.indexOf(':') + 1).trim() : tip }}</span>
                 </div>
               </div>
             </div>
-            
           </div>
-
         </div>
-      </transition>
+      </div>
 
       <transition name="fade">
         <div v-if="popupActivo" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="cerrarPopup">
@@ -967,7 +879,7 @@ const guardar = async () => {
   @apply text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-6 mb-3 block;
 }
 .btn-save {
-  @apply px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95;
+  @apply px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:opacity-80;
 }
 
 .fade-enter-active, .fade-leave-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }

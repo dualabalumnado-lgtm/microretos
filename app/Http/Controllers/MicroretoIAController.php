@@ -18,11 +18,11 @@ class MicroretoIAController extends Controller
             'ciclo_nombre' => 'required|string',
             'ciclo_id' => 'required',
             'nivelGrupo' => 'required|string',
-            'cursoSeleccionado' => 'required|integer', // NUEVO: Validamos que llegue el curso
+            'cursoSeleccionado' => 'required|integer',
             'modulo_id' => 'nullable|array'
         ]);
 
-        // Convertimos las consecuencias (Pregunta 4) en texto para el contexto
+        // Convertimos las consecuencias en texto para el contexto
         $consecuencias = implode(", ", $request->consecuencias ?? []);
         
         // 1. Obtener currículo de los módulos seleccionados (o del curso del ciclo)
@@ -31,7 +31,6 @@ class MicroretoIAController extends Controller
         if ($request->filled('modulo_id') && is_array($request->modulo_id) && count($request->modulo_id) > 0) {
             $query->whereIn('id', $request->modulo_id);
         } else {
-            // NUEVO: Si la IA decide, le pasamos solo los módulos del curso seleccionado
             $query->where('idcicloformativo', $request->ciclo_id)
                   ->where('curso', $request->cursoSeleccionado);
         }
@@ -49,12 +48,11 @@ class MicroretoIAController extends Controller
         }
         $curriculumTexto .= "\n--- FIN CURRÍCULO ---";
 
-        // NUEVO: Añadimos el contexto del curso a las reglas
         $esBasica = ($request->nivelGrupo === 'Básico');
         $reglaExtra = $esBasica ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado." : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
         $reglaExtra .= " TEN EN CUENTA QUE ES PARA ALUMNADO DE {$request->cursoSeleccionado}º CURSO. Adapta el prototipo a sus conocimientos.";
 
-        // 2. Construcción del Contexto de la Entrevista (Paso 2 enriquecido)
+        // 2. Construcción del Contexto de la Entrevista
         $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector}). ";
         if ($request->filled('empresaTamano')) $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
         if ($request->filled('empresaUbicacion')) $contextoEmpresa .= "Ubicación: {$request->empresaUbicacion}. ";
@@ -64,13 +62,18 @@ class MicroretoIAController extends Controller
         $contextoFriccion .= "DETALLE DEL PROBLEMA (P2b): {$request->friccionProblema}\n";
         $contextoFriccion .= "OBJETIVOS DE MEJORA / CONSECUENCIAS (P4): {$consecuencias}\n";
 
-        // Añadimos la Pregunta 5 (Expectativa) si existe
         if ($request->filled('expectativasAlumno')) {
             $contextoFriccion .= "EXPECTATIVA DE LO QUE DEBE HACER EL ALUMNO (P5): {$request->expectativasAlumno}\n";
         }
 
-        $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y ciclos formativos. 
-        Tu objetivo es redactar un documento técnico, atractivo, formal y corporativo. No uses lenguaje robótico ni emojis.";
+        // ======================================================================
+        // NUEVOS PROMPTS OPTIMIZADOS PARA VARIEDAD (Estilo Lovable)
+        // ======================================================================
+        $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y metodologías ágiles (Design Thinking).
+        REGLAS ESTRICTAS:
+        1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar (maqueta, guion, flujo de trabajo, mockup de app, plano físico) pero NUNCA dictar la solución final. El alumno debe idearla.
+        2. Genera EXACTAMENTE 3 microretos totalmente distintos entre sí para la misma empresa. Si uno es tecnológico, haz otro organizativo/procesos y otro centrado en el cliente/espacio físico.
+        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto de entre los proporcionados.";
 
         $userPrompt = "
         {$contextoEmpresa}
@@ -82,39 +85,43 @@ class MicroretoIAController extends Controller
         {$curriculumTexto}
         {$reglaExtra}
 
-        Basándote estrictamente en los módulos del currículo proporcionado y en la EXPECTATIVA de la empresa (P5), DEVUELVE ESTE JSON EXACTO:
+        Basándote estrictamente en los módulos del currículo proporcionado, DEVUELVE ESTE JSON EXACTO CON UN ARRAY DE 3 MICRORETOS:
         {
-            \"titulo\": \"Título corto y directo del reto\",
-            \"subtitulo\": \"Descripción de 1 línea de lo que se va a desarrollar\",
-            \"empresa_nombre\": \"{$request->empresaNombre}\",
-            \"quien_es\": \"1-2 frases sobre la actividad de la empresa basándote en su sector y operativa.\",
-            \"dia_a_dia\": \"1 frase clara sobre cómo operan y dónde falla el proceso actualmente.\",
-            \"dificultades\": [\"Fallo 1\", \"Fallo 2\"],
-            \"pregunta_reto\": \"Formula el desafío técnico en forma de pregunta directa empezando por ¿Cómo podríamos...?\",
-            \"que_necesitan\": [\"Necesidad 1\", \"Necesidad 2\"],
-            \"limitaciones\": [\"Restricción 1\", \"Restricción 2\"],
-            \"prototipos\": [\"Entregable concreto 1\", \"Entregable concreto 2\"],
-            \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\", \"ODS Y: Nombre completo del ODS\"],
-            \"evaluacion_oficial\": [
+            \"microretos\": [
                 {
-                    \"modulo\": \"Nombre exacto del Módulo 1\",
-                    \"ra\": \"Texto del RA asociado\",
-                    \"ce\": [\"Texto CE 1\", \"Texto CE 2\"],
-                    \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje en la resolución del problema de la empresa.\"
-                },
-                {
-                    \"modulo\": \"Nombre exacto del Módulo 2 (OBLIGATORIO: Incluye siempre al menos 2 módulos para que el reto sea transversal)\",
-                    \"ra\": \"Texto del RA asociado\",
-                    \"ce\": [\"Texto CE 1\"],
-                    \"aplicacion\": \"Breve frase explicando la utilidad práctica aquí.\"
+                    \"titulo\": \"Título corto y directo del reto\",
+                    \"subtitulo\": \"Descripción de 1 línea del desafío (sin revelar la solución)\",
+                    \"empresa_nombre\": \"{$request->empresaNombre}\",
+                    \"quien_es\": \"1-2 frases sobre la actividad de la empresa basándote en su sector y operativa.\",
+                    \"dia_a_dia\": \"1 frase clara sobre cómo operan y dónde falla el proceso actualmente.\",
+                    \"dificultades\": [\"Fallo 1\", \"Fallo 2\"],
+                    \"pregunta_reto\": \"Formula el desafío en forma de pregunta abierta empezando por ¿Cómo podríamos...?\",
+                    \"que_necesitan\": [\"Necesidad 1\", \"Necesidad 2\"],
+                    \"limitaciones\": [\"Restricción 1\", \"Restricción 2\"],
+                    \"prototipos\": [\"Entregable concreto 1 (ej: Diagrama de flujo)\", \"Entregable concreto 2 (ej: Guion de entrevista)\"],
+                    \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\", \"ODS Y: Nombre completo del ODS\"],
+                    \"evaluacion_oficial\": [
+                        {
+                            \"modulo\": \"Nombre exacto del Módulo 1\",
+                            \"ra\": \"Texto del RA asociado\",
+                            \"ce\": [\"Texto CE 1\", \"Texto CE 2\"],
+                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje en la resolución del problema de la empresa.\"
+                        },
+                        {
+                            \"modulo\": \"Nombre exacto del Módulo 2 (OBLIGATORIO: Incluye siempre al menos 2 módulos para que el reto sea transversal)\",
+                            \"ra\": \"Texto del RA asociado\",
+                            \"ce\": [\"Texto CE 1\"],
+                            \"aplicacion\": \"Breve frase explicando la utilidad práctica aquí.\"
+                        }
+                    ],
+                    \"variantes\": [
+                        \"Nombre de la Variante: Descripción de una modificación del reto para adaptarlo a otros escenarios.\"
+                    ],
+                    \"tips_profesorado\": [
+                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles para organizar al alumnado].\",
+                        \"Prevención de Bloqueos: [Explicación de dónde se atascarán técnicamente y cómo guiarles].\"
+                    ]
                 }
-            ],
-            \"variantes\": [
-                \"Nombre de la Variante: Descripción de una modificación del reto para adaptarlo a otros escenarios.\"
-            ],
-            \"tips_profesorado\": [
-                \"Gestión de Aula: [Instrucciones sobre dinámicas o roles para organizar al alumnado].\",
-                \"Prevención de Bloqueos: [Explicación de dónde se atascarán técnicamente y cómo guiarles].\"
             ]
         }";
 
@@ -127,7 +134,7 @@ class MicroretoIAController extends Controller
                     ["role" => "user", "content" => $userPrompt]
                 ],
                 "response_format" => ["type" => "json_object"],
-                "temperature" => 0.7
+                "temperature" => 0.9 // Alta temperatura para mayor creatividad
             ]);
 
         if ($response->successful()) {
