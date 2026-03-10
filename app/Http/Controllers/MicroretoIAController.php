@@ -9,6 +9,41 @@ use App\Models\Modulo;
 
 class MicroretoIAController extends Controller
 {
+
+    public function index()
+    {
+        // 1. Obtenemos todos los microretos usando Eloquent (para que respete los arrays de tu modelo)
+        $microretos = \App\Models\Microreto::all();
+
+        // 2. Mapeamos cada microreto para inyectarle el Centro y la Familia
+        $microretos->map(function ($reto) {
+            
+            // Buscamos la empresa vinculada a este reto
+            $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
+            
+            if ($empresa) {
+                // Si la empresa existe, le pasamos el centro
+                $reto->centro_educativo = $empresa->centro_educativo;
+                
+                // Buscamos la familia en la tabla pivote
+                $familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
+                    ->where('empresa_id', $empresa->id)
+                    ->value('familia');
+                    
+                $reto->familia = $familia;
+            } else {
+                // Valores por defecto si por algún motivo la empresa fue borrada o no coincide
+                $reto->centro_educativo = 'Centro Desconocido';
+                $reto->familia = 'Familia Desconocida';
+            }
+
+            return $reto;
+        });
+
+        // 3. Devolvemos el JSON listo y vitaminado para tu frontend en Vue
+        return response()->json($microretos);
+    }
+
     public function generar(Request $request)
     {
         $request->validate([
@@ -19,13 +54,12 @@ class MicroretoIAController extends Controller
             'ciclo_id' => 'required',
             'nivelGrupo' => 'required|string',
             'cursoSeleccionado' => 'required|integer',
-            'modulo_id' => 'nullable|array'
+            'modulo_id' => 'nullable|array',
+            'cantidad' => 'required|integer|min:1|max:15' // ¡NUEVO! Validamos la cantidad
         ]);
 
-        // Convertimos las consecuencias en texto para el contexto
         $consecuencias = implode(", ", $request->consecuencias ?? []);
         
-        // 1. Obtener currículo de los módulos seleccionados (o del curso del ciclo)
         $query = Modulo::with(['ras.criteriosEvaluacion']);
         
         if ($request->filled('modulo_id') && is_array($request->modulo_id) && count($request->modulo_id) > 0) {
@@ -52,7 +86,6 @@ class MicroretoIAController extends Controller
         $reglaExtra = $esBasica ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado." : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
         $reglaExtra .= " TEN EN CUENTA QUE ES PARA ALUMNADO DE {$request->cursoSeleccionado}º CURSO. Adapta el prototipo a sus conocimientos.";
 
-        // 2. Construcción del Contexto de la Entrevista
         $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector}). ";
         if ($request->filled('empresaTamano')) $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
         if ($request->filled('empresaUbicacion')) $contextoEmpresa .= "Ubicación: {$request->empresaUbicacion}. ";
@@ -67,13 +100,13 @@ class MicroretoIAController extends Controller
         }
 
         // ======================================================================
-        // NUEVOS PROMPTS OPTIMIZADOS PARA VARIEDAD (Estilo Lovable)
+        // PROMPT OPTIMIZADO PARA ACEPTAR CANTIDAD DINÁMICA
         // ======================================================================
         $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y metodologías ágiles (Design Thinking).
         REGLAS ESTRICTAS:
-        1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar (maqueta, guion, flujo de trabajo, mockup de app, plano físico) pero NUNCA dictar la solución final. El alumno debe idearla.
-        2. Genera EXACTAMENTE 3 microretos totalmente distintos entre sí para la misma empresa. Si uno es tecnológico, haz otro organizativo/procesos y otro centrado en el cliente/espacio físico.
-        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto de entre los proporcionados.";
+        1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar. El alumno debe idear la solución final.
+        2. Genera EXACTAMENTE {$request->cantidad} microreto(s) totalmente distintos entre sí para la misma empresa.
+        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto.";
 
         $userPrompt = "
         {$contextoEmpresa}
@@ -85,7 +118,7 @@ class MicroretoIAController extends Controller
         {$curriculumTexto}
         {$reglaExtra}
 
-        Basándote estrictamente en los módulos del currículo proporcionado, DEVUELVE ESTE JSON EXACTO CON UN ARRAY DE 3 MICRORETOS:
+        Basándote en los módulos del currículo, DEVUELVE ESTE JSON EXACTO CON UN ARRAY DE EXACTAMENTE {$request->cantidad} MICRORETO(S):
         {
             \"microretos\": [
                 {
@@ -99,34 +132,27 @@ class MicroretoIAController extends Controller
                     \"que_necesitan\": [\"Necesidad 1\", \"Necesidad 2\"],
                     \"limitaciones\": [\"Restricción 1\", \"Restricción 2\"],
                     \"prototipos\": [\"Entregable concreto 1 (ej: Diagrama de flujo)\", \"Entregable concreto 2 (ej: Guion de entrevista)\"],
-                    \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\", \"ODS Y: Nombre completo del ODS\"],
+                    \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\"],
                     \"evaluacion_oficial\": [
                         {
                             \"modulo\": \"Nombre exacto del Módulo 1\",
                             \"ra\": \"Texto del RA asociado\",
-                            \"ce\": [\"Texto CE 1\", \"Texto CE 2\"],
-                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje en la resolución del problema de la empresa.\"
-                        },
-                        {
-                            \"modulo\": \"Nombre exacto del Módulo 2 (OBLIGATORIO: Incluye siempre al menos 2 módulos para que el reto sea transversal)\",
-                            \"ra\": \"Texto del RA asociado\",
                             \"ce\": [\"Texto CE 1\"],
-                            \"aplicacion\": \"Breve frase explicando la utilidad práctica aquí.\"
+                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje.\"
                         }
                     ],
                     \"variantes\": [
-                        \"Nombre de la Variante: Descripción de una modificación del reto para adaptarlo a otros escenarios.\"
+                        \"Nombre de la Variante: Descripción de una modificación del reto.\"
                     ],
                     \"tips_profesorado\": [
-                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles para organizar al alumnado].\",
-                        \"Prevención de Bloqueos: [Explicación de dónde se atascarán técnicamente y cómo guiarles].\"
+                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles].\"
                     ]
                 }
             ]
         }";
 
         $response = Http::withToken(env('OPENAI_API_KEY'))
-            ->timeout(90)
+            ->timeout(120) // He subido el timeout a 120s porque si le pides 15 retos, tardará más en generar
             ->post("https://api.openai.com/v1/chat/completions", [
                 "model" => "gpt-4o",
                 "messages" => [
@@ -134,7 +160,7 @@ class MicroretoIAController extends Controller
                     ["role" => "user", "content" => $userPrompt]
                 ],
                 "response_format" => ["type" => "json_object"],
-                "temperature" => 0.9 // Alta temperatura para mayor creatividad
+                "temperature" => 0.9
             ]);
 
         if ($response->successful()) {
@@ -144,20 +170,32 @@ class MicroretoIAController extends Controller
         return response()->json(['error' => 'Error al contactar con la IA'], 500);
     }
 
+    // Guarda UN SOLO reto
     public function guardarEnBD(Request $request)
     {
         try {
             $microreto = Microreto::create($request->all());
-
-            return response()->json([
-                'mensaje' => 'Micro-reto archivado en la biblioteca con éxito',
-                'reto' => $microreto
-            ], 201);
-            
+            return response()->json(['mensaje' => 'Micro-reto archivado', 'reto' => $microreto], 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Error al guardar en BD: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['error' => 'Error al guardar en BD: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ¡NUEVO! Guarda TODOS los retos del array de golpe
+    public function guardarLote(Request $request)
+    {
+        $request->validate([
+            'microretos' => 'required|array'
+        ]);
+
+        try {
+            $insertados = [];
+            foreach($request->microretos as $retoData) {
+                $insertados[] = Microreto::create($retoData);
+            }
+            return response()->json(['mensaje' => count($insertados) . ' Micro-retos archivados en lote con éxito'], 201);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al guardar el lote en BD: ' . $e->getMessage()], 500);
         }
     }
 }

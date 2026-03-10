@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import GeneradorMicroretos from '../views/GeneradorMicroretos.vue'
+import BibliotecaMicroretos from '../views/BibliotecaMicroretos.vue'
 
 
 
@@ -10,6 +11,12 @@ const router = createRouter({
       path: '/microretos', 
       name: 'microretos',
       component: GeneradorMicroretos
+    },
+    
+   {
+    path: '/biblioteca', 
+      name: 'biblioteca',
+      component: BibliotecaMicroretos
     }
   ]
 })
