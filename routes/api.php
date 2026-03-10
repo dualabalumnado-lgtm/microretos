@@ -10,6 +10,8 @@ use App\Http\Controllers\MicroretoIAController;
 |--------------------------------------------------------------------------
 */
 
+Route::get('/microretos', [MicroretoIAController::class, 'index']);
+// (Si prefieres ponerlo en DatosFPController, cambia la clase)
 // --- RUTAS DE CONSULTA (LECTURA) ---
 // Estas rutas alimentan tus desplegables en cascada
 
