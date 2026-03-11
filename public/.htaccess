@@ -5,19 +5,12 @@
 
     RewriteEngine On
 
-    # Autorizaciones
+    # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # 1. Las peticiones de la API van a Laravel (index.php)
-    RewriteCond %{REQUEST_URI} ^/api/
+    # Manda todas las peticiones a Laravel (index.php)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
-
-    # 2. Si el archivo físico existe (imágenes, CSS, JS de Vue), lo muestra
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
-    RewriteCond %{REQUEST_FILENAME} -d
-    RewriteRule ^ - [L]
-
-    # 3. TODO lo demás (como /microretos) va a tu frontend compilado de Vue (index.html)
-    RewriteRule ^ index.html [L]
 </IfModule>
