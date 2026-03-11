@@ -142,7 +142,7 @@ const limpiarFormulario = () => {
     centroFiltro.value = ''; // Limpiamos el filtro del colegio también
     empresaDetalle.value = null;
     microretosGenerados.value = [];
-    guardadoExitoso.value = false;
+    //guardadoExitoso.value = false;
     crmActualizado.value = false;
     diagnosticoRecuperado.value = false;
     todosGuardados.value = false;
