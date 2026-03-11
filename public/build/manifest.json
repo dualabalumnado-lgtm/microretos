@@ -4,7 +4,7 @@
     "src": "frontend-microretos/src/assets/logo.png"
   },
   "resources/css/app.css": {
-    "file": "assets/app-cLrFBCev.css",
+    "file": "assets/app-mx4GMwe7.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,12 +13,12 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DbMr3mu7.js",
+    "file": "assets/app-P8CXN8w2.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
-      "assets/app-B3JvO2v1.css"
+      "assets/app-TLDBkJKO.css"
     ],
     "assets": [
       "assets/logo-H7Fb1UXP.png"
