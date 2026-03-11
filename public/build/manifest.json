@@ -1,0 +1,27 @@
+{
+  "frontend-microretos/src/assets/logo.png": {
+    "file": "assets/logo-H7Fb1UXP.png",
+    "src": "frontend-microretos/src/assets/logo.png"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-cLrFBCev.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-DbMr3mu7.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "css": [
+      "assets/app-B3JvO2v1.css"
+    ],
+    "assets": [
+      "assets/logo-H7Fb1UXP.png"
+    ]
+  }
+}
