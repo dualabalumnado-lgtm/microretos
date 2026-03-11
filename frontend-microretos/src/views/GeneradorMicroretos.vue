@@ -165,8 +165,8 @@ const cargarDemo = () => {
   esModoDemo.value = true;
   
   seleccion.value.empresaId = '';
-  centroFiltro.value = "IES Ana Luisa de Benítez"; // Auto-rellenamos el colegio
-  buscadorEmpresa.value = "VirtualNest SL"; // Rellenamos el buscador
+  centroFiltro.value = "IES Ana Luisa de Benítez"; 
+  buscadorEmpresa.value = "VirtualNest SL"; 
   empresaDetalle.value = null;
   diagnosticoRecuperado.value = false;
   
@@ -218,7 +218,8 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
   
   if (!nuevoId) return;
 
-  const emp = empresas.value.find(e => e.id === nuevoId);
+  // ¡ESTA ES LA CORRECCIÓN CLAVE PARA TiDB! Usamos String() para evitar fallos de tipos (1 vs "1")
+  const emp = empresas.value.find(e => String(e.id) === String(nuevoId));
   if(emp) {
     empresaDetalle.value = emp; 
     seleccion.value.empresaNombre = emp.nombre_comercial;
@@ -291,7 +292,8 @@ const guardarInfoEmpresa = async () => {
   try {
     if (seleccion.value.empresaId) {
       await api.put(`/empresas/${seleccion.value.empresaId}`, payload);
-      const emp = empresas.value.find(e => e.id === seleccion.value.empresaId);
+      // Otra corrección estricta para TiDB:
+      const emp = empresas.value.find(e => String(e.id) === String(seleccion.value.empresaId));
       if(emp) Object.assign(emp, { ...payload, centro_educativo: payload.centroEducativo, dia_a_normal: payload.diaANormal, friccion_area: payload.friccionArea, friccion_problema: payload.friccionProblema, lo_que_no_quieren: payload.loQueNoQuieren });
     } else {
       const res = await api.post('/empresas', payload);
@@ -496,12 +498,21 @@ const guardar = async (index) => {
                   </div>
                 </div>
               </div>
-
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
                 <div v-if="!seleccion.empresaId && !seleccion.empresaNombre" class="absolute inset-0 bg-[#1a1a1a]/80 z-10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
                   <span class="bg-[#121212] text-[#F2F2F2] border border-[#333333] px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-xl text-[#99CC33]">
                     Busca una empresa o usa la Demo 👆
                   </span>
+                </div>
+
+                <div class="col-span-2">
+                  <label class="label-style">Nombre Comercial *</label>
+                  <input v-model="seleccion.empresaNombre" class="input-style bg-[#121212] opacity-80" readonly />
+                </div>
+
+                <div class="col-span-2 md:col-span-1">
+                  <label class="label-style text-[#00A859]">Colegio / Centro Educativo</label>
+                  <input v-model="seleccion.empresaCentro" class="input-style border-[#00A859]/50" placeholder="Ej: IES Ana Luisa de Benítez..." />
                 </div>
                 
                 <div>
