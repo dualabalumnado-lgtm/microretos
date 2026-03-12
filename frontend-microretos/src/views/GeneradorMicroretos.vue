@@ -214,7 +214,7 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
   seleccion.value.familia = ''; ciclos.value = []; seleccion.value.cicloId = ''; modulos.value = [];
   modulosSeleccionados.value = []; familiasFiltradas.value = [];
   empresaDetalle.value = null; crmActualizado.value = false; diagnosticoRecuperado.value = false;
-  microretosGenerados.value = []; guardadoExitoso.value = false;
+  microretosGenerados.value = []; 
   
   if (!nuevoId) return;
 
@@ -503,16 +503,6 @@ const guardar = async (index) => {
                   <span class="bg-[#121212] text-[#F2F2F2] border border-[#333333] px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-xl text-[#99CC33]">
                     Busca una empresa o usa la Demo 👆
                   </span>
-                </div>
-
-                <div class="col-span-2">
-                  <label class="label-style">Nombre Comercial *</label>
-                  <input v-model="seleccion.empresaNombre" class="input-style bg-[#121212] opacity-80" readonly />
-                </div>
-
-                <div class="col-span-2 md:col-span-1">
-                  <label class="label-style text-[#00A859]">Colegio / Centro Educativo</label>
-                  <input v-model="seleccion.empresaCentro" class="input-style border-[#00A859]/50" placeholder="Ej: IES Ana Luisa de Benítez..." />
                 </div>
                 
                 <div>
