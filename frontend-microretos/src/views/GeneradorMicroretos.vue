@@ -26,7 +26,11 @@ let autoSelectDemoCycle = false;
 
 // --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
+
 const centrosDisponibles = computed(() => {
+  // ESCUDO: Si empresas.value se ha llenado de HTML/error y no es un Array, para y devuelve vacío.
+  if (!Array.isArray(empresas.value)) return []; 
+  
   const centros = empresas.value.map(e => e.centro_educativo).filter(Boolean);
   return [...new Set(centros)].sort();
 });
@@ -213,8 +217,17 @@ onMounted(async () => {
 
   try {
     const res = await api.get('/empresas');
-    empresas.value = res.data; 
-  } catch (e) { console.error(e); }
+    // ESCUDO: Solo guardamos la variable si el servidor manda una lista real
+    if (Array.isArray(res.data)) {
+        empresas.value = res.data; 
+    } else {
+        console.error("Peligro: La API devolvió esto en lugar de una lista:", res.data);
+        empresas.value = []; // Lo vaciamos para que no explote
+    }
+  } catch (e) { 
+    console.error("Error conectando a la API:", e);
+    empresas.value = [];
+  }
 });
 
 watch(() => seleccion.value.empresaId, async (nuevoId) => {
