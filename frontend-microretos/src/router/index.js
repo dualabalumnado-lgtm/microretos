@@ -1,20 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import GeneradorMicroretos from '../views/GeneradorMicroretos.vue'
 import BibliotecaMicroretos from '../views/BibliotecaMicroretos.vue'
-
-
+import Home from '../views/Home.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/', 
+      name: 'home',
+      component: Home
+    },
+    {
       path: '/microretos', 
       name: 'microretos',
       component: GeneradorMicroretos
     },
-    
-   {
-    path: '/biblioteca', 
+    {
+      path: '/biblioteca', 
       name: 'biblioteca',
       component: BibliotecaMicroretos
     }
