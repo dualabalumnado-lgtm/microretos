@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// Esta línea es la clave: 
-// Si existe la variable de producción la usa, si no, usa '/api' para local
-const apiURL = import.meta.env.VITE_API_URL || '/api';
+// El código detecta automáticamente dónde está abierto el navegador
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// Si está en tu Mac, busca en local. Si está en internet, dispara al subdominio.
+const apiURL = isLocal ? '/api' : 'https://api.dualab.es/api';
 
 const api = axios.create({
   baseURL: apiURL,
