@@ -1,29 +1,59 @@
 @import "tailwindcss";
 
-
-/* Forzar Tema Oscuro Permanente y Colores de Marca */
+/* ---------------------------------------------------
+   Tema Claro/Luminoso Global (Fondo y Texto Base) 
+--------------------------------------------------- */
 body {
-  background-color: #121212 !important; /* Fondo gris muy oscuro (Carbón) */
-  color: #D9D9D9 !important; /* Texto gris muy claro */
+  background-color: #F8FAFC !important; /* Fondo gris azulado muy claro */
+  color: #4B5563 !important; /* Texto gris medio para una lectura suave y cómoda */
 }
 
-/* Títulos Principales en Verde Brillante */
+/* ---------------------------------------------------
+   Tipografía Global
+   (Sin !important para permitir que Tailwind sobrescriba
+   los colores cuando usamos fondos oscuros)
+--------------------------------------------------- */
 h1, h2 {
-  color: #99CC33 !important; 
+  color: #121212; /* Casi negro para máxima jerarquía */
 }
 
-/* Títulos Secundarios / Íconos destacados en Verde Esmeralda */
 h3, h4 {
-  color: #00A859 !important; 
+  color: #1F2937; /* Gris oscuro para subtítulos */
 }
 
-/* Ajustes para inputs globales en el tema oscuro */
+/* ---------------------------------------------------
+   Estilo de Inputs (Alto Contraste)
+   Aplica el estilo moderno oscuro sobre tarjetas claras
+--------------------------------------------------- */
 input, select, textarea {
-  background-color: #1a1a1a !important;
-  color: #F2F2F2 !important; /* Blanco hueso para escribir */
-  border-color: #333333 !important;
+  background-color: #1F2937 !important; /* Fondo gris muy oscuro (Carbón) */
+  color: #FFFFFF !important; /* Texto blanco puro */
+  border: 2px solid transparent !important;
 }
 
+/* Color del texto de relleno (placeholder) */
+input::placeholder, textarea::placeholder {
+  color: #6B7280 !important; /* Gris medio/claro para que se lea sobre el fondo oscuro */
+}
+
+/* Estado de Focus (Al hacer clic para escribir) */
 input:focus, select:focus, textarea:focus {
-  border-color: #99CC33 !important; /* Al hacer click, borde verde brillante */
+  border-color: #00A859 !important; /* Borde verde corporativo */
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(0, 168, 89, 0.2) !important; /* Halo de luz verde suave (focus-ring) */
+}
+
+/* Customización del Scrollbar (Opcional, pero recomendado para mantener limpieza) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F8FAFC; 
+}
+::-webkit-scrollbar-thumb {
+  background: #E2E8F0; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00A859; 
 }

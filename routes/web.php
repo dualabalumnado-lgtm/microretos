@@ -2,14 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+// Cualquier ruta que el usuario escriba, le devolvemos la vista "welcome"
+// y dejamos que Vue Router decida qué componente mostrar.
 Route::get('/{any}', function () {
-    // Buscamos  archivo de Vue compilado
-    $path = public_path('index.html');
-    
-    // Si existe, se lo mandamos al usuario
-    if (file_exists($path)) {
-        return file_get_contents($path);
-    }
-    
-    return "Error: No se encuentra el frontend compilado.";
+    return view('welcome');
 })->where('any', '.*');

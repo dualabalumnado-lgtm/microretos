@@ -12,4 +12,12 @@ export default defineConfig({
         }),
         vue(),
     ],
+    // ¡AQUÍ ESTÁ LA MAGIA!
+    server: {
+        host: '0.0.0.0', // Le dice a Docker que abra la puerta
+        port: 5176,      // Fija el puerto
+        hmr: {
+            host: 'localhost' // Le dice al navegador: "Búscame en localhost, no en 0.0.0.0"
+        }
+    }
 });
