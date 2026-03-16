@@ -12,7 +12,12 @@ export default defineConfig({
   proxy: {
     '/api': {
       // Cambia esto por la URL que usas en tu navegador para ver tu backend
-      target: 'http://generador-microretos-dualab.test', 
+      //Target Gabri
+      target: 'http://127.0.0.1:8000',
+
+      //Target Hosting
+      //target: 'http://generador-microretos-dualab.test', 
+
       changeOrigin: true,
       headers: { Accept: 'application/json' },
     }

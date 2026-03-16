@@ -15,6 +15,9 @@ Route::get('/microretos', [MicroretoIAController::class, 'index']);
 // --- RUTAS DE CONSULTA (LECTURA) ---
 // Estas rutas alimentan tus desplegables en cascada
 
+// API para buscar microreto para mostrar en Detalle-Microreto
+Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
+
 // 1. Nuevas rutas B2B (Empresas y Familias asociadas)
 Route::get('/empresas', [DatosFPController::class, 'getEmpresas']);
 Route::get('/empresas/{id}/familias', [DatosFPController::class, 'getFamiliasPorEmpresa']);
