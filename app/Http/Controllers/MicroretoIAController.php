@@ -44,6 +44,29 @@ class MicroretoIAController extends Controller
         return response()->json($microretos);
     }
 
+    /**
+     * Devuelve un microreto por ID, enriquecido con centro_educativo y familia.
+     */
+    public function show($id)
+    {
+        $reto = \App\Models\Microreto::findOrFail($id);
+
+        $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
+
+        if ($empresa) {
+            $reto->centro_educativo = $empresa->centro_educativo;
+            $familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
+                ->where('empresa_id', $empresa->id)
+                ->value('familia');
+            $reto->familia = $familia;
+        } else {
+            $reto->centro_educativo = 'Centro Desconocido';
+            $reto->familia = 'Familia Desconocida';
+        }
+
+        return response()->json($reto);
+    }
+
     public function generar(Request $request)
     {
         $request->validate([
