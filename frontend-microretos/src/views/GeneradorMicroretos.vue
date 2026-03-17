@@ -20,17 +20,14 @@ const buscadorEmpresa = ref('');
 const mostrarDropdownEmpresas = ref(false);
 const empresaDetalle = ref(null); 
 
-// --- ESTADO MODO DEMO ---
+// --- ESTADO MODO DEMO Y SIMULACIÓN ---
 const esModoDemo = ref(false);
+const esInfoSimulada = ref(false); // NUEVO: Estado para el botón de Información Simulada
 let autoSelectDemoCycle = false; 
 
 // --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
-
 const centrosDisponibles = computed(() => {
-  // ESCUDO: Si empresas.value se ha llenado de HTML/error y no es un Array, para y devuelve vacío.
-  if (!Array.isArray(empresas.value)) return []; 
-  
   const centros = empresas.value.map(e => e.centro_educativo).filter(Boolean);
   return [...new Set(centros)].sort();
 });
@@ -153,6 +150,7 @@ const limpiarFormulario = () => {
     diagnosticoRecuperado.value = false;
     todosGuardados.value = false;
     esModoDemo.value = false;
+    esInfoSimulada.value = false; // Añadido: desmarca el botón al vaciar
     modulosSeleccionados.value = [];
     
     seleccion.value = {
@@ -217,17 +215,8 @@ onMounted(async () => {
 
   try {
     const res = await api.get('/empresas');
-    // ESCUDO: Solo guardamos la variable si el servidor manda una lista real
-    if (Array.isArray(res.data)) {
-        empresas.value = res.data; 
-    } else {
-        console.error("Peligro: La API devolvió esto en lugar de una lista:", res.data);
-        empresas.value = []; // Lo vaciamos para que no explote
-    }
-  } catch (e) { 
-    console.error("Error conectando a la API:", e);
-    empresas.value = [];
-  }
+    empresas.value = res.data; 
+  } catch (e) { console.error(e); }
 });
 
 watch(() => seleccion.value.empresaId, async (nuevoId) => {
@@ -440,7 +429,7 @@ const guardar = async (index) => {
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)]">
               
-              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
@@ -449,10 +438,17 @@ const guardar = async (index) => {
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-2">
+                  <button @click="esInfoSimulada = !esInfoSimulada"
+                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Información Simulada
+                  </button>
                   <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <span v-if="esModoDemo">✓ MODO DEMO ACTIVO</span>
+                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
                     <span v-else> Cargar Demo</span>
                   </button>
                   <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
@@ -487,41 +483,52 @@ const guardar = async (index) => {
                 </div>
               </div>
 
-              <div v-if="empresaDetalle" class="bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
-                <div class="flex items-center gap-3 mb-6">
-                  <div class="w-2 h-6 bg-[#00A859] rounded-full"></div>
-                  <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Ficha de Contacto</h3>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div v-if="empresaDetalle.persona_contacto || empresaDetalle.telefono || empresaDetalle.email_general">
-                    <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Contacto Directo</p>
-                    <p v-if="empresaDetalle.persona_contacto" class="font-semibold text-[#1F2937] text-sm">{{ empresaDetalle.persona_contacto }}</p>
-                    <p v-if="empresaDetalle.telefono" class="text-gray-600 text-sm flex items-center gap-2 mt-1">
-                      <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg> {{ empresaDetalle.telefono }}
-                    </p>
-                    <p v-if="empresaDetalle.email_general" class="text-gray-600 text-sm flex items-center gap-2 mt-1 truncate">
-                      <svg class="w-4 h-4 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> {{ empresaDetalle.email_general }}
-                    </p>
-                  </div>
-
-                  <div v-if="empresaDetalle.direccion || empresaDetalle.municipio || empresaDetalle.codigo_postal">
-                    <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Ubicación</p>
-                    <p class="text-sm text-gray-600 leading-tight">
-                      {{ empresaDetalle.direccion }} {{ empresaDetalle.numero }} <br>
-                      {{ empresaDetalle.codigo_postal }} - {{ empresaDetalle.municipio }} <span v-if="empresaDetalle.provincia">({{ empresaDetalle.provincia }})</span>
-                    </p>
-                  </div>
-
-                  <div v-if="empresaDetalle.actividad || empresaDetalle.web">
-                    <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Actividad / Web</p>
-                    <p v-if="empresaDetalle.actividad" class="text-sm text-gray-600 line-clamp-2" :title="empresaDetalle.actividad">{{ empresaDetalle.actividad }}</p>
-                    <a v-if="empresaDetalle.web" :href="empresaDetalle.web" target="_blank" class="text-[#00A859] hover:underline font-bold text-sm truncate flex items-center gap-1 mt-1">
-                      {{ empresaDetalle.web.replace(/^https?:\/\//, '') }}
-                    </a>
-                  </div>
+            <div v-if="empresaDetalle" class="bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
+  
+            <div class="mb-8">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-2 h-6 bg-[#00A859] rounded-full"></div>
+                <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Ficha de Contacto</h3>
+              </div>
+              
+              <div v-if="empresaDetalle.razon_social" class="flex items-start gap-3 ml-1">
+                <svg class="w-5 h-5 mt-0.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"></path></svg>
+                <div>
+                  <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Razón Social</p>
+                  <p class="font-bold text-[#1F2937] text-lg leading-tight">{{ empresaDetalle.razon_social }}</p>
                 </div>
               </div>
+            </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-gray-200/60">
+                <div v-if="empresaDetalle.persona_contacto || empresaDetalle.telefono || empresaDetalle.email_general">
+                  <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Contacto Directo</p>
+                  <p v-if="empresaDetalle.persona_contacto" class="font-semibold text-[#1F2937] text-sm">{{ empresaDetalle.persona_contacto }}</p>
+                  <p v-if="empresaDetalle.telefono" class="text-gray-600 text-sm flex items-center gap-2 mt-1">
+                    <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg> {{ empresaDetalle.telefono }}
+                  </p>
+                  <p v-if="empresaDetalle.email_general" class="text-gray-600 text-sm flex items-center gap-2 mt-1 truncate">
+                    <svg class="w-4 h-4 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> {{ empresaDetalle.email_general }}
+                  </p>
+                </div>
+
+                <div v-if="empresaDetalle.direccion || empresaDetalle.municipio || empresaDetalle.codigo_postal">
+                  <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Ubicación</p>
+                  <p class="text-sm text-gray-600 leading-tight">
+                    {{ empresaDetalle.direccion }} {{ empresaDetalle.numero }} <br>
+                    {{ empresaDetalle.codigo_postal }} - {{ empresaDetalle.municipio }} <span v-if="empresaDetalle.provincia">({{ empresaDetalle.provincia }})</span>
+                  </p>
+                </div>
+
+                <div v-if="empresaDetalle.actividad || empresaDetalle.web">
+                  <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Actividad / Web</p>
+                  <p v-if="empresaDetalle.actividad" class="text-sm text-gray-600 line-clamp-2" :title="empresaDetalle.actividad">{{ empresaDetalle.actividad }}</p>
+                  <a v-if="empresaDetalle.web" :href="empresaDetalle.web" target="_blank" class="text-[#00A859] hover:underline font-bold text-sm truncate flex items-center gap-1 mt-1">
+                    {{ empresaDetalle.web.replace(/^https?:\/\//, '') }}
+                  </a>
+                </div>
+              </div>
+            </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
                 <div v-if="!seleccion.empresaId && !seleccion.empresaNombre" class="absolute inset-0 bg-white/70 z-10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
@@ -562,12 +569,32 @@ const guardar = async (index) => {
                 Entrevista de Diagnóstico
               </div>
               
-              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#99CC33]/15 flex items-center justify-center text-[#00A859]">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                   </div>
                   <h2 class="text-2xl font-black uppercase tracking-tight text-[#1F2937]">Realidad de la Empresa</h2>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <button @click="esInfoSimulada = !esInfoSimulada"
+                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Información Simulada
+                  </button>
+                  <button @click="cargarDemo" :disabled="esModoDemo" 
+                    :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
+                    <span v-else> Cargar Demo</span>
+                  </button>
+                  <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Vaciar
+                  </button>
                 </div>
               </div>
 
@@ -687,12 +714,32 @@ const guardar = async (index) => {
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 3" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative overflow-hidden">
-              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                   </div>
                   <h2 class="text-2xl font-black uppercase tracking-tight text-[#1F2937]">Match Académico</h2>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <button @click="esInfoSimulada = !esInfoSimulada"
+                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Información Simulada
+                  </button>
+                  <button @click="cargarDemo" :disabled="esModoDemo" 
+                    :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
+                    <span v-else> Cargar Demo</span>
+                  </button>
+                  <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Vaciar
+                  </button>
                 </div>
               </div>
               
