@@ -189,6 +189,7 @@ class MicroretoIAController extends Controller
     public function guardarEnBD(Request $request)
     {
         try {
+            $datos = $request->except(['_ui_guardado', '_ui_guardando']); //Limpieza defensiva
             $microreto = Microreto::create($request->all());
             return response()->json(['mensaje' => 'Micro-reto archivado', 'reto' => $microreto], 201);
         } catch (\Exception $e) {
@@ -206,11 +207,23 @@ class MicroretoIAController extends Controller
         try {
             $insertados = [];
             foreach($request->microretos as $retoData) {
+                unset($retoData['_ui_guardado'], $retoData['_ui_guardando']); //Limpieza defensiva
                 $insertados[] = Microreto::create($retoData);
             }
             return response()->json(['mensaje' => count($insertados) . ' Micro-retos archivados en lote con éxito'], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al guardar el lote en BD: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $microreto = Microreto::findOrFail($id);
+            $microreto->delete();
+            return response()->json(['mensaje' => 'Micro-reto eliminado correctamente'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 500);
         }
     }
 }

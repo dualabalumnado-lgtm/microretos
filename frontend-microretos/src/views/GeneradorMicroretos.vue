@@ -346,15 +346,22 @@ const generarReto = async () => {
 const guardarTodos = async () => {
   guardandoTodos.value = true;
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean);
-    const moduloStr = nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : 'Transversal';
+    const nombresModulosSeleccionados = modulosSeleccionados.value
+      .map(id => modulos.value.find(m => m.id === id)?.nombre)
+      .filter(Boolean);
+    const moduloStr = nombresModulosSeleccionados.length > 0 
+      ? nombresModulosSeleccionados.join(' y ') 
+      : 'Transversal';
     const cicloStr = ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre;
 
     const payload = microretosGenerados.value
-      .filter(r => !r._ui_guardado) 
-      .map(reto => ({
-        ...reto, ciclo: cicloStr, modulo: moduloStr,
-        duracion: seleccion.value.duracion, nivel_grupo: seleccion.value.nivelGrupo
+      .filter(r => !r._ui_guardado)
+      .map(({ _ui_guardado, _ui_guardando, ...retoLimpio }) => ({  //Desestructuración para eliminar claves UI
+        ...retoLimpio,
+        ciclo: cicloStr,
+        modulo: moduloStr,
+        duracion: seleccion.value.duracion,
+        nivel_grupo: seleccion.value.nivelGrupo
       }));
 
     if (payload.length > 0) {
@@ -364,22 +371,42 @@ const guardarTodos = async () => {
     } else {
       alert("Todos los retos mostrados ya estaban guardados.");
     }
-  } catch (e) { alert("Error al guardar el lote de microretos en BD"); } finally { guardandoTodos.value = false; }
+  } catch (e) { 
+    console.error("Error al guardar el lote:", e);
+    alert("Error al guardar el lote de microretos en BD"); 
+  } finally { 
+    guardandoTodos.value = false; 
+  }
 };
 
 const guardar = async (index) => {
   const reto = microretosGenerados.value[index];
   reto._ui_guardando = true;
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean);
+    const nombresModulosSeleccionados = modulosSeleccionados.value
+      .map(id => modulos.value.find(m => m.id === id)?.nombre)
+      .filter(Boolean);
+
+    const { _ui_guardado, _ui_guardando, ...retoLimpio } = reto; //Desestructuración para eliminar claves UI
+
     await api.post('/guardar-microreto-bd', { 
-      ...reto, ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
-      modulo: nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : 'Transversal',
-      duracion: seleccion.value.duracion, nivel_grupo: seleccion.value.nivelGrupo
+      ...retoLimpio,
+      ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
+      modulo: nombresModulosSeleccionados.length > 0 
+        ? nombresModulosSeleccionados.join(' y ') 
+        : 'Transversal',
+      duracion: seleccion.value.duracion,
+      nivel_grupo: seleccion.value.nivelGrupo
     });
     reto._ui_guardado = true;
-  } catch (e) { alert("Error al guardar este microreto"); } finally { reto._ui_guardando = false; }
+  } catch (e) { 
+    console.error("Error al guardar:", e);
+    alert("Error al guardar este microreto"); 
+  } finally { 
+    reto._ui_guardando = false; 
+  }
 };
+
 </script>
 
 <template>

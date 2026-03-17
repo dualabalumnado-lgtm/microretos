@@ -49,6 +49,11 @@ Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
 // Guarda el resultado final en la base de datos
 Route::post('/guardar-microreto-bd', [MicroretoIAController::class, 'guardarEnBD']);
 
+// Guarda lote de microretos en la base de datos
+Route::post('/guardar-microretos-lote', [MicroretoIAController::class, 'guardarLote']); 
+
+// Borrar microreto
+Route::delete('/microretos/{id}', [MicroretoIAController::class, 'destroy']);
 
 Route::get('/importar-excel', function () {
     // 1. Buscamos el archivo que acabas de guardar
