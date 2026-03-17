@@ -11,38 +11,30 @@ class MicroretoIAController extends Controller
 {
 
     public function index()
-    {
-        // 1. Obtenemos todos los microretos usando Eloquent (para que respete los arrays de tu modelo)
-        $microretos = \App\Models\Microreto::all();
+{
+    // 1. Obtenemos todos y REASIGNAMOS el resultado del map
+    $microretos = \App\Models\Microreto::all()->map(function ($reto) {
+        
+        $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
+        
+        if ($empresa) {
+            $reto->centro_educativo = $empresa->centro_educativo;
+            $reto->familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
+                ->where('empresa_id', $empresa->id)
+                ->value('familia');
+        } else {
+            $reto->centro_educativo = 'Centro Desconocido';
+            $reto->familia = 'Familia Desconocida';
+        }
 
-        // 2. Mapeamos cada microreto para inyectarle el Centro y la Familia
-        $microretos->map(function ($reto) {
-            
-            // Buscamos la empresa vinculada a este reto
-            $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
-            
-            if ($empresa) {
-                // Si la empresa existe, le pasamos el centro
-                $reto->centro_educativo = $empresa->centro_educativo;
-                
-                // Buscamos la familia en la tabla pivote
-                $familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
-                    ->where('empresa_id', $empresa->id)
-                    ->value('familia');
-                    
-                $reto->familia = $familia;
-            } else {
-                // Valores por defecto si por algún motivo la empresa fue borrada o no coincide
-                $reto->centro_educativo = 'Centro Desconocido';
-                $reto->familia = 'Familia Desconocida';
-            }
+        // ASEGURAMOS QUE EL FRONTEND RECIBA UN BOOLEANO PURO
+        $reto->es_simulado = (bool) $reto->es_simulado;
 
-            return $reto;
-        });
+        return $reto;
+    });
 
-        // 3. Devolvemos el JSON listo y vitaminado para tu frontend en Vue
-        return response()->json($microretos);
-    }
+    return response()->json($microretos);
+}
 
     /**
      * Devuelve un microreto por ID, enriquecido con centro_educativo y familia.
