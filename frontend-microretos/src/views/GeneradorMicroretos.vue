@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import api from '../api.js'; 
 
 const familias = ref([]); 
@@ -127,16 +127,39 @@ const getDatosPaso2Preparados = () => {
 
 const empresasFiltradasBusqueda = computed(() => {
   let filtradas = empresas.value;
-  if (centroFiltro.value) filtradas = filtradas.filter(e => e.centro_educativo === centroFiltro.value);
-  if (buscadorEmpresa.value) filtradas = filtradas.filter(e => e.nombre_comercial.toLowerCase().includes(buscadorEmpresa.value.toLowerCase()));
+  if (centroFiltro.value) {
+    filtradas = filtradas.filter(e => e.centro_educativo === centroFiltro.value);
+  }
+  if (buscadorEmpresa.value) { 
+    filtradas = filtradas.filter(e => 
+      e.nombre_comercial?.toLowerCase().includes(buscadorEmpresa.value.toLowerCase())
+    );
+  }
   return filtradas;
 });
 
 const seleccionarEmpresa = (emp) => {
   seleccion.value.empresaId = emp.id;
+  seleccion.value.empresaNombre = emp.nombre_comercial;
   buscadorEmpresa.value = emp.nombre_comercial;
   mostrarDropdownEmpresas.value = false;
 };
+
+const onBuscadorInput = () => {
+  mostrarDropdownEmpresas.value = true;
+  // Si el usuario borra el campo, limpiamos la empresa seleccionada
+  if (!buscadorEmpresa.value) {
+    seleccion.value.empresaId = '';
+    seleccion.value.empresaNombre = '';
+    empresaDetalle.value = null;
+  }
+};
+
+watch(buscadorEmpresa, (val) => {
+  if (val && empresas.value.length > 0) {
+    mostrarDropdownEmpresas.value = true;
+  }
+});
 
 // --- FUNCIÓN LIMPIAR FORMULARIO (BOTÓN ROJO) ---
 const limpiarFormulario = () => {
@@ -207,16 +230,25 @@ const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.va
 const paso2Valido = computed(() => seleccion.value.diaANormal && seleccion.value.friccionProblema);
 const paso3Valido = computed(() => seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado); 
 
-onMounted(async () => {
-  // Disparar la animación de entrada
-  setTimeout(() => {
-    isLoaded.value = true;
-  }, 100);
+// Cierra el dropdown al hacer clic fuera
+const buscadorRef = ref(null);
+const cerrarDropdownFuera = (e) => {
+  if (buscadorRef.value && !buscadorRef.value.contains(e.target)) {
+    mostrarDropdownEmpresas.value = false;
+  }
+};
 
+onMounted(async () => {
+  document.addEventListener('click', cerrarDropdownFuera);
+  setTimeout(() => { isLoaded.value = true; }, 100);
   try {
     const res = await api.get('/empresas');
-    empresas.value = res.data; 
+    empresas.value = res.data;
   } catch (e) { console.error(e); }
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', cerrarDropdownFuera);
 });
 
 watch(() => seleccion.value.empresaId, async (nuevoId) => {
@@ -407,6 +439,11 @@ const guardar = async (index) => {
   }
 };
 
+// Computed que indica si hay "contexto de empresa" suficiente
+const tieneContextoEmpresa = computed(() => {
+  return !!(seleccion.value.empresaId || seleccion.value.empresaNombre || buscadorEmpresa.value);
+});
+
 </script>
 
 <template>
@@ -494,18 +531,56 @@ const guardar = async (index) => {
                   </select>
                 </div>
                 
-                <div class="relative">
+                <div class="relative" ref="buscadorRef">
                   <label class="label-style">Escribe para buscar empresa</label>
-                  <div class="absolute inset-y-0 left-5 top-[28px] flex items-center pointer-events-none">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                  <div class="absolute left-5 top-[38px] flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
                   </div>
-                  <input v-model="buscadorEmpresa" @focus="mostrarDropdownEmpresas = true" class="input-style pl-14 text-lg" placeholder="Ej: Fundación Sergio Alonso..." />
                   
-                  <div v-if="mostrarDropdownEmpresas && empresasFiltradasBusqueda.length > 0" class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl max-h-64 overflow-y-auto z-50">
-                    <button v-for="emp in empresasFiltradasBusqueda" :key="emp.id" @click="seleccionarEmpresa(emp)" class="w-full text-left px-6 py-4 border-b border-[#374151] hover:bg-[#374151] transition-colors last:border-0">
-                      <span class="font-bold text-white block">{{ emp.nombre_comercial }}</span>
-                      <span class="text-xs text-gray-400 uppercase tracking-widest">{{ emp.sector || 'Sin sector especificado' }}</span>
-                    </button>
+                  <input
+                    v-model="buscadorEmpresa"
+                    @input="onBuscadorInput"
+                    @focus="mostrarDropdownEmpresas = true"
+                    autocomplete="new-password"
+                    name="buscar-empresa-dualab"
+                    type="search"
+                    class="input-style pl-14 text-lg"
+                    placeholder="Ej: Fundación Sergio Alonso..."
+                  />
+                  
+                  <Transition name="dropdown">
+                    <div
+                      v-if="mostrarDropdownEmpresas && empresasFiltradasBusqueda.length > 0"
+                      class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl max-h-64 overflow-y-auto z-50"
+                    >
+                      <div v-if="buscadorEmpresa" class="px-6 pt-3 pb-1">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                          {{ empresasFiltradasBusqueda.length }} resultado(s) para "{{ buscadorEmpresa }}"
+                        </span>
+                      </div>
+                      
+                      <button
+                        v-for="emp in empresasFiltradasBusqueda"
+                        :key="emp.id"
+                        @mousedown.prevent="seleccionarEmpresa(emp)"
+                        class="w-full text-left px-6 py-4 border-b border-[#374151] hover:bg-[#374151] transition-colors last:border-0"
+                      >
+                        <span class="font-bold text-white block">{{ emp.nombre_comercial }}</span>
+                        <span class="text-xs text-gray-400 uppercase tracking-widest">
+                          {{ emp.sector || 'Sin sector especificado' }}
+                        </span>
+                      </button>
+                    </div>
+                  </Transition>
+
+                  <!-- Mensaje cuando no hay resultados -->
+                  <div
+                    v-if="mostrarDropdownEmpresas && buscadorEmpresa && empresasFiltradasBusqueda.length === 0"
+                    class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl z-50 px-6 py-5"
+                  >
+                    <p class="text-gray-400 text-sm">No se encontró ninguna empresa con ese nombre.</p>
                   </div>
                 </div>
               </div>
@@ -558,7 +633,8 @@ const guardar = async (index) => {
             </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
-                <div v-if="!seleccion.empresaId && !seleccion.empresaNombre" class="absolute inset-0 bg-white/70 z-10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+
+                <div v-if="!tieneContextoEmpresa" class="absolute inset-0 bg-white/70 z-10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
                   <span class="bg-[#1F2937] text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg">
                     Busca una empresa o usa la Demo 👆
                   </span>
@@ -1184,4 +1260,12 @@ const guardar = async (index) => {
 .fade-leave-to { opacity: 0; transform: translateX(-10px); }
 .fade-up-enter-active { transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
 .fade-up-enter-from { opacity: 0; transform: translateY(40px); }
+
+.dropdown-enter-active, .dropdown-leave-active {
+  transition: all 0.15s ease;
+}
+.dropdown-enter-from, .dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
 </style>
