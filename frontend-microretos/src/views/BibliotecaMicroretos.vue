@@ -2,40 +2,21 @@
 import { ref, computed, onMounted } from 'vue';
 import api from '../api.js';
 
-// --- ESTADO PARA ANIMACIONES DE ENTRADA ---
 const isLoaded = ref(false);
-
 const microretos = ref([]);
 const cargando = ref(true);
+const familias = ref([]);
 
-// Nuevos Filtros solicitados
-const familias = ref([]); // array de strings por ahora: ["Informática", "Sanidad", ...]
-
-// null = vista familias | string = familia seleccionada
 const familiaSeleccionada = ref(null);
 
-// Filtros (sin familia, se elige con las tarjetas)
+// filtroCentro ahora actúa en AMBAS capas (familias y microretos)
 const filtroCentro = ref('');
 const filtroCiclo = ref('');
 
-// const filtroCentro = ref('');
-// const filtroFamilia = ref('');
-// const filtroCiclo = ref('');
-
-// Extraer opciones únicas en cascada
 const centrosDisponibles = computed(() => {
   const centros = microretos.value.map(m => m.centro_educativo || m.centro).filter(Boolean);
   return [...new Set(centros)].sort();
 });
-
-// const familiasDisponibles = computed(() => {
-//   let datos = microretos.value;
-//   if (filtroCentro.value) {
-//     datos = datos.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
-//   }
-//   const familias = datos.map(m => m.familia).filter(Boolean);
-//   return [...new Set(familias)].sort();
-// });
 
 const ciclosDisponibles = computed(() => {
   let datos = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
@@ -45,19 +26,6 @@ const ciclosDisponibles = computed(() => {
   return [...new Set(datos.map(m => m.ciclo).filter(Boolean))].sort();
 });
 
-// const ciclosDisponibles = computed(() => {
-//   let datos = microretos.value;
-//   if (filtroCentro.value) {
-//     datos = datos.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
-//   }
-//   if (filtroFamilia.value) {
-//     datos = datos.filter(m => m.familia === filtroFamilia.value);
-//   }
-//   const ciclos = datos.map(m => m.ciclo).filter(Boolean);
-//   return [...new Set(ciclos)].sort();
-// });
-
-// Lógica de filtrado
 const microretosFiltrados = computed(() => {
   return microretos.value.filter(reto => {
     const centroReto = reto.centro_educativo || reto.centro;
@@ -69,23 +37,22 @@ const microretosFiltrados = computed(() => {
   });
 });
 
-// const microretosFiltrados = computed(() => {
-//   return microretos.value.filter(reto => {
-//     const centroReto = reto.centro_educativo || reto.centro;
-//     const coincideCentro = filtroCentro.value === '' || centroReto === filtroCentro.value;
-//     const coincideFamilia = filtroFamilia.value === '' || reto.familia === filtroFamilia.value;
-//     const coincideCiclo = filtroCiclo.value === '' || reto.ciclo === filtroCiclo.value;
-//     return coincideCentro && coincideFamilia && coincideCiclo;
-//   });
-// });
-
-// Contador de retos por familia para mostrarlo en las tarjetas
+// Solo cuenta retos del centro seleccionado para las tarjetas de familia
 const conteoPorFamilia = computed(() => {
   const mapa = {};
-  microretos.value.forEach(m => {
+  const datos = filtroCentro.value
+    ? microretos.value.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
+    : microretos.value;
+  datos.forEach(m => {
     if (m.familia) mapa[m.familia] = (mapa[m.familia] || 0) + 1;
   });
   return mapa;
+});
+
+// Familias que tienen al menos 1 reto en el centro seleccionado
+const familiasFiltradas = computed(() => {
+  if (!filtroCentro.value) return familias.value;
+  return familias.value.filter(f => (conteoPorFamilia.value[f.nombre] || 0) > 0);
 });
 
 onMounted(async () => {
@@ -96,11 +63,17 @@ onMounted(async () => {
       api.get('/familias'),
     ]);
     microretos.value = resMicroretos.data;
-    // /familias devuelve array de strings → lo normalizamos
-    // Cuando en el futuro devuelva { nombre, imagen_url }, esto seguirá funcionando
     familias.value = resFamilias.data.map(f =>
       typeof f === 'string' ? { nombre: f, imagen_url: null } : f
     );
+
+    // Establecer el primer centro disponible como valor por defecto
+    const centros = [...new Set(
+      resMicroretos.data.map(m => m.centro_educativo || m.centro).filter(Boolean)
+    )].sort();
+    if (centros.length > 0) {
+      filtroCentro.value = centros[0];
+    }
   } catch (error) {
     console.error('Error al cargar la biblioteca:', error);
   } finally {
@@ -108,41 +81,23 @@ onMounted(async () => {
   }
 });
 
-// onMounted(async () => {
-//   // Disparar la animación de entrada
-//   setTimeout(() => {
-//     isLoaded.value = true;
-//   }, 100);
-
-//   try {
-//     const res = await api.get('/microretos');
-//     microretos.value = res.data;
-//   } catch (error) {
-//     console.error("Error al cargar la biblioteca:", error);
-//   } finally {
-//     cargando.value = false;
-//   }
-// });
-
 const seleccionarFamilia = (nombre) => {
   familiaSeleccionada.value = nombre;
-  filtroCentro.value = '';
   filtroCiclo.value = '';
+  // filtroCentro se mantiene intacto al entrar en una familia
 };
 
 const volverAFamilias = () => {
   familiaSeleccionada.value = null;
-  filtroCentro.value = '';
   filtroCiclo.value = '';
+  // filtroCentro se mantiene al volver, para no perder la selección
 };
 
 const limpiarFiltros = () => {
-  filtroCentro.value = '';
-  //filtroFamilia.value = '';
   filtroCiclo.value = '';
 };
 
-// --- ESTADO DEL MODAL DE CONFIRMACIÓN ---
+// --- MODAL ---
 const modalVisible = ref(false);
 const retoAEliminar = ref(null);
 
@@ -167,7 +122,6 @@ const confirmarEliminar = async () => {
     cancelarEliminar();
   }
 };
-
 </script>
 
 <template>
@@ -180,7 +134,7 @@ const confirmarEliminar = async () => {
 
     <div class="max-w-7xl mx-auto relative z-10">
 
-      <!-- HEADER (sin cambios) -->
+      <!-- HEADER -->
       <header class="mb-10 text-center flex flex-col items-center">
         <div
           class="inline-flex items-center mb-8 bg-[#1F2937] py-4 pr-10 pl-6 rounded-[3rem] shadow-lg border border-[#333333] transition-all duration-1000 ease-out transform"
@@ -214,6 +168,37 @@ const confirmarEliminar = async () => {
 
       <template v-else>
 
+        <!-- ============================================ -->
+        <!-- SELECTOR DE CENTRO (visible en ambas capas) -->
+        <!-- ============================================ -->
+        <div
+          class="mb-8 transition-all duration-1000 delay-400 ease-out transform"
+          :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
+          <div class="bg-white/90 backdrop-blur-md rounded-[2rem] p-5 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.04)]">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+              <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2 whitespace-nowrap">
+                <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                Centro Educativo
+              </label>
+              <div class="flex flex-wrap gap-2 flex-1">
+                <button
+                  v-for="centro in centrosDisponibles"
+                  :key="centro"
+                  @click="() => { filtroCentro = centro; familiaSeleccionada = null; filtroCiclo = ''; }"
+                  class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 border"
+                  :class="filtroCentro === centro
+                    ? 'bg-[#00A859] text-white border-[#00A859] shadow-md'
+                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'">
+                  {{ centro }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ================================ -->
         <!-- CAPA 1: TARJETAS DE FAMILIAS     -->
         <!-- ================================ -->
@@ -226,30 +211,14 @@ const confirmarEliminar = async () => {
               Selecciona una familia profesional para explorar sus micro-retos
             </p>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-if="familiasFiltradas.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <button
-                v-for="familia in familias"
+                v-for="familia in familiasFiltradas"
                 :key="familia.nombre"
                 @click="seleccionarFamilia(familia.nombre)"
                 class="group relative rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white text-left focus:outline-none focus:ring-2 focus:ring-[#00A859]/40">
 
-                <!--
-                  ZONA DE IMAGEN
-                  Ahora muestra un placeholder con gradiente.
-                  En la próxima versión de BD, cuando familia.imagen_url exista,
-                  simplemente quitar el bloque placeholder y descomentar el <img>.
-                -->
                 <div class="relative h-44 overflow-hidden">
-
-                  <!-- FUTURO: descomentar cuando haya imágenes -->
-                  <!-- <img
-                    v-if="familia.imagen_url"
-                    :src="familia.imagen_url"
-                    :alt="familia.nombre"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  /> -->
-
-                  <!-- PLACEHOLDER ACTUAL: gradiente con icono -->
                   <div class="w-full h-full bg-gradient-to-br from-[#00A859]/10 via-[#99CC33]/10 to-gray-100 flex items-center justify-center group-hover:from-[#00A859]/20 group-hover:via-[#99CC33]/15 transition-all duration-300">
                     <svg class="w-16 h-16 text-[#00A859]/30 group-hover:text-[#00A859]/50 transition-colors duration-300"
                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,14 +226,11 @@ const confirmarEliminar = async () => {
                         d="M12 14l9-5-9-5-9 5 9 5zm0 7V14m0 0l-6.16-3.422M12 21a11.952 11.952 0 01-5.835-6.578" />
                     </svg>
                   </div>
-
-                  <!-- Contador de retos -->
                   <div class="absolute top-3 right-3 bg-[#00A859] text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow">
                     {{ conteoPorFamilia[familia.nombre] || 0 }} reto{{ (conteoPorFamilia[familia.nombre] || 0) !== 1 ? 's' : '' }}
                   </div>
                 </div>
 
-                <!-- Nombre y CTA -->
                 <div class="p-5">
                   <h3 class="font-black text-[#1F2937] text-base leading-tight mb-3 group-hover:text-[#00A859] transition-colors line-clamp-2">
                     {{ familia.nombre }}
@@ -277,9 +243,21 @@ const confirmarEliminar = async () => {
                     </svg>
                   </div>
                 </div>
-
               </button>
             </div>
+
+            <!-- Sin familias para este centro -->
+            <div v-else class="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-300 shadow-sm">
+              <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-gray-100 shadow-inner">
+                <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 class="text-[#1F2937] font-black text-2xl mb-2">Sin micro-retos para este centro</h3>
+              <p class="text-gray-500 text-sm max-w-md mx-auto">Este centro todavía no tiene micro-retos generados.</p>
+            </div>
+
           </div>
         </Transition>
 
@@ -289,7 +267,6 @@ const confirmarEliminar = async () => {
         <Transition name="slide-up" mode="out-in">
           <div v-if="familiaSeleccionada" key="microretos">
 
-            <!-- Cabecera con botón volver -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <div class="flex items-center gap-4">
                 <button @click="volverAFamilias"
@@ -308,24 +285,9 @@ const confirmarEliminar = async () => {
               </span>
             </div>
 
-            <!-- Filtros: Centro + Ciclo únicamente -->
+            <!-- Filtro de Ciclo (el de centro ya está arriba, siempre visible) -->
             <section class="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.04)] mb-10">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
-
-                <div>
-                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-2 mb-2 flex items-center gap-2">
-                    <svg class="w-3 h-3 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    Centro Educativo
-                  </label>
-                  <select v-model="filtroCentro" @change="filtroCiclo = ''"
-                    class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-[#1F2937] focus:bg-white focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/10 outline-none transition-all shadow-sm">
-                    <option value="">Todos los centros...</option>
-                    <option v-for="centro in centrosDisponibles" :key="centro" :value="centro">{{ centro }}</option>
-                  </select>
-                </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
 
                 <div>
                   <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-2 mb-2 block">
@@ -340,9 +302,9 @@ const confirmarEliminar = async () => {
                 </div>
 
                 <div>
-                  <button @click="limpiarFiltros" :disabled="!filtroCentro && !filtroCiclo"
+                  <button @click="limpiarFiltros" :disabled="!filtroCiclo"
                     class="w-full py-3.5 rounded-xl font-bold text-xs tracking-widest uppercase transition-all border flex items-center justify-center gap-2 shadow-sm"
-                    :class="(filtroCentro || filtroCiclo)
+                    :class="filtroCiclo
                       ? 'bg-white text-red-500 border-red-200 hover:bg-red-50 hover:border-red-400'
                       : 'bg-gray-50 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed'">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -356,7 +318,7 @@ const confirmarEliminar = async () => {
               </div>
             </section>
 
-            <!-- Grid de microretos (sin cambios respecto al original) -->
+            <!-- Grid de microretos -->
             <div v-if="microretosFiltrados.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div v-for="reto in microretosFiltrados" :key="reto.id"
                 class="bg-white rounded-[1.5rem] border border-gray-100 hover:border-[#00A859]/40 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] shadow-sm transition-all duration-300 flex flex-col group relative overflow-hidden transform hover:-translate-y-1">
@@ -415,7 +377,6 @@ const confirmarEliminar = async () => {
               </div>
             </div>
 
-            <!-- Sin resultados -->
             <div v-else class="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-300 shadow-sm">
               <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-gray-100 shadow-inner">
                 <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,7 +399,7 @@ const confirmarEliminar = async () => {
     </div>
   </div>
 
-  <!-- MODAL ELIMINAR (sin cambios) -->
+  <!-- MODAL ELIMINAR -->
   <Transition name="fade">
     <div v-if="modalVisible"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
