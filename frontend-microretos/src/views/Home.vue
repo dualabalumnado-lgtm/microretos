@@ -1,21 +1,30 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router'; // Importamos el router
+import { useRouter } from 'vue-router';
+import LoginModal from '../components/LoginModal.vue'; 
 
-const router = useRouter(); // Instanciamos el router
-
-// Estado para controlar las animaciones de entrada
+const router = useRouter();
 const isLoaded = ref(false);
+const showLogin = ref(false); // 👈 controla el modal
 
 onMounted(() => {
-  // Pequeño retraso para asegurar que la vista renderiza antes de animar
   setTimeout(() => {
     isLoaded.value = true;
   }, 100);
 });
 
-// Funciones de navegación conectadas a tus rutas
+// 👇 Ya no navega directamente, abre el modal
 const irAGenerador = () => {
+  // Si ya está logueado, navega directo
+  if (localStorage.getItem('admin_token')) {
+    router.push({ name: 'microretos' });
+  } else {
+    showLogin.value = true;
+  }
+};
+
+// 👇 Solo navega si el login fue exitoso
+const onLoginSuccess = () => {
   router.push({ name: 'microretos' });
 };
 
@@ -130,6 +139,8 @@ const irABiblioteca = () => {
         </div>
       </main>
     </div>
+    <!-- Al final del template, antes del último </div> -->
+    <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
   </div>
 </template>
 
