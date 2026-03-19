@@ -1,10 +1,15 @@
 <script setup>
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import LoginModal from './LoginModal.vue'  
 
 const isOpen    = ref(false)
 const logoError = ref(false)
 const route     = useRoute()
+const router    = useRouter()
+
+// 👇 controla el modal
+const showLogin = ref(false)
 
 const toggle = () => { isOpen.value = !isOpen.value }
 const close  = () => { isOpen.value = false }
@@ -13,9 +18,24 @@ const closeOnMobile = () => {
   if (window.innerWidth < 1024) isOpen.value = false
 }
 
-// Home: exact match. Resto: startsWith para cubrir subrutas futuras
 const isActive = (path) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
+
+// 👇 intercepta el click del generador
+const irAGenerador = () => {
+  closeOnMobile()
+  if (localStorage.getItem('admin_token')) {
+    router.push('/microretos')
+  } else {
+    showLogin.value = true
+  }
+}
+
+// 👇 navega tras login exitoso
+const onLoginSuccess = () => {
+  isOpen.value = false
+  router.push('/microretos')
+}
 
 defineExpose({ isOpen, toggle, close })
 </script>
@@ -111,18 +131,18 @@ defineExpose({ isOpen, toggle, close })
         </p>
 
         <!-- Generador de microretos -->
-        <RouterLink
-          to="/microretos"
-          @click="closeOnMobile"
-          class="nav-item"
+        <!-- Generador de microretos — cambia RouterLink por button -->
+        <button
+          @click="irAGenerador"
+          class="nav-item w-full text-left"
           :class="isActive('/microretos') ? 'nav-item--active' : 'nav-item--idle'"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
           <span>Generador de microretos</span>
-        </RouterLink>
+        </button>
 
         <!-- Biblioteca de microretos -->
         <RouterLink
@@ -156,6 +176,8 @@ defineExpose({ isOpen, toggle, close })
 
     </aside>
   </Transition>
+   <!-- Modal de login -->
+  <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
 </template>
 
 <style scoped>
