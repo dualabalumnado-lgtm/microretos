@@ -55,6 +55,14 @@ Route::post('/guardar-microretos-lote', [MicroretoIAController::class, 'guardarL
 // Borrar microreto
 Route::delete('/microretos/{id}', [MicroretoIAController::class, 'destroy']);
 
+// LOGIN Y LOGOUT
+use App\Http\Controllers\AdminAuthController;
+
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+
+
 Route::get('/importar-excel', function () {
     // 1. Buscamos el archivo que acabas de guardar
     $path = storage_path('app/agraria.csv'); ///////////////////////////////////////
