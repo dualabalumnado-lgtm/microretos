@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth'; 
 import LoginModal from '../components/LoginModal.vue'; 
 
 const router = useRouter();
+const authStore = useAuthStore();
 const isLoaded = ref(false);
 const showLogin = ref(false); // 👈 controla el modal
 
@@ -16,7 +18,7 @@ onMounted(() => {
 // 👇 Ya no navega directamente, abre el modal
 const irAGenerador = () => {
   // Si ya está logueado, navega directo
-  if (localStorage.getItem('admin_token')) {
+  if (authStore.isAuthenticated) {
     router.push({ name: 'microretos' });
   } else {
     showLogin.value = true;
