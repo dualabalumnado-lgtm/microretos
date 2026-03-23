@@ -14,4 +14,13 @@ const api = axios.create({
   }
 });
 
+// Adjunta el token Sanctum en cada petición si existe
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('admin_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default api;

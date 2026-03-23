@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class AdminAuthController extends Controller
 {
@@ -15,25 +16,15 @@ class AdminAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $adminEmail    = config('admin.email');
-        $adminPassword = config('admin.password');
-
-        if (
-            $request->email !== $adminEmail ||
-            $request->password !== $adminPassword
-        ) {
+        if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
                 'success' => false,
                 'message' => 'Credenciales incorrectas.',
             ], 401);
         }
 
-        // Genera un token simple firmado (no requiere Sanctum ni Passport)
-        $token = base64_encode(hash_hmac(
-            'sha256',
-            $adminEmail . now()->format('Y-m-d'),
-            config('app.key')
-        ));
+        $user  = Auth::user();
+        $token = $user->createToken('admin-token')->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -44,7 +35,8 @@ class AdminAuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        // Si en el futuro usas Sanctum, aquí revocarías el token
+        $request->user()->currentAccessToken()->delete();
+
         return response()->json([
             'success' => true,
             'message' => 'Sesión cerrada.',
