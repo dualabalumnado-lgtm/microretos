@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DatosFPController;
 use App\Http\Controllers\MicroretoIAController;
+use App\Http\Controllers\AdminAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -10,59 +11,45 @@ use App\Http\Controllers\MicroretoIAController;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/microretos', [MicroretoIAController::class, 'index']);
-// (Si prefieres ponerlo en DatosFPController, cambia la clase)
-// --- RUTAS DE CONSULTA (LECTURA) ---
-// Estas rutas alimentan tus desplegables en cascada
+// --- RUTAS PÚBLICAS (sin autenticación) ---
 
-// API para buscar microreto para mostrar en Detalle-Microreto
+Route::get('/microretos', [MicroretoIAController::class, 'index']);
 Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
 
-// 1. Nuevas rutas B2B (Empresas y Familias asociadas)
 Route::get('/empresas', [DatosFPController::class, 'getEmpresas']);
 Route::get('/empresas/{id}/familias', [DatosFPController::class, 'getFamiliasPorEmpresa']);
 
-// 2. Rutas Académicas clásicas
 Route::get('/familias', [DatosFPController::class, 'getFamilias']);
 Route::get('/familias/{familia}/ciclos', [DatosFPController::class, 'getCiclos']);
 Route::get('/ciclos/{idCiclo}/modulos', [DatosFPController::class, 'getModulos']);
-Route::get('/modulos/{idModulo}/ra-ce', [DatosFPController::class, 'getRaCe']); // Se llama ra-ce en URL, getRaCe en método
+Route::get('/modulos/{idModulo}/ra-ce', [DatosFPController::class, 'getRaCe']);
 
-// Crear nueva empresa
-Route::post('/empresas', [\App\Http\Controllers\DatosFPController::class, 'guardarEmpresa']);
-
-// Actualizar información de empresa existente
-Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);
-
-
-
-// Actualizar información faltante de la empresa 
-Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);
-//-------------------------------------------------------------//
-
-// --- RUTAS DE ACCIÓN (ESCRITURA / IA) ---
-// Estas rutas procesan la generación y el guardado
-
-// Genera el JSON con OpenAI
-Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
-
-// Guarda el resultado final en la base de datos
-Route::post('/guardar-microreto-bd', [MicroretoIAController::class, 'guardarEnBD']);
-
-// Guarda lote de microretos en la base de datos
-Route::post('/guardar-microretos-lote', [MicroretoIAController::class, 'guardarLote']); 
-
-// Borrar microreto
-Route::delete('/microretos/{id}', [MicroretoIAController::class, 'destroy']);
-
-// LOGIN Y LOGOUT
-use App\Http\Controllers\AdminAuthController;
-
+// Auth pública
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
-Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
 
+// --- RUTAS PROTEGIDAS (requieren token Sanctum) ---
 
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Auth
+    Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+    // Escritura de empresas
+    Route::post('/empresas', [DatosFPController::class, 'guardarEmpresa']);
+    Route::put('/empresas/{id}', [DatosFPController::class, 'actualizarEmpresa']);
+
+    // Generación y guardado de microretos
+    Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
+    Route::post('/guardar-microreto-bd', [MicroretoIAController::class, 'guardarEnBD']);
+    Route::post('/guardar-microretos-lote', [MicroretoIAController::class, 'guardarLote']);
+
+    // Borrar microreto ← protegido
+    Route::delete('/microretos/{id}', [MicroretoIAController::class, 'destroy']);
+
+});
+
+// -------- IMPORTACIONES ---------
 Route::get('/importar-excel', function () {
     // 1. Buscamos el archivo que acabas de guardar
     $path = storage_path('app/agraria.csv'); ///////////////////////////////////////

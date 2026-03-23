@@ -1,8 +1,11 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed  } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'  
+import api from '../api.js'
+import { useAuthStore } from '../stores/auth'
 
+const authStore    = useAuthStore()
 const isOpen    = ref(false)
 const logoError = ref(false)
 const route     = useRoute()
@@ -10,6 +13,9 @@ const router    = useRouter()
 
 // 👇 controla el modal
 const showLogin = ref(false)
+const cargandoOut  = ref(false) 
+
+// const estaAutenticado = computed(() => !!localStorage.getItem('admin_token'))
 
 const toggle = () => { isOpen.value = !isOpen.value }
 const close  = () => { isOpen.value = false }
@@ -24,7 +30,8 @@ const isActive = (path) =>
 // 👇 intercepta el click del generador
 const irAGenerador = () => {
   closeOnMobile()
-  if (localStorage.getItem('admin_token')) {
+  if (authStore.isAuthenticated) {
+  // if (localStorage.getItem('admin_token')) {
     router.push('/microretos')
   } else {
     showLogin.value = true
@@ -37,11 +44,27 @@ const onLoginSuccess = () => {
   router.push('/microretos')
 }
 
+const cerrarSesion = async () => {
+  cargandoOut.value = true
+  try {
+    await api.post('/admin/logout')
+  } catch (e) {
+    // Si falla la petición, igual limpiamos localmente
+    console.warn('Error al revocar token en servidor:', e)
+  } finally {
+    authStore.logout()
+    // localStorage.removeItem('admin_token')
+    cargandoOut.value = false
+    isOpen.value = false
+    router.push('/')
+  }
+}
+
+
 defineExpose({ isOpen, toggle, close })
 </script>
 
 <template>
-  <!-- Overlay (solo móvil, cierra el panel al tocar fuera) -->
   <Transition name="sp-fade">
     <div
       v-if="isOpen"
@@ -50,7 +73,6 @@ defineExpose({ isOpen, toggle, close })
     />
   </Transition>
 
-  <!-- Botón hamburguesa / toggle -->
   <button
     @click="toggle"
     :aria-label="isOpen ? 'Cerrar menú' : 'Abrir menú'"
@@ -71,7 +93,6 @@ defineExpose({ isOpen, toggle, close })
     </span>
   </button>
 
-  <!-- Panel lateral -->
   <Transition name="sp-slide">
     <aside
       v-if="isOpen"
@@ -104,7 +125,6 @@ defineExpose({ isOpen, toggle, close })
           Navegación
         </p>
 
-        <!-- Home -->
         <RouterLink
           to="/"
           @click="closeOnMobile"
@@ -130,8 +150,6 @@ defineExpose({ isOpen, toggle, close })
           Herramientas
         </p>
 
-        <!-- Generador de microretos -->
-        <!-- Generador de microretos — cambia RouterLink por button -->
         <button
           @click="irAGenerador"
           class="nav-item w-full text-left"
@@ -144,7 +162,6 @@ defineExpose({ isOpen, toggle, close })
           <span>Generador de microretos</span>
         </button>
 
-        <!-- Biblioteca de microretos -->
         <RouterLink
           to="/biblioteca"
           @click="closeOnMobile"
@@ -154,7 +171,7 @@ defineExpose({ isOpen, toggle, close })
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 22v-15A2.5 2.5 0 016.5 2z"/>
             <line x1="9" y1="7" x2="15" y2="7"/>
             <line x1="9" y1="11" x2="15" y2="11"/>
           </svg>
@@ -163,8 +180,63 @@ defineExpose({ isOpen, toggle, close })
 
       </nav>
 
-      <!-- Footer -->
-      <div class="px-4 py-4 border-t border-white/10">
+      <!-- Footer: sesión + sistema activo -->
+      <div class="px-4 py-4 border-t border-white/10 space-y-3">
+
+        <!-- ← BLOQUE DE SESIÓN -->
+        <!-- Si está autenticado: muestra email + botón logout -->
+        <div v-if="authStore.isAuthenticated" class="px-3 py-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full bg-[#00A859]/20 border border-[#00A859]/30 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[9px] font-black uppercase tracking-widest text-white/30">Sesión activa</p>
+              <p class="text-xs font-bold text-white truncate">Administrador</p>
+            </div>
+          </div>
+
+          <button
+            @click="cerrarSesion"
+            :disabled="cargandoOut"
+            class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl
+                   bg-red-500/10 border border-red-500/20 text-red-400
+                   hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300
+                   font-black text-[10px] uppercase tracking-widest
+                   transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg v-if="!cargandoOut" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            <svg v-else class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+            </svg>
+            {{ cargandoOut ? 'Cerrando...' : 'Cerrar sesión' }}
+          </button>
+        </div>
+
+        <!-- Si NO está autenticado: botón de login -->
+        <button
+          v-else
+          @click="showLogin = true"
+          class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl
+                 bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859]
+                 hover:bg-[#00A859]/20 hover:border-[#00A859]/40
+                 font-black text-[10px] uppercase tracking-widest
+                 transition-all duration-200"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          Iniciar sesión
+        </button>
+
+        <!-- Indicador sistema activo -->
         <div class="flex items-center gap-2 px-3 py-2.5 rounded-2xl
                     bg-[#99CC33]/10 border border-[#99CC33]/20">
           <span class="w-2 h-2 rounded-full bg-[#99CC33] animate-pulse flex-shrink-0" />
@@ -176,12 +248,11 @@ defineExpose({ isOpen, toggle, close })
 
     </aside>
   </Transition>
-   <!-- Modal de login -->
+
   <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
 </template>
 
 <style scoped>
-/*Ítem base*/
 .nav-item {
   display: flex;
   align-items: center;
@@ -197,48 +268,28 @@ defineExpose({ isOpen, toggle, close })
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/*En reposo*/
-.nav-item--idle {
-  color: rgba(255, 255, 255, 0.5);
-}
+.nav-item--idle { color: rgba(255, 255, 255, 0.5); }
 .nav-item--idle:hover {
   background-color: rgba(255, 255, 255, 0.07);
   color: rgba(255, 255, 255, 0.9);
 }
-
-/*Activo*/
 .nav-item--active {
   background: linear-gradient(135deg, rgba(0,168,89,0.18) 0%, rgba(153,204,51,0.12) 100%);
   color: #00A859;
   box-shadow: inset 3px 0 0 #00A859;
 }
-
-/*Icono*/
 .nav-icon {
   width: 17px;
   height: 17px;
   flex-shrink: 0;
   color: inherit;
 }
-
-/*Transición panel*/
 .sp-slide-enter-active,
-.sp-slide-leave-active {
-  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
+.sp-slide-leave-active { transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1); }
 .sp-slide-enter-from,
-.sp-slide-leave-to {
-  transform: translateX(-100%);
-}
-
-/*Transición overlay*/
+.sp-slide-leave-to { transform: translateX(-100%); }
 .sp-fade-enter-active,
-.sp-fade-leave-active {
-  transition: opacity 250ms ease;
-}
+.sp-fade-leave-active { transition: opacity 250ms ease; }
 .sp-fade-enter-from,
-.sp-fade-leave-to {
-  opacity: 0;
-}
+.sp-fade-leave-to { opacity: 0; }
 </style>

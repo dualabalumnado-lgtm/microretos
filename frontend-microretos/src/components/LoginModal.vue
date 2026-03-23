@@ -73,7 +73,10 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
+
+const authStore = useAuthStore()
 
 const props = defineProps({
   modelValue: Boolean
@@ -121,7 +124,8 @@ async function handleLogin() {
     })
 
     if (response.data.success) {
-      localStorage.setItem('admin_token', response.data.token)
+      authStore.login(response.data.token)
+      // localStorage.setItem('admin_token', response.data.token)
       emit('login-success', response.data)
       emit('update:modelValue', false)
       form.email = ''
