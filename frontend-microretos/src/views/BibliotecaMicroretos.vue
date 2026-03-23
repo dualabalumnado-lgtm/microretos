@@ -1,13 +1,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth'
 import api from '../api.js';
+import LoginModal from '../components/LoginModal.vue'; 
 
+const router = useRouter();
 const isLoaded = ref(false);
 const microretos = ref([]);
 const cargando = ref(true);
 const familias = ref([]);
+const showLogin = ref(false);
+const accionPendiente = ref(null);
 
 const familiaSeleccionada = ref(null);
+
+const authStore = useAuthStore()
 
 // filtroCentro ahora actúa en AMBAS capas (familias y microretos)
 const filtroCentro = ref('');
@@ -97,11 +105,40 @@ const limpiarFiltros = () => {
   filtroCiclo.value = '';
 };
 
+const estaAutenticado = () => authStore.isAuthenticated
+
+const irADetalle = (reto) => {
+  if (!estaAutenticado()) {
+    accionPendiente.value = { tipo: 'ver', payload: reto };
+    showLogin.value = true;
+    return;
+  }
+  router.push({ name: 'detalle-microreto', params: { id: reto.id } });
+};
+
+const onLoginSuccess = () => {
+  if (!accionPendiente.value) return;
+  const { tipo, payload } = accionPendiente.value;
+  accionPendiente.value = null;
+
+  if (tipo === 'eliminar') {
+    retoAEliminar.value = payload;
+    modalVisible.value = true;
+  } else if (tipo === 'ver') {
+    router.push({ name: 'detalle-microreto', params: { id: payload.id } });
+  }
+};
+
 // --- MODAL ---
 const modalVisible = ref(false);
 const retoAEliminar = ref(null);
 
 const abrirModalEliminar = (reto) => {
+  if (!estaAutenticado()) {
+    accionPendiente.value = { tipo: 'eliminar', payload: reto };
+    showLogin.value = true;
+    return;
+  }
   retoAEliminar.value = reto;
   modalVisible.value = true;
 };
@@ -367,13 +404,13 @@ const confirmarEliminar = async () => {
                   </svg>
                 </button>
 
-                <RouterLink :to="{ name: 'detalle-microreto', params: { id: reto.id } }"
+                <button @click="irADetalle(reto)"
                   class="w-full bg-gray-50 group-hover:bg-[#00A859] text-gray-500 group-hover:text-white font-black text-xs uppercase tracking-widest py-4 transition-all duration-300 border-t border-gray-100 group-hover:border-[#00A859] flex items-center justify-center gap-2">
                   Ver Ficha Técnica
                   <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </RouterLink>
+                </button>
               </div>
             </div>
 
@@ -430,6 +467,9 @@ const confirmarEliminar = async () => {
       </div>
     </div>
   </Transition>
+
+  <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
+
 </template>
 
 <style scoped>
