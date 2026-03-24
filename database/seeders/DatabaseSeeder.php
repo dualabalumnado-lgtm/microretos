@@ -13,12 +13,14 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      */
-    public function run(): void
-    {
-        User::factory()->create([
+   public function run(): void
+{
+    \App\Models\User::updateOrCreate(
+        ['email' => env('ADMIN_EMAIL')],
+        [
             'name'     => 'Administrador DuaLab',
-            'email'    => env('ADMIN_EMAIL'),
             'password' => bcrypt(env('ADMIN_PASSWORD')),
-        ]);
-    }
+        ]
+    );
+}
 }
