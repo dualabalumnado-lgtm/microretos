@@ -113,7 +113,9 @@ defineExpose({ isOpen, toggle, close })
              class="w-9 h-9 rounded-xl bg-[#00A859] flex items-center justify-center font-black text-white text-sm">
           D
         </div>
-        <span class="font-black text-xl tracking-tighter text-white uppercase">
+        <span
+          class="ml-4 font-black text-xl tracking-tighter text-white uppercase"
+        >
           Dua<span class="text-[#00A859]">Lab</span>
         </span>
       </div>
