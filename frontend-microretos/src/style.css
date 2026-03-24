@@ -25,22 +25,22 @@ h3, h4 {
    Estilo de Inputs (Alto Contraste)
    Aplica el estilo moderno oscuro sobre tarjetas claras
 --------------------------------------------------- */
+
 input, select, textarea {
-  background-color: #1F2937 !important; /* Fondo gris muy oscuro (Carbón) */
-  color: #FFFFFF !important; /* Texto blanco puro */
-  border: 2px solid transparent !important;
+  background-color: #F0FBF4 !important; /* Verde muy claro (menta suave) */
+  color: #1F2937 !important;            /* Texto oscuro para máxima legibilidad */
+  border: 2px solid #BBE8D0 !important; /* Borde verde tenue */
 }
 
-/* Color del texto de relleno (placeholder) */
 input::placeholder, textarea::placeholder {
-  color: #6B7280 !important; /* Gris medio/claro para que se lea sobre el fondo oscuro */
+  color: #9CA3AF !important; /* Gris medio, legible sobre fondo verde claro */
 }
 
-/* Estado de Focus (Al hacer clic para escribir) */
 input:focus, select:focus, textarea:focus {
-  border-color: #00A859 !important; /* Borde verde corporativo */
+  border-color: #00A859 !important;
+  background-color: #E6F7EE !important; /* Verde un tono más intenso al enfocar */
   outline: none !important;
-  box-shadow: 0 0 0 4px rgba(0, 168, 89, 0.2) !important; /* Halo de luz verde suave (focus-ring) */
+  box-shadow: 0 0 0 4px rgba(0, 168, 89, 0.15) !important;
 }
 
 /* Customización del Scrollbar (Opcional, pero recomendado para mantener limpieza) */

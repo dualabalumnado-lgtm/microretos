@@ -169,6 +169,14 @@ const confirmarEliminar = async () => {
       :class="isLoaded ? 'opacity-10' : 'opacity-0'">
     </div>
 
+    <img
+      src="../assets/logo.png"
+      alt=""
+      aria-hidden="true"
+      class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[550px] max-w-none pointer-events-none select-none object-contain transition-opacity duration-1000 z-0"
+      :class="isLoaded ? 'opacity-20' : 'opacity-0'"
+    />
+
     <div class="max-w-7xl mx-auto relative z-10">
 
       <!-- HEADER -->
