@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api.js';
 
@@ -24,6 +24,25 @@ onMounted(async () => {
 });
 
 const volver = () => router.push({ name: 'biblioteca' });
+
+// --- NUEVA LÓGICA PARA LA IMAGEN DE FONDO ---
+const imagenFondo = computed(() => {
+  // Si todavía no hay reto o no tiene familia, devolvemos null (o podrías devolver el logo por defecto)
+  if (!reto.value || !reto.value.familia) return null;
+
+  // 1. Convertimos el nombre (ej. "Imagen y Sonido" -> "imagen-y-sonido")
+  const slugFamilia = reto.value.familia
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quita tildes
+    .replace(/\s+/g, '-')                             // Cambia espacios por guiones
+    .replace(/[^a-z0-9-]/g, '');                      // Limpia caracteres extraños
+
+  // 2. Construimos la URL usando la variable de entorno de Vite
+  // Importante: le quitamos el '/api' del final a tu VITE_API_URL para acceder a la carpeta public
+  const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
+  
+  return `${baseUrl}/familias/${slugFamilia}.webp`;
+});
 </script>
 
 <template>
@@ -102,81 +121,96 @@ const volver = () => router.push({ name: 'biblioteca' });
              :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'">
 
           <!-- ── Cabecera ── -->
-          <div class="bg-gray-50 border-b border-gray-100 px-6 py-8 md:px-14 md:pt-12 md:pb-10">
+          <div class="relative bg-gray-50 border-b border-gray-100 overflow-hidden">
+            
+            <div class="absolute inset-0 z-0 pointer-events-none">
+              <div class="absolute inset-0 bg-gradient-to-r from-gray-50 via-gray-50/95 to-transparent z-10"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-gray-50 via-transparent to-transparent z-10"></div>
+              
+              <img
+                v-if="imagenFondo"
+                :src="imagenFondo"
+                alt=""
+                class="w-full h-full object-cover object-right opacity-30 md:opacity-40 mix-blend-multiply transition-opacity duration-1000"
+                :class="isLoaded ? 'opacity-30 md:opacity-40' : 'opacity-0'"
+              />
+            </div>
 
-            <p class="text-[#00A859] font-bold text-[10px] tracking-[0.2em] uppercase mb-4
-                      flex items-center gap-2">
-              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
-                         a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              DuaLab · Ficha de Microreto
-            </p>
+            <div class="relative z-10 px-6 py-8 md:px-14 md:pt-12 md:pb-10 max-w-4xl">
 
-            <h1 class="text-2xl sm:text-3xl md:text-5xl font-black text-[#1F2937]
-                       tracking-tight leading-tight mb-3">
-              {{ reto.titulo }}
-            </h1>
-            <h2 class="text-base md:text-xl text-gray-500 font-medium leading-relaxed mb-8">
-              {{ reto.subtitulo }}
-            </h2>
-
-            <!-- Etiquetas -->
-            <div class="flex flex-wrap gap-2 md:gap-3">
-              <span class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                           bg-[#1F2937] text-white rounded-lg
-                           text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <p class="text-[#00A859] font-bold text-[10px] tracking-[0.2em] uppercase mb-4
+                        flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5
-                           m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0
-                           011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
+                           a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                {{ reto.empresa_nombre }}
-              </span>
+                DuaLab · Ficha de Microreto
+              </p>
 
-              <span v-if="reto.familia"
-                    class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                           bg-white border border-gray-200 text-[#1F2937] rounded-lg
-                           text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                <svg class="w-3.5 h-3.5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2-2H5a2 2 0 01-2-2v-6
-                           a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5
-                           a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                </svg>
-                {{ reto.familia }}
-              </span>
+              <h1 class="text-2xl sm:text-3xl md:text-5xl font-black text-[#1F2937]
+                         tracking-tight leading-tight mb-3">
+                {{ reto.titulo }}
+              </h1>
+              <h2 class="text-base md:text-xl text-gray-500 font-medium leading-relaxed mb-8">
+                {{ reto.subtitulo }}
+              </h2>
 
-              <span v-if="reto.nivel_grupo"
-                    class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                           bg-white border border-gray-200 text-gray-500 rounded-lg
-                           text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0
-                           002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2
-                           a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2
-                           2h-2a2 2 0 01-2-2z"/>
-                </svg>
-                Nivel {{ reto.nivel_grupo }}
-              </span>
+              <div class="flex flex-wrap gap-2 md:gap-3">
+                <span class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-[#1F2937] text-white rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-sm">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5
+                             m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0
+                             011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                  </svg>
+                  {{ reto.empresa_nombre }}
+                </span>
 
-              <span v-if="reto.ciclo"
-                    class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                           bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859] rounded-lg
-                           text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 14l9-5-9-5-9 5 9 5z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0
-                           0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0
-                           01.665-6.479L12 14z"/>
-                </svg>
-                {{ reto.ciclo }}
-              </span>
+                <span v-if="reto.familia"
+                      class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-white/80 backdrop-blur-sm border border-gray-200 text-[#1F2937] rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <svg class="w-3.5 h-3.5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2-2H5a2 2 0 01-2-2v-6
+                             a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5
+                             a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                  </svg>
+                  {{ reto.familia }}
+                </span>
+
+                <span v-if="reto.nivel_grupo"
+                      class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-500 rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0
+                             002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2
+                             a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2
+                             2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                  Nivel {{ reto.nivel_grupo }}
+                </span>
+
+                <span v-if="reto.ciclo"
+                      class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-[#00A859]/10 backdrop-blur-sm border border-[#00A859]/20 text-[#00A859] rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 14l9-5-9-5-9 5 9 5z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0
+                             0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0
+                             01.665-6.479L12 14z"/>
+                  </svg>
+                  {{ reto.ciclo }}
+                </span>
+              </div>
             </div>
           </div>
 
