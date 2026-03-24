@@ -29,6 +29,14 @@ const volver = () => router.push({ name: 'biblioteca' });
 <template>
   <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
 
+    <img
+      src="../assets/logo.png"
+      alt=""
+      aria-hidden="true"
+      class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[550px] max-w-none pointer-events-none select-none object-contain transition-opacity duration-1000 z-0"
+      :class="isLoaded ? 'opacity-20' : 'opacity-0'"
+    />
+
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />

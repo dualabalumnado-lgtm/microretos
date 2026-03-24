@@ -448,6 +448,15 @@ const tieneContextoEmpresa = computed(() => {
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden">
+
+    <img
+      src="../assets/logo.png"
+      alt=""
+      aria-hidden="true"
+      class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[550px] max-w-none pointer-events-none select-none object-contain transition-opacity duration-1000 z-0"
+      :class="isLoaded ? 'opacity-20' : 'opacity-0'"
+    />
+
     <div class="max-w-6xl mx-auto">
       
       <header class="mb-10 text-center flex flex-col items-center">
@@ -491,7 +500,7 @@ const tieneContextoEmpresa = computed(() => {
       <main class="min-h-[400px]">
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-            <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)]">
+            <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
               
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8">
                 <div class="flex items-center gap-4">
@@ -520,6 +529,16 @@ const tieneContextoEmpresa = computed(() => {
                     Vaciar
                   </button>
                 </div>
+              </div>
+
+              <div v-if="esModoDemo" 
+                class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
+                <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-xs font-bold text-[#00A859] uppercase tracking-widest">
+                  Modo Demo activo — los campos están bloqueados. Pulsa "Vaciar" para editarlos.
+                </p>
               </div>
               
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -585,7 +604,7 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
 
-            <div v-if="empresaDetalle" class="bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
+            <div v-if="empresaDetalle" class="bg-white rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
   
             <div class="mb-8">
               <div class="flex items-center gap-3 mb-4">
@@ -642,12 +661,12 @@ const tieneContextoEmpresa = computed(() => {
                 
                 <div>
                   <label class="label-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'text-red-500' : ''">Sector de Actividad *</label>
-                  <input v-model="seleccion.empresaSector" class="input-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 placeholder:text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''" placeholder="¡FALTA INFO! Rellénalo por favor..." />
+                  <input v-model="seleccion.empresaSector" :disabled="esModoDemo" class="input-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 placeholder:text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''" placeholder="¡FALTA INFO! Rellénalo por favor..." />
                 </div>
 
                 <div>
                   <label class="label-style" :class="!seleccion.empresaTamano && (seleccion.empresaId || seleccion.empresaNombre) ? 'text-red-500' : ''">Tamaño de la Empresa *</label>
-                  <select v-model="seleccion.empresaTamano" class="input-style" :class="!seleccion.empresaTamano && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''">
+                  <select v-model="seleccion.empresaTamano" :disabled="esModoDemo" class="input-style" :class="!seleccion.empresaTamano && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''">
                     <option value="" disabled selected>¡FALTA INFO! Selecciona...</option>
                     <option value="Micropyme (1-10)">Micropyme (1 a 10 empleados)</option>
                     <option value="Pequeña (10-50)">Pequeña (10 a 50 empleados)</option>
@@ -658,7 +677,7 @@ const tieneContextoEmpresa = computed(() => {
 
                 <div class="col-span-2">
                   <label class="label-style">Web (Opcional)</label>
-                  <input v-model="seleccion.empresaWeb" class="input-style" placeholder="https://..." />
+                  <input v-model="seleccion.empresaWeb" :disabled="esModoDemo" class="input-style" placeholder="https://..." />
                 </div>
               </div>
             </section>
@@ -667,7 +686,7 @@ const tieneContextoEmpresa = computed(() => {
 
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 2" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative overflow-hidden">
+             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
               <div class="absolute top-0 right-0 bg-gray-50 text-[#1F2937] px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-bl-3xl border-b border-l border-gray-100">
                 Entrevista de Diagnóstico
               </div>
@@ -688,17 +707,35 @@ const tieneContextoEmpresa = computed(() => {
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Información Simulada
                   </button>
+
+                  <span v-if="esModoDemo"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase flex items-center gap-2 border bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default">
+                    ✓ DEMO ACTIVA
+                  </span>
+
+                  <!--
                   <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
                     <span v-else> Cargar Demo</span>
                   </button>
+                  -->
                   <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Vaciar
                   </button>
                 </div>
+              </div>
+
+              <div v-if="esModoDemo" 
+                class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
+                <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-xs font-bold text-[#00A859] uppercase tracking-widest">
+                  Modo Demo activo — los campos están bloqueados. Pulsa "Vaciar" para editarlos.
+                </p>
               </div>
 
               <div v-if="diagnosticoRecuperado" class="mb-10 p-5 md:p-6 bg-[#00A859]/5 border border-[#00A859]/20 rounded-3xl flex gap-4 md:gap-5 items-start">
@@ -723,7 +760,7 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 1)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 1)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-                  <textarea v-model="seleccion.diaANormal" class="input-style h-24" placeholder="Ej: Somos una empresa de servicios informáticos..."></textarea>
+                  <textarea v-model="seleccion.diaANormal" :disabled="esModoDemo" class="input-style h-24" placeholder="Ej: Somos una empresa de servicios informáticos..."></textarea>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -736,14 +773,14 @@ const tieneContextoEmpresa = computed(() => {
                       <button @click="abrirPopup('info', 2)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                       <button @click="abrirPopup('ejemplo', 2)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                     </div>
-                    <input v-model="seleccion.friccionArea" class="input-style" placeholder="Ej: Registro manual de albaranes..." />
+                    <input v-model="seleccion.friccionArea" :disabled="esModoDemo" class="input-style" placeholder="Ej: Registro manual de albaranes..." />
                   </div>
                   <div>
                     <label class="label-style flex items-center gap-2 mb-3">
                       <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2b</span>
                       ¿Por qué? Cuéntanos qué ocurre hoy
                     </label>
-                    <textarea v-model="seleccion.friccionProblema" class="input-style h-24" placeholder="Se pierde mucho tiempo porque... hay errores cuando..."></textarea>
+                    <textarea v-model="seleccion.friccionProblema" :disabled="esModoDemo" class="input-style h-24" placeholder="Se pierde mucho tiempo porque... hay errores cuando..."></textarea>
                   </div>
                 </div>
 
@@ -759,13 +796,14 @@ const tieneContextoEmpresa = computed(() => {
                   
                   <div class="flex flex-wrap gap-2 mb-4">
                     <button v-for="opt in limitacionesOpciones" :key="opt" 
-                      @click="seleccion.restricciones.includes(opt) ? seleccion.restricciones = seleccion.restricciones.filter(c => c !== opt) : seleccion.restricciones.push(opt)"
+                      @click="!esModoDemo && (seleccion.restricciones.includes(opt) ? seleccion.restricciones = seleccion.restricciones.filter(c => c !== opt) : seleccion.restricciones.push(opt))"
+                      :disabled="esModoDemo"
                       :class="seleccion.restricciones.includes(opt) ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white border-transparent shadow-md' : 'bg-[#1F2937] text-gray-300 border-transparent hover:border-[#00A859]/50'"
                       class="px-5 py-2.5 rounded-2xl border-2 text-[10px] font-black uppercase transition-all shadow-sm">
                       {{ opt }}
                     </button>
                   </div>
-                  <textarea v-model="seleccion.otraLimitacion" class="input-style h-20" placeholder="Describe aquí otros intentos de solución o detalles de las limitaciones..."></textarea>
+                  <textarea v-model="seleccion.otraLimitacion" :disabled="esModoDemo" class="input-style h-20" placeholder="Describe aquí otros intentos de solución o detalles de las limitaciones..."></textarea>
                 </div>
 
                 <div>
@@ -773,7 +811,7 @@ const tieneContextoEmpresa = computed(() => {
                     <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3b</span>
                     ¿Qué NO quieren bajo ningún concepto?
                   </label>
-                  <input v-model="seleccion.loQueNoQuieren" class="input-style" placeholder="Ej: Nada que requiera suscripción mensual..." />
+                  <input v-model="seleccion.loQueNoQuieren" :disabled="esModoDemo" class="input-style" placeholder="Ej: Nada que requiera suscripción mensual..." />
                 </div>
 
                 <div>
@@ -788,13 +826,14 @@ const tieneContextoEmpresa = computed(() => {
                   
                   <div class="flex flex-wrap gap-2 mb-4">
                     <button v-for="opt in consecuenciasOpciones" :key="opt" 
-                      @click="seleccion.consecuencias.includes(opt) ? seleccion.consecuencias = seleccion.consecuencias.filter(c => c !== opt) : seleccion.consecuencias.push(opt)"
+                      @click="!esModoDemo && (seleccion.consecuencias.includes(opt) ? seleccion.consecuencias = seleccion.consecuencias.filter(c => c !== opt) : seleccion.consecuencias.push(opt))"
+                      :disabled="esModoDemo"
                       :class="seleccion.consecuencias.includes(opt) ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white border-transparent shadow-md' : 'bg-[#1F2937] text-gray-300 border-transparent hover:border-[#99CC33]/50'"
                       class="px-5 py-2.5 rounded-2xl border-2 text-[10px] font-black uppercase transition-all shadow-sm">
                       {{ opt }}
                     </button>
                   </div>
-                  <input v-model="seleccion.otraConsecuencia" class="input-style" placeholder="Otra mejora específica (Opcional)..." />
+                  <input v-model="seleccion.otraConsecuencia" :disabled="esModoDemo" class="input-style" placeholder="Otra mejora específica (Opcional)..." />
                 </div>
 
                 <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
@@ -806,7 +845,7 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 5)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 5)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-                  <textarea v-model="seleccion.expectativasAlumno" class="input-style h-24" placeholder="Ej: Que investigue herramientas gratuitas y proponga un prototipo sencillo..."></textarea>
+                  <textarea v-model="seleccion.expectativasAlumno" :disabled="esModoDemo" class="input-style h-24" placeholder="Ej: Que investigue herramientas gratuitas y proponga un prototipo sencillo..."></textarea>
                 </div>
 
               </div>
@@ -816,7 +855,7 @@ const tieneContextoEmpresa = computed(() => {
 
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 3" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-            <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative overflow-hidden">
+            <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
@@ -833,12 +872,20 @@ const tieneContextoEmpresa = computed(() => {
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Información Simulada
                   </button>
+
+                  <span v-if="esModoDemo"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase flex items-center gap-2 border bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default">
+                    ✓ DEMO ACTIVA
+                  </span>
+
+                  <!--
                   <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
                     <span v-else> Cargar Demo</span>
                   </button>
+                  -->
                   <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Vaciar
@@ -846,10 +893,20 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
               
+              <div v-if="esModoDemo" 
+                class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
+                <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-xs font-bold text-[#00A859] uppercase tracking-widest">
+                  Modo Demo activo — los campos están bloqueados. Pulsa "Vaciar" para editarlos.
+                </p>
+              </div>
+
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="col-span-2 md:col-span-1">
                   <label class="label-style">Familia Profesional Asociada *</label>
-                  <select v-model="seleccion.familia" class="input-style">
+                  <select v-model="seleccion.familia" :disabled="esModoDemo" class="input-style">
                     <option value="">Selecciona Familia...</option>
                     <option v-for="f in familiasFiltradas" :key="f" :value="f">{{ f }}</option>
                   </select>
@@ -857,7 +914,7 @@ const tieneContextoEmpresa = computed(() => {
 
                 <div class="col-span-2 md:col-span-1">
                   <label class="label-style">Nivel del Grupo-Clase *</label>
-                  <select v-model="seleccion.nivelGrupo" class="input-style">
+                  <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
                     <option value="Básico">Básico (Ej: FP Básica o 1º de GM)</option>
                     <option value="Medio">Medio (Ej: 2º de GM o 1º de GS)</option>
                     <option value="Alto">Alto (Ej: 2º de GS o Especialización)</option>
@@ -869,7 +926,8 @@ const tieneContextoEmpresa = computed(() => {
                   
                   <div v-if="ciclos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                      <button v-for="c in ciclos" :key="c.id" 
-                        @click="seleccion.cicloId = c.id"
+                        @click="!esModoDemo && (seleccion.cicloId = c.id)"
+                        :disabled="esModoDemo"
                         :class="seleccion.cicloId === c.id 
                             ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] border-transparent text-white' 
                             : 'bg-[#1F2937] border-transparent text-gray-300 hover:border-[#00A859]/40'"
@@ -892,12 +950,14 @@ const tieneContextoEmpresa = computed(() => {
                 <div class="col-span-2 mt-6">
                   <label class="label-style !mb-3">Curso del Alumnado *</label>
                   <div class="flex bg-[#1F2937] p-1.5 rounded-2xl w-full md:w-1/2 shadow-inner">
-                    <button @click="seleccion.cursoSeleccionado = 1" 
+                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 1)" 
+                      :disabled="esModoDemo"
                       :class="seleccion.cursoSeleccionado === 1 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'" 
                       class="flex-1 py-3 rounded-xl text-sm transition-all">
                       1º Curso
                     </button>
-                    <button @click="seleccion.cursoSeleccionado = 2" 
+                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 2)" 
+                      :disabled="esModoDemo"
                       :class="seleccion.cursoSeleccionado === 2 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'" 
                       class="flex-1 py-3 rounded-xl text-sm transition-all">
                       2º Curso
@@ -912,7 +972,7 @@ const tieneContextoEmpresa = computed(() => {
                       <span class="text-xs text-gray-400 italic">Si no eliges, la IA cruzará con todos.</span>
                     </div>
                     
-                    <select v-model="modulosSeleccionados" multiple :disabled="modulosDelCurso.length === 0" class="input-style min-h-[120px]">
+                    <select v-model="modulosSeleccionados" multiple :disabled="esModoDemo || modulosDelCurso.length === 0" class="input-style min-h-[120px]">
                       <option v-for="m in modulosDelCurso" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                     </select>
                     <p v-if="modulosDelCurso.length === 0 && seleccion.cicloId" class="text-xs text-red-500 mt-2 italic">No hay módulos cargados para este curso.</p>
@@ -922,7 +982,7 @@ const tieneContextoEmpresa = computed(() => {
                 <div class="col-span-2 mt-2 pt-6 border-t border-gray-100">
                   <div class="w-full md:w-1/3">
                     <label class="label-style !mb-3 text-[#1F2937]">Cantidad de Variantes a Generar *</label>
-                    <select v-model="seleccion.cantidadMicroretos" class="input-style focus:!border-[#00A859]">
+                    <select v-model="seleccion.cantidadMicroretos" :disabled="esModoDemo" class="input-style focus:!border-[#00A859]">
                       <option v-for="n in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15]" :key="n" :value="n">
                         Generar {{ n }} Variante{{ n > 1 ? 's' : '' }}
                       </option>
@@ -1243,7 +1303,20 @@ const tieneContextoEmpresa = computed(() => {
 
 /* Estilos adaptados: Inputs OSCUROS sobre fondo claro para alto contraste */
 .input-style {
-  @apply w-full bg-[#1F2937] border-2 border-transparent rounded-2xl p-4 text-sm font-semibold text-white focus:bg-[#273344] focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/20 outline-none transition-all placeholder:text-gray-500 disabled:opacity-50 shadow-inner;
+  @apply w-full border-2 rounded-2xl p-4 text-sm font-semibold outline-none transition-all shadow-inner disabled:opacity-50;
+  background-color: #F0FBF4;
+  color: #1F2937;
+  border-color: #BBE8D0;
+}
+
+.input-style::placeholder {
+  color: #9CA3AF;
+}
+
+.input-style:focus {
+  background-color: #E6F7EE;
+  border-color: #00A859;
+  box-shadow: 0 0 0 4px rgba(0, 168, 89, 0.15);
 }
 
 .label-style {
