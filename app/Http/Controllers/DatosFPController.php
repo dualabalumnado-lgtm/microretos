@@ -37,16 +37,21 @@ class DatosFPController extends Controller
     // ENDPOINTS ACADÉMICOS ORIGINALES
     // ==========================================
 
-    public function getFamilias()
-    {
-        return response()->json(
-            CicloFormativo::whereNotNull('familia')
-                ->where('familia', '!=', '')
-                ->distinct()
-                ->orderBy('familia')
-                ->pluck('familia')
-        );
-    }
+  public function getFamilias()
+{
+    $familias = \App\Models\Familia::select('nombre', 'imagen_url')
+        ->orderBy('nombre')
+        ->get()
+        ->map(function ($familia) {
+            if ($familia->imagen_url) {
+                // asset() usa el APP_URL de tu .env y añade la barra si hace falta
+                $familia->imagen_url = asset($familia->imagen_url);
+            }
+            return $familia;
+        });
+        
+    return response()->json($familias);
+}
 
     public function getCiclos(Request $request, $familia)
     {

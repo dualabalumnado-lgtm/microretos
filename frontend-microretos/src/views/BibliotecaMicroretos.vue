@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick} from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js';
@@ -70,25 +70,32 @@ onMounted(async () => {
       api.get('/microretos'),
       api.get('/familias'),
     ]);
-    microretos.value = resMicroretos.data;
+
+    microretos.value = resMicroretos.data.filter(m => {
+      const centro = m.centro_educativo || m.centro;
+      const familia = m.familia;
+      return (
+        centro && centro !== 'Centro Desconocido' &&
+        familia && familia !== 'Familia Desconocida'
+      );
+    });
+
     familias.value = resFamilias.data.map(f =>
       typeof f === 'string' ? { nombre: f, imagen_url: null } : f
     );
 
-    // Establecer el primer centro disponible como valor por defecto
-    const centros = [...new Set(
-      resMicroretos.data.map(m => m.centro_educativo || m.centro).filter(Boolean)
-    )].sort();
-    if (centros.length > 0) {
-      filtroCentro.value = centros[0];
+    await nextTick();
+
+    if (centrosDisponibles.value.length > 0) {
+      filtroCentro.value = centrosDisponibles.value[0];
     }
+
   } catch (error) {
     console.error('Error al cargar la biblioteca:', error);
   } finally {
     cargando.value = false;
   }
-});
-
+}); 
 const seleccionarFamilia = (nombre) => {
   familiaSeleccionada.value = nombre;
   filtroCiclo.value = '';
@@ -264,9 +271,16 @@ const confirmarEliminar = async () => {
                 class="group relative rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white text-left focus:outline-none focus:ring-2 focus:ring-[#00A859]/40">
 
                 <div class="relative h-44 overflow-hidden">
-                  <div class="w-full h-full bg-gradient-to-br from-[#00A859]/10 via-[#99CC33]/10 to-gray-100 flex items-center justify-center group-hover:from-[#00A859]/20 group-hover:via-[#99CC33]/15 transition-all duration-300">
-                    <svg class="w-16 h-16 text-[#00A859]/30 group-hover:text-[#00A859]/50 transition-colors duration-300"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <img
+                    v-if="familia.imagen_url"
+                    :src="familia.imagen_url"
+                    :alt="familia.nombre"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full bg-gradient-to-br from-[#00A859]/10 via-[#99CC33]/10 to-gray-100 flex items-center justify-center">
+                    <svg class="w-16 h-16 text-[#00A859]/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
                         d="M12 14l9-5-9-5-9 5 9 5zm0 7V14m0 0l-6.16-3.422M12 21a11.952 11.952 0 01-5.835-6.578" />
                     </svg>
