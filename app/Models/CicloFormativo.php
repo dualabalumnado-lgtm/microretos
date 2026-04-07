@@ -8,9 +8,23 @@ class CicloFormativo extends Model
 {
     protected $table = 'ciclos_formativos';
 
-    // Un Ciclo tiene muchos Módulos
+    public function familia()
+    {
+        return $this->belongsTo(Familia::class, 'familia_id');
+    }
+
     public function modulos()
     {
         return $this->hasMany(Modulo::class, 'idcicloformativo');
+    }
+
+    public function centros()
+    {
+        return $this->belongsToMany(CentroEducativo::class, 'centro_ciclo', 'ciclo_id', 'centro_id');
+    }
+
+    public function microretos()
+    {
+        return $this->hasMany(Microreto::class, 'ciclo_id');
     }
 }
