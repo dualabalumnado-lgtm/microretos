@@ -1,38 +1,18 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+// Migración duplicada — convertida en no-op.
+// La tabla microretos la crea 2026_02_23_133058_create_microretos_table.php
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
-        Schema::create('microretos', function (Blueprint $table) {
-            $table->id();
-            
-            // Datos generados por la IA
-            $table->string('titulo');
-            $table->text('contexto_empresa');
-            $table->text('reto_tecnico');
-            $table->string('entregable_esperado')->nullable();
-            
-            // Como las soft skills vienen en array (ej: ["Resiliencia", "Empatía"]), lo guardamos como JSON
-            $table->json('indicadores_resiliencia')->nullable(); 
-            
-            // El match académico de la IA
-            $table->text('modulos_sugeridos')->nullable();
-            $table->text('ra_ce_asociados')->nullable();
-            
-            // Datos del Filtro de DuaLab
-            $table->string('ciclo')->nullable();
-            $table->string('modulo')->nullable();
-            
-            $table->timestamps();
-        });
+        // No-op: la tabla ya existe por la migración anterior
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('microretos');
     }

@@ -13,16 +13,19 @@ use App\Http\Controllers\AdminAuthController;
 
 // --- RUTAS PÚBLICAS (sin autenticación) ---
 
-Route::get('/microretos', [MicroretoIAController::class, 'index']);
-Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
+// Biblioteca pública: throttle para evitar scraping masivo
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/microretos',         [MicroretoIAController::class, 'index']);
+    Route::get('/microretos/{id}',    [MicroretoIAController::class, 'show']);
+    Route::get('/familias',           [DatosFPController::class, 'getFamilias']);
+});
 
-Route::get('/empresas', [DatosFPController::class, 'getEmpresas']);
-Route::get('/empresas/{id}/familias', [DatosFPController::class, 'getFamiliasPorEmpresa']);
-
-Route::get('/familias', [DatosFPController::class, 'getFamilias']);
-Route::get('/familias/{familia}/ciclos', [DatosFPController::class, 'getCiclos']);
-Route::get('/ciclos/{idCiclo}/modulos', [DatosFPController::class, 'getModulos']);
-Route::get('/modulos/{idModulo}/ra-ce', [DatosFPController::class, 'getRaCe']);
+// Datos académicos (ciclos, módulos) — throttle estándar
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('/familias/{familia}/ciclos',  [DatosFPController::class, 'getCiclos']);
+    Route::get('/ciclos/{idCiclo}/modulos',   [DatosFPController::class, 'getModulos']);
+    Route::get('/modulos/{idModulo}/ra-ce',   [DatosFPController::class, 'getRaCe']);
+});
 
 // Auth pública
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
@@ -35,75 +38,80 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
-    // Escritura de empresas
-    Route::post('/empresas', [DatosFPController::class, 'guardarEmpresa']);
-    Route::put('/empresas/{id}', [DatosFPController::class, 'actualizarEmpresa']);
+    // Empresas — datos completos solo para usuarios autenticados
+    Route::get('/empresas',              [DatosFPController::class, 'getEmpresas']);
+    Route::get('/empresas/{id}/familias',[DatosFPController::class, 'getFamiliasPorEmpresa']);
+    Route::post('/empresas',             [DatosFPController::class, 'guardarEmpresa']);
+    Route::put('/empresas/{id}',         [DatosFPController::class, 'actualizarEmpresa']);
 
-    // Generación y guardado de microretos
-    Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
-    Route::post('/guardar-microreto-bd', [MicroretoIAController::class, 'guardarEnBD']);
-    Route::post('/guardar-microretos-lote', [MicroretoIAController::class, 'guardarLote']);
+    // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
+    });
 
-    // Borrar microreto ← protegido
-    Route::delete('/microretos/{id}', [MicroretoIAController::class, 'destroy']);
+    // Guardado y borrado de microretos
+    Route::post('/guardar-microreto-bd',      [MicroretoIAController::class, 'guardarEnBD']);
+    Route::post('/guardar-microretos-lote',   [MicroretoIAController::class, 'guardarLote']);
+    Route::delete('/microretos/{id}',         [MicroretoIAController::class, 'destroy']);
 
 });
 
-// -------- IMPORTACIONES ---------
-Route::get('/importar-excel', function () {
-    // 1. Buscamos el archivo que acabas de guardar
+// -------- IMPORTACIONES (protegidas con auth) ---------
+Route::middleware('auth:sanctum')->get('/importar-excel', function () {
     $path = storage_path('app/agraria.csv'); ///////////////////////////////////////
-    if (!file_exists($path)) return "No se encuentra el archivo informatica.csv en storage/app/";
+    if (!file_exists($path)) return "No se encuentra el archivo agraria.csv en storage/app/";
 
-    $file = fopen($path, 'r');
+    $familiaImport = 'Agraria'; /////////////////////////////////////
+    $familiaId     = \App\Models\Familia::where('nombre', $familiaImport)->value('id');
 
-    // 2. Ignoramos las primeras 4 líneas (las de colores y cabeceras)
-    for ($i = 0; $i < 4; $i++) {
-        fgetcsv($file, 0, ',', '"');
-    }
-
+    $file     = fopen($path, 'r');
     $contador = 0;
 
-    // 3. Leemos línea por línea
-    while (($data = fgetcsv($file, 0, ',', '"')) !== false) {
-        // Si la columna 4 (Razón social) está vacía, saltamos esta fila
-        if (empty($data[4])) continue; 
+    // Ignoramos las primeras 4 líneas (cabeceras)
+    for ($i = 0; $i < 4; $i++) fgetcsv($file, 0, ',', '"');
 
-        // 4. Guardamos la Empresa
-        $empresa = \App\Models\Empresa::create([
-            'cif'               => $data[2] ?? null,
-            'nombre_comercial'  => $data[4], // Usamos Razón Social porque Nombre Comercial estaba vacío
-            'telefono'          => $data[5] ?? null,
-            'estado_contacto'   => $data[6] ?? null,
-            'fecha_cita'        => $data[7] ?? null,
-            'persona_contacto'  => $data[8] ?? null,
-            'email_general'     => $data[9] ?? null,
-            'posicion_contacto' => $data[10] ?? null,
-            'sector'            => $data[11] ?? null,
-            'actividad'         => $data[12] ?? null,
-            'horario_atencion'  => $data[13] ?? null,
-            'direccion'         => $data[14] ?? null,
-            'numero'            => $data[15] ?? null,
-            'otros_direccion'   => $data[16] ?? null,
-            'codigo_postal'     => $data[17] ?? null,
-            'municipio'         => $data[18] ?? null,
-            'provincia'         => $data[19] ?? null,
-            'web'               => $data[20] ?? null,
-            'proyecto_asociado' => $data[21] ?? null,
-        ]);
+    \Illuminate\Support\Facades\DB::transaction(function () use ($file, $familiaImport, $familiaId, &$contador) {
+        while (($data = fgetcsv($file, 0, ',', '"')) !== false) {
+            if (empty($data[4])) continue;
 
-        // 5. La vinculamos a la Familia en la tabla pivote
-        \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
-            'empresa_id' => $empresa->id,
-            'familia'    => 'Agraria' /////////////////////////////////////
-        ]);
+            $empresa = \App\Models\Empresa::create([
+                'cif'               => $data[2]  ?? null,
+                'nombre_comercial'  => $data[4],
+                'telefono'          => $data[5]  ?? null,
+                'estado_contacto'   => $data[6]  ?? null,
+                'fecha_cita'        => $data[7]  ?? null,
+                'persona_contacto'  => $data[8]  ?? null,
+                'email_general'     => $data[9]  ?? null,
+                'posicion_contacto' => $data[10] ?? null,
+                'sector'            => $data[11] ?? null,
+                'actividad'         => $data[12] ?? null,
+                'horario_atencion'  => $data[13] ?? null,
+                'direccion'         => $data[14] ?? null,
+                'numero'            => $data[15] ?? null,
+                'otros_direccion'   => $data[16] ?? null,
+                'codigo_postal'     => $data[17] ?? null,
+                'municipio'         => $data[18] ?? null,
+                'provincia'         => $data[19] ?? null,
+                'web'               => $data[20] ?? null,
+                'proyecto_asociado' => $data[21] ?? null,
+            ]);
 
-        $contador++;
-    }
+            \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
+                'empresa_id' => $empresa->id,
+                'familia'    => $familiaImport,
+                'familia_id' => $familiaId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $contador++;
+        }
+    });
 
     fclose($file);
-    return "¡BINGO! Se han importado correctamente {$contador} empresas y se han vinculado a la familia de Informática.";
+    return "¡BINGO! Se han importado correctamente {$contador} empresas.";
 });
+
 /* 
 
 Route::get('/importar-excel-nuevo', function () {
@@ -276,7 +284,7 @@ Route::get('/importar-excel-nuevo', function () {
     return "¡BINGO! Se han importado correctamente {$contador} nuevas empresas (Formato Transporte).";
 }); */
 
-Route::get('/importar-excel-5', function () {
+Route::middleware('auth:sanctum')->get('/importar-excel-5', function () {
     // 1. CAMBIA AQUÍ el nombre de tu archivo CSV de Energías
     $path = storage_path('app/energia_2.csv'); 
     if (!file_exists($path)) return "No se encuentra el archivo en storage/app/";
@@ -320,10 +328,15 @@ Route::get('/importar-excel-5', function () {
             'centro_educativo'  => 'IES Aguas Nuevas', 
         ]);
 
-        // 4. Asignamos la Familia Profesional
+        // 4. Asignamos la Familia Profesional (con FK normalizada)
+        $familiaImport5 = 'Energía y Agua';
+        $familiaId5 = \App\Models\Familia::where('nombre', $familiaImport5)->value('id');
         \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
             'empresa_id' => $empresa->id,
-            'familia'    => 'Energía y Agua' 
+            'familia'    => $familiaImport5,
+            'familia_id' => $familiaId5,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $contador++;

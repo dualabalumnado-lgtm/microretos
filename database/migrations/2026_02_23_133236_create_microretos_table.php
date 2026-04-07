@@ -1,25 +1,17 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+// Migración duplicada — convertida en no-op.
+// La tabla microretos la crea 2026_02_23_133058_create_microretos_table.php
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('microretos', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        // No-op: la tabla ya existe por la migración anterior
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('microretos');

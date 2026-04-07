@@ -3,7 +3,8 @@ import { ref, computed, onMounted, nextTick} from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js';
-import LoginModal from '../components/LoginModal.vue'; 
+import LoginModal from '../components/LoginModal.vue';
+import { usePdfExport } from '../composables/usePdfExport.js';
 
 const router = useRouter();
 const isLoaded = ref(false);
@@ -16,6 +17,7 @@ const accionPendiente = ref(null);
 const familiaSeleccionada = ref(null);
 
 const authStore = useAuthStore()
+const { descargarPDF } = usePdfExport()
 
 // filtroCentro ahora actúa en AMBAS capas (familias y microretos)
 const filtroCentro = ref('');
@@ -426,13 +428,24 @@ const confirmarEliminar = async () => {
                   </svg>
                 </button>
 
-                <button @click="irADetalle(reto)"
-                  class="w-full bg-gray-50 group-hover:bg-[#00A859] text-gray-500 group-hover:text-white font-black text-xs uppercase tracking-widest py-4 transition-all duration-300 border-t border-gray-100 group-hover:border-[#00A859] flex items-center justify-center gap-2">
-                  Ver Ficha Técnica
-                  <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
+                <div class="flex border-t border-gray-100 group-hover:border-[#00A859] transition-colors duration-300">
+                  <button @click.stop="descargarPDF(reto)"
+                    class="flex items-center justify-center gap-1.5 px-4 py-4 bg-gray-50 group-hover:bg-[#00A859]/10 text-gray-400 group-hover:text-[#00A859] font-black text-[10px] uppercase tracking-widest transition-all duration-300 border-r border-gray-100 group-hover:border-[#00A859]/20 shrink-0"
+                    title="Descargar PDF">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    PDF
+                  </button>
+                  <button @click="irADetalle(reto)"
+                    class="flex-1 bg-gray-50 group-hover:bg-[#00A859] text-gray-500 group-hover:text-white font-black text-xs uppercase tracking-widest py-4 transition-all duration-300 flex items-center justify-center gap-2">
+                    Ver Ficha Técnica
+                    <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
