@@ -1,50 +1,34 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import api from '../api.js';
-import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue'
-import { useAuthStore } from '../stores/auth'
-import LoginModal from '../components/LoginModal.vue'
+import { useAuthStore } from '../stores/auth';
+import LoginModal from '../components/LoginModal.vue';
 
-// ── Modales ──────────────────────────────────────────────
-const authStore = useAuthStore()
+const authStore = useAuthStore();
+const showLogin = ref(false);
 
-const mostrarLogin          = ref(false)
-const mostrarNuevaEmpresa   = ref(false)
-const mostrarEditarEmpresa  = ref(false)
-const empresaAEditar        = ref(null)
-const modalesRef            = ref(null)
-
-const accionPendiente   = ref(null) 
-
-const familias = ref([]);
+const familias = ref([]); 
 const ciclos = ref([]);
 const modulos = ref([]);
-
-// Todas las familias únicas de todas las empresas (para el select del modal)
-const todasLasFamilias = computed(() => {
-  // Se carga desde la API igual que getFamilias en DatosFPController
-  return familiasProfesionalesGlobal.value
-})
-const familiasProfesionalesGlobal = ref([])
 
 // --- ESTADO PARA ANIMACIONES DE ENTRADA ---
 const isLoaded = ref(false);
 
 // --- CONTROL DE NAVEGACIÓN ---
-const pasoActual = ref(1);
+const pasoActual = ref(1); 
 const totalPasos = 3;
 
 // --- VARIABLES B2B ---
 const empresas = ref([]);
-const familiasFiltradas = ref([]);
+const familiasFiltradas = ref([]); 
 const buscadorEmpresa = ref('');
 const mostrarDropdownEmpresas = ref(false);
-const empresaDetalle = ref(null);
+const empresaDetalle = ref(null); 
 
-// --- ESTADO MODO DEMO Y SIMULACIÓN ---
+// --- ETADO MODO DEMO Y SIMULACIÓN ---
 const esModoDemo = ref(false);
 const esInfoSimulada = ref(false); // NUEVO: Estado para el botón de Información Simulada
-let autoSelectDemoCycle = false;
+let autoSelectDemoCycle = false; 
 
 // --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
@@ -54,34 +38,34 @@ const centrosDisponibles = computed(() => {
 });
 
 const seleccion = ref({
-  empresaId: '',
+  empresaId: '', 
   empresaNombre: '',
-  empresaCentro: '',
+  empresaCentro: '', 
   empresaSector: '',
   empresaUbicacion: '',
-  empresaTamano: '',
+  empresaTamano: '', 
   empresaWeb: '',
-
-  diaANormal: '',
-  friccionArea: '',
-  friccionProblema: '',
-  restricciones: [],
-  otraLimitacion: '',
-  loQueNoQuieren: '',
-  consecuencias: [],
-  otraConsecuencia: '',
-  expectativasAlumno: '',
+  
+  diaANormal: '',        
+  friccionArea: '',      
+  friccionProblema: '', 
+  restricciones: [],    
+  otraLimitacion: '',   
+  loQueNoQuieren: '',   
+  consecuencias: [],    
+  otraConsecuencia: '', 
+  expectativasAlumno: '', 
 
   familia: '',
-  cicloId: '',
+  cicloId: '', 
   cursoSeleccionado: 2,
   duracion: '1 a 2 semanas',
   nivelGrupo: 'Medio',
-
-  cantidadMicroretos: 3,
+  
+  cantidadMicroretos: 3, 
 });
 
-const modulosSeleccionados = ref([]);
+const modulosSeleccionados = ref([]); 
 
 const modulosDelCurso = computed(() => {
   return modulos.value.filter(m => m.curso == seleccion.value.cursoSeleccionado);
@@ -97,7 +81,7 @@ const guardandoTodos = ref(false);
 const todosGuardados = ref(false);
 
 const consecuenciasOpciones = [
-  'Errores frecuentes', 'Costes innecesarios', 'Pérdida de tiempo',
+  'Errores frecuentes', 'Costes innecesarios', 'Pérdida de tiempo', 
   'Insatisfacción del cliente', 'Riesgos de seguridad', 'Desperdicio de materiales', 'Falta de comunicación interna'
 ];
 
@@ -107,30 +91,48 @@ const limitacionesOpciones = [
   'Falta de tiempo', 'Normativa RGPD'
 ];
 
-const popupActivo = ref(null);
+// Límites de caracteres por campo. Aviso al 85%, bloqueo en max.
+// Objetivo: ~1.600 tokens de contexto de empresa en el peor caso (≈ 5.800 chars ÷ 3,5).
+const CHAR_LIMITS = {
+  diaANormal:         { max: 1000, warn: 850 },
+  friccionArea:       { max: 400,  warn: 340 },
+  friccionProblema:   { max: 1200, warn: 1020 },
+  otraLimitacion:     { max: 600,  warn: 510 },
+  loQueNoQuieren:     { max: 500,  warn: 425 },
+  otraConsecuencia:   { max: 300,  warn: 255 },
+  expectativasAlumno: { max: 800,  warn: 680 },
+};
+// Reactivo en template: Vue rastrea seleccion.value al renderizar
+const charInfo = (field) => {
+  const { max, warn } = CHAR_LIMITS[field];
+  const len = (seleccion.value[field] || '').length;
+  return { len, max, isWarning: len >= warn, isOver: len >= max };
+};
+
+const popupActivo = ref(null); 
 const abrirPopup = (tipo, id) => { popupActivo.value = { tipo, id }; };
 const cerrarPopup = () => { popupActivo.value = null; };
 
 const ayudas = {
-  1: {
-    info: "Detalla la actividad principal de la empresa, su modelo de negocio y quiénes conforman el equipo. Esto ayuda a la IA a dimensionar la solución.",
-    ejemplo: "Somos una agencia de logística especializada en última milla para e-commerce. Contamos con 15 repartidores y 3 personas en oficina gestionando rutas y atención al cliente."
+  1: { 
+    info: "Detalla la actividad principal de la empresa, su modelo de negocio y quiénes conforman el equipo. Esto ayuda a la IA a dimensionar la solución.", 
+    ejemplo: "Somos una agencia de logística especializada en última milla para e-commerce. Contamos con 15 repartidores y 3 personas en oficina gestionando rutas y atención al cliente." 
   },
-  2: {
-    info: "Identifica el 'cuello de botella' o proceso que genera más fricción, consume más tiempo absurdo o provoca más errores en el día a día.",
-    ejemplo: "La planificación matutina de rutas. Actualmente se hace en una pizarra y cruzando hojas de Excel, lo que provoca que los repartidores salgan tarde y se crucen en las mismas zonas de la ciudad."
+  2: { 
+    info: "Identifica el 'cuello de botella' o proceso que genera más fricción, consume más tiempo absurdo o provoca más errores en el día a día.", 
+    ejemplo: "La planificación matutina de rutas. Actualmente se hace en una pizarra y cruzando hojas de Excel, lo que provoca que los repartidores salgan tarde y se crucen en las mismas zonas de la ciudad." 
   },
-  3: {
-    info: "Menciona intentos previos de solución o barreras reales (presupuesto, conocimientos técnicos, resistencia al cambio) que impidan resolverlo fácilmente.",
-    ejemplo: "Probamos un software de pago corporativo pero era muy complejo y los repartidores no lo usaban. Además, no tenemos presupuesto para comprar tablets nuevas para todos los vehículos."
+  3: { 
+    info: "Menciona intentos previos de solución o barreras reales (presupuesto, conocimientos técnicos, resistencia al cambio) que impidan resolverlo fácilmente.", 
+    ejemplo: "Probamos un software de pago corporativo pero era muy complejo y los repartidores no lo usaban. Además, no tenemos presupuesto para comprar tablets nuevas para todos los vehículos." 
   },
-  4: {
-    info: "Visualiza el escenario ideal. ¿Qué cambiaría radicalmente en la empresa si este problema se resolviera hoy mismo?",
-    ejemplo: "Ahorraríamos 2 horas de trabajo administrativo al día, reduciríamos el gasto en combustible un 15% y los clientes recibirían sus paquetes mucho antes."
+  4: { 
+    info: "Visualiza el escenario ideal. ¿Qué cambiaría radicalmente en la empresa si este problema se resolviera hoy mismo?", 
+    ejemplo: "Ahorraríamos 2 horas de trabajo administrativo al día, reduciríamos el gasto en combustible un 15% y los clientes recibirían sus paquetes mucho antes." 
   },
-  5: {
-    info: "Acota qué esperas que el alumnado produzca como resultado final del reto (un diseño, una maqueta, un plan, un script, un prototipo...).",
-    ejemplo: "Esperamos que analicen el flujo actual y diseñen un prototipo funcional en AppSheet o Glide (herramientas No-Code) que permita a los repartidores ver su ruta optimizada en su propio móvil."
+  5: { 
+    info: "Acota qué esperas que el alumnado produzca como resultado final del reto (un diseño, una maqueta, un plan, un script, un prototipo...).", 
+    ejemplo: "Esperamos que analicen el flujo actual y diseñen un prototipo funcional en AppSheet o Glide (herramientas No-Code) que permita a los repartidores ver su ruta optimizada en su propio móvil." 
   }
 };
 
@@ -138,11 +140,11 @@ const getDatosPaso2Preparados = () => {
   let limitacionesFinales = [...seleccion.value.restricciones];
   if (seleccion.value.otraLimitacion) limitacionesFinales.push(seleccion.value.otraLimitacion);
   const restriccionesStr = limitacionesFinales.join(', ');
-
+  
   let consecuenciasFinales = [...seleccion.value.consecuencias];
   if (seleccion.value.otraConsecuencia) consecuenciasFinales.push(seleccion.value.otraConsecuencia);
   const consecuenciasStr = consecuenciasFinales.join(', ');
-
+  
   return { restriccionesStr, consecuenciasStr, consecuenciasArray: consecuenciasFinales };
 };
 
@@ -151,8 +153,8 @@ const empresasFiltradasBusqueda = computed(() => {
   if (centroFiltro.value) {
     filtradas = filtradas.filter(e => e.centro_educativo === centroFiltro.value);
   }
-  if (buscadorEmpresa.value) {
-    filtradas = filtradas.filter(e =>
+  if (buscadorEmpresa.value) { 
+    filtradas = filtradas.filter(e => 
       e.nombre_comercial?.toLowerCase().includes(buscadorEmpresa.value.toLowerCase())
     );
   }
@@ -166,56 +168,6 @@ const seleccionarEmpresa = (emp) => {
   mostrarDropdownEmpresas.value = false;
 };
 
-/** Abre modal de nueva empresa, pidiendo login si no está autenticado */
-const abrirNuevaEmpresa = () => {
-  if (!authStore.isAuthenticated) {
-    modalesRef.value?.abrirLoginPara('nueva')
-  } else {
-    mostrarNuevaEmpresa.value = true
-  }
-}
-
-/** Abre modal de edición, pidiendo login si no está autenticado */
-const abrirEditarEmpresa = () => {
-  empresaAEditar.value = empresaDetalle.value
-  if (!authStore.isAuthenticated) {
-    modalesRef.value?.abrirLoginPara('editar')
-  } else {
-    mostrarEditarEmpresa.value = true
-  }
-}
-
-const onNecesitaLogin = (accion) => {
-  accionPendiente.value = accion
-  mostrarLogin.value = true
-}
-
-const onLoginSuccess = () => {
-  if (accionPendiente.value) {
-    modalesRef.value?.abrirTrasLogin(accionPendiente.value)
-    accionPendiente.value = null
-  }
-}
-
-/** Callback: empresa recién creada desde el modal → la añade a la lista y la selecciona */
-const onEmpresaCreada = (empresa) => {
-  empresas.value.push(empresa)
-  // Pequeño delay para que el DOM actualice el dropdown antes de seleccionar
-  setTimeout(() => seleccionarEmpresa(empresa), 50)
-}
-
-const onEmpresaActualizada = (empresa) => {
-  const idx = empresas.value.findIndex(e => String(e.id) === String(empresa.id))
-  if (idx !== -1) Object.assign(empresas.value[idx], empresa)
-  empresaDetalle.value = empresa
-  // Sincronizar campos reactivos del formulario
-  seleccion.value.empresaNombre   = empresa.nombre_comercial || ''
-  seleccion.value.empresaSector   = empresa.sector           || ''
-  seleccion.value.empresaTamano   = empresa.tamano           || ''
-  seleccion.value.empresaWeb      = empresa.web              || ''
-  seleccion.value.empresaCentro   = empresa.centro_educativo || ''
-}
-
 const onBuscadorInput = () => {
   mostrarDropdownEmpresas.value = true;
   // Si el usuario borra el campo, limpiamos la empresa seleccionada
@@ -225,18 +177,6 @@ const onBuscadorInput = () => {
     empresaDetalle.value = null;
   }
 };
-
-const onBuscadorBlur = () => {
-  setTimeout(() => {
-    if (
-      mostrarDropdownEmpresas.value === false &&
-      buscadorEmpresa.value &&
-      !seleccion.value.empresaId
-    ) {
-    // Empresa no encontrada → ofrecer crear
-    }
-  }, 200)
-}
 
 watch(buscadorEmpresa, (val) => {
   if (val && empresas.value.length > 0) {
@@ -258,7 +198,7 @@ const limpiarFormulario = () => {
     esModoDemo.value = false;
     esInfoSimulada.value = false; // Añadido: desmarca el botón al vaciar
     modulosSeleccionados.value = [];
-
+    
     seleccion.value = {
       empresaId: '', empresaNombre: '', empresaCentro: '', empresaSector: '',
       empresaUbicacion: '', empresaTamano: '', empresaWeb: '',
@@ -273,21 +213,21 @@ const limpiarFormulario = () => {
 // --- FUNCIÓN PARA CARGAR DATOS DEMO EXACTOS ---
 const cargarDemo = () => {
   esModoDemo.value = true;
-
+  
   seleccion.value.empresaId = '';
-  centroFiltro.value = "IES Ana Luisa de Benítez";
-  buscadorEmpresa.value = "VirtualNest SL";
+  centroFiltro.value = "IES Ana Luisa de Benítez"; 
+  buscadorEmpresa.value = "VirtualNest SL"; 
   empresaDetalle.value = null;
   diagnosticoRecuperado.value = false;
-
+  
   // Datos Paso 1
   seleccion.value.empresaNombre = "VirtualNest SL";
   seleccion.value.empresaSector = "Informática y Comunicaciones";
   seleccion.value.empresaTamano = "Mediana (50-250)";
   seleccion.value.empresaWeb = "www.virtualnest.demo";
   seleccion.value.empresaCentro = "IES Ana Luisa de Benítez";
-
-  // Datos Paso 2
+  
+  // Datos Paso 2 
   seleccion.value.diaANormal = "Desarrollamos software y simuladores de realidad virtual para formación corporativa e industrial. Tenemos un equipo de 20 programadores, 5 diseñadores 3D y personal de Calidad (QA).";
   seleccion.value.friccionArea = "Testing y reporte de bugs en entornos 3D interactivos.";
   seleccion.value.friccionProblema = "Los testers tienen que quitarse las gafas de realidad virtual (VR) cada vez que encuentran un fallo para anotarlo en un Excel o Jira en el ordenador. Esto corta la inmersión, pierden el hilo y se olvidan de detalles visuales exactos del bug.";
@@ -297,21 +237,21 @@ const cargarDemo = () => {
   seleccion.value.consecuencias = ["Pérdida de tiempo", "Errores frecuentes"];
   seleccion.value.otraConsecuencia = "Bugs difíciles de reproducir por falta de contexto visual y coordenadas exactas.";
   seleccion.value.expectativasAlumno = "Que investigue soluciones de captura de datos in-app o proponga un flujo mediante scripts ligeros que permita registrar coordenadas (X, Y, Z) y capturas de pantalla pulsando un solo botón en los mandos VR, guardándolo automáticamente.";
-
-  // Datos Paso 3
+  
+  // Datos Paso 3 
   familiasFiltradas.value = ["Informática y Comunicaciones"];
   seleccion.value.nivelGrupo = "Alto";
   seleccion.value.cursoSeleccionado = 2;
-
-  autoSelectDemoCycle = true;
+  
+  autoSelectDemoCycle = true; 
   seleccion.value.familia = "Informática y Comunicaciones";
-
+  
   alert("¡Modo Demo activado! Se ha cargado el caso de VirtualNest SL.");
 };
 
 const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.value.empresaSector && seleccion.value.empresaTamano);
 const paso2Valido = computed(() => seleccion.value.diaANormal && seleccion.value.friccionProblema);
-const paso3Valido = computed(() => seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado);
+const paso3Valido = computed(() => seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado); 
 
 // Cierra el dropdown al hacer clic fuera
 const buscadorRef = ref(null);
@@ -321,27 +261,29 @@ const cerrarDropdownFuera = (e) => {
   }
 };
 
-onMounted(async () => {
-  document.addEventListener('click', cerrarDropdownFuera)
-  setTimeout(() => { isLoaded.value = true }, 100)
+const cargarEmpresas = async () => {
   try {
-    const [resEmpresas, resFamilias] = await Promise.all([
-      api.get('/empresas'),
-      api.get('/familias'),
-    ])
-    empresas.value = resEmpresas.data
-    familiasProfesionalesGlobal.value = resFamilias.data   // string[]
-  } catch (e) { console.error(e) }
-})
+    const res = await api.get('/empresas');
+    empresas.value = res.data;
+  } catch (e) {
+    console.error(e);
+  }
+};
 
-// onMounted(async () => {
-//   document.addEventListener('click', cerrarDropdownFuera);
-//   setTimeout(() => { isLoaded.value = true; }, 100);
-//   try {
-//     const res = await api.get('/empresas');
-//     empresas.value = res.data;
-//   } catch (e) { console.error(e); }
-// });
+const onLoginSuccess = async () => {
+  showLogin.value = false;
+  await cargarEmpresas();
+};
+
+onMounted(async () => {
+  document.addEventListener('click', cerrarDropdownFuera);
+  setTimeout(() => { isLoaded.value = true; }, 100);
+  if (!authStore.isAuthenticated) {
+    showLogin.value = true;
+  } else {
+    await cargarEmpresas();
+  }
+});
 
 onUnmounted(() => {
   document.removeEventListener('click', cerrarDropdownFuera);
@@ -351,17 +293,17 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
   seleccion.value.familia = ''; ciclos.value = []; seleccion.value.cicloId = ''; modulos.value = [];
   modulosSeleccionados.value = []; familiasFiltradas.value = [];
   empresaDetalle.value = null; crmActualizado.value = false; diagnosticoRecuperado.value = false;
-  microretosGenerados.value = [];
-
+  microretosGenerados.value = []; 
+  
   if (!nuevoId) return;
 
   const emp = empresas.value.find(e => String(e.id) === String(nuevoId));
   if(emp) {
-    empresaDetalle.value = emp;
+    empresaDetalle.value = emp; 
     seleccion.value.empresaNombre = emp.nombre_comercial;
-    seleccion.value.empresaCentro = emp.centro_educativo || '';
-    seleccion.value.empresaSector = emp.sector || '';
-    seleccion.value.empresaTamano = emp.tamano || '';
+    seleccion.value.empresaCentro = emp.centro_educativo || ''; 
+    seleccion.value.empresaSector = emp.sector || ''; 
+    seleccion.value.empresaTamano = emp.tamano || ''; 
     seleccion.value.empresaWeb = emp.web || '';
     seleccion.value.empresaUbicacion = [emp.municipio, emp.provincia].filter(Boolean).join(', ');
 
@@ -383,21 +325,21 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
 
 watch(() => seleccion.value.familia, async (val) => {
   if (!val) return;
-  const url = seleccion.value.empresaCentro
+  const url = seleccion.value.empresaCentro 
     ? `/familias/${encodeURIComponent(val)}/ciclos?centro=${encodeURIComponent(seleccion.value.empresaCentro)}`
     : `/familias/${encodeURIComponent(val)}/ciclos`;
 
   const res = await api.get(url);
   ciclos.value = res.data;
-
+  
   if (autoSelectDemoCycle && ciclos.value.length > 0) {
      const cicloWeb = ciclos.value.find(c => c.nombre.includes('Web') || c.nombre.includes('Aplicaciones') || c.nombre.includes('Sistemas'));
      seleccion.value.cicloId = cicloWeb ? cicloWeb.id : ciclos.value[0].id;
      autoSelectDemoCycle = false;
   } else {
-     seleccion.value.cicloId = '';
+     seleccion.value.cicloId = ''; 
   }
-
+  
   modulos.value = []; modulosSeleccionados.value = [];
 });
 
@@ -418,7 +360,7 @@ const retrocederPaso = () => { if (pasoActual.value > 1) pasoActual.value--; win
 const guardarInfoEmpresa = async () => {
   actualizandoCRM.value = true;
   const datosP2 = getDatosPaso2Preparados();
-
+  
   const payload = {
     nombreComercial: seleccion.value.empresaNombre, centroEducativo: seleccion.value.empresaCentro, sector: seleccion.value.empresaSector, tamano: seleccion.value.empresaTamano, web: seleccion.value.empresaWeb,
     diaANormal: seleccion.value.diaANormal, friccionArea: seleccion.value.friccionArea, friccionProblema: seleccion.value.friccionProblema, consecuencias: datosP2.consecuenciasStr, restricciones: datosP2.restriccionesStr, loQueNoQuieren: seleccion.value.loQueNoQuieren,
@@ -436,30 +378,30 @@ const guardarInfoEmpresa = async () => {
       empresas.value.push(res.data.empresa);
     }
     crmActualizado.value = true;
-    setTimeout(() => crmActualizado.value = false, 3000);
+    setTimeout(() => crmActualizado.value = false, 3000); 
   } catch(e) { alert("Error al procesar la empresa en la BD."); } finally { actualizandoCRM.value = false; }
 };
 
 const generarReto = async () => {
   cargando.value = true;
-  todosGuardados.value = false;
+  todosGuardados.value = false; 
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean);
+    const nombresModulosSeleccionados = modulosSeleccionados.value.map(id => modulos.value.find(m => m.id === id)?.nombre).filter(Boolean); 
     const moduloNombreTxt = nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : `A determinar por IA (${seleccion.value.cursoSeleccionado}º Curso)`;
     const datosP2 = getDatosPaso2Preparados();
-
+    
     const res = await api.post('/generar-microreto', {
       ...seleccion.value, restricciones: datosP2.restriccionesStr, consecuencias: datosP2.consecuenciasArray,
       ciclo_nombre: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre, modulo_nombre: moduloNombreTxt,
       ciclo_id: seleccion.value.cicloId, modulo_id: modulosSeleccionados.value.length > 0 ? modulosSeleccionados.value : null,
-      nivelGrupo: seleccion.value.nivelGrupo, expectativasAlumno: seleccion.value.expectativasAlumno,
+      nivelGrupo: seleccion.value.nivelGrupo, expectativasAlumno: seleccion.value.expectativasAlumno, 
       cursoSeleccionado: seleccion.value.cursoSeleccionado,
-      cantidad: seleccion.value.cantidadMicroretos
+      cantidad: seleccion.value.cantidadMicroretos 
     });
 
     if (res.data && res.data.microretos) {
         res.data.microretos.forEach(reto => {
-            microretosGenerados.value.unshift({
+            microretosGenerados.value.unshift({ 
                 ...reto,
                 _ui_guardado: false,
                 _ui_guardando: false
@@ -477,8 +419,8 @@ const guardarTodos = async () => {
     const nombresModulosSeleccionados = modulosSeleccionados.value
       .map(id => modulos.value.find(m => m.id === id)?.nombre)
       .filter(Boolean);
-    const moduloStr = nombresModulosSeleccionados.length > 0
-      ? nombresModulosSeleccionados.join(' y ')
+    const moduloStr = nombresModulosSeleccionados.length > 0 
+      ? nombresModulosSeleccionados.join(' y ') 
       : 'Transversal';
     const cicloStr = ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre;
 
@@ -486,6 +428,8 @@ const guardarTodos = async () => {
       .filter(r => !r._ui_guardado)
       .map(({ _ui_guardado, _ui_guardando, ...retoLimpio }) => ({  //Desestructuración para eliminar claves UI
         ...retoLimpio,
+        empresa_id: seleccion.value.empresaId || null,
+        ciclo_id:   seleccion.value.cicloId   || null,
         ciclo: cicloStr,
         modulo: moduloStr,
         duracion: seleccion.value.duracion,
@@ -499,11 +443,11 @@ const guardarTodos = async () => {
     } else {
       alert("Todos los retos mostrados ya estaban guardados.");
     }
-  } catch (e) {
+  } catch (e) { 
     console.error("Error al guardar el lote:", e);
-    alert("Error al guardar el lote de microretos en BD");
-  } finally {
-    guardandoTodos.value = false;
+    alert("Error al guardar el lote de microretos en BD"); 
+  } finally { 
+    guardandoTodos.value = false; 
   }
 };
 
@@ -519,6 +463,8 @@ const guardar = async (index) => {
 
     await api.post('/guardar-microreto-bd', {
       ...retoLimpio,
+      empresa_id: seleccion.value.empresaId || null,
+      ciclo_id:   seleccion.value.cicloId   || null,
       ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
       modulo: nombresModulosSeleccionados.length > 0
         ? nombresModulosSeleccionados.join(' y ')
@@ -527,11 +473,11 @@ const guardar = async (index) => {
       nivel_grupo: seleccion.value.nivelGrupo
     });
     reto._ui_guardado = true;
-  } catch (e) {
+  } catch (e) { 
     console.error("Error al guardar:", e);
-    alert("Error al guardar este microreto");
-  } finally {
-    reto._ui_guardando = false;
+    alert("Error al guardar este microreto"); 
+  } finally { 
+    reto._ui_guardando = false; 
   }
 };
 
@@ -554,7 +500,7 @@ const tieneContextoEmpresa = computed(() => {
     />
 
     <div class="max-w-6xl mx-auto">
-
+      
       <header class="mb-10 text-center flex flex-col items-center">
         <div class="inline-flex items-center mb-8 bg-[#1F2937] py-4 pr-10 pl-6 rounded-[3rem] shadow-lg border border-[#333333] transition-all duration-1000 ease-out transform"
              :class="isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0'">
@@ -563,12 +509,12 @@ const tieneContextoEmpresa = computed(() => {
             Dua<span class="text-[#00A859]">Lab</span><span class="text-[#99CC33] not-italic text-lg md:text-xl ml-1">Studio Tool</span>
           </span>
         </div>
-
+        
         <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-4 text-[#121212] transition-all duration-1000 delay-150 ease-out transform"
             :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
           Factoría de <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Micro-Retos</span>
         </h1>
-
+        
         <p class="text-gray-500 max-w-2xl mx-auto text-base md:text-lg leading-relaxed font-medium transition-all duration-1000 delay-300 ease-out transform"
            :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
           Convierte problemas empresariales reales en retos educativos clasificados por el currículo oficial.
@@ -597,7 +543,7 @@ const tieneContextoEmpresa = computed(() => {
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
-
+              
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
@@ -605,7 +551,7 @@ const tieneContextoEmpresa = computed(() => {
                   </div>
                   <h2 class="text-2xl font-black uppercase tracking-tight text-[#1F2937]">Buscar en DuaLab</h2>
                 </div>
-
+                
                 <div class="flex flex-wrap items-center gap-2">
                   <button @click="esInfoSimulada = !esInfoSimulada"
                     :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
@@ -614,7 +560,7 @@ const tieneContextoEmpresa = computed(() => {
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Información Simulada
                   </button>
-                  <button @click="cargarDemo" :disabled="esModoDemo"
+                  <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
@@ -627,7 +573,7 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
 
-              <div v-if="esModoDemo"
+              <div v-if="esModoDemo" 
                 class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
                 <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -636,7 +582,7 @@ const tieneContextoEmpresa = computed(() => {
                   Modo Demo activo — los campos están bloqueados. Pulsa "Vaciar" para editarlos.
                 </p>
               </div>
-
+              
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label class="label-style">Filtrar por Colegio/Centro (Opcional)</label>
@@ -645,7 +591,7 @@ const tieneContextoEmpresa = computed(() => {
                     <option v-for="centro in centrosDisponibles" :key="centro" :value="centro">{{ centro }}</option>
                   </select>
                 </div>
-
+                
                 <div class="relative" ref="buscadorRef">
                   <label class="label-style">Escribe para buscar empresa</label>
                   <div class="absolute left-5 top-[38px] flex items-center pointer-events-none">
@@ -653,7 +599,7 @@ const tieneContextoEmpresa = computed(() => {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                   </div>
-
+                  
                   <input
                     v-model="buscadorEmpresa"
                     @input="onBuscadorInput"
@@ -664,7 +610,7 @@ const tieneContextoEmpresa = computed(() => {
                     class="input-style pl-14 text-lg"
                     placeholder="Ej: Fundación Sergio Alonso..."
                   />
-
+                  
                   <Transition name="dropdown">
                     <div
                       v-if="mostrarDropdownEmpresas && empresasFiltradasBusqueda.length > 0"
@@ -675,7 +621,7 @@ const tieneContextoEmpresa = computed(() => {
                           {{ empresasFiltradasBusqueda.length }} resultado(s) para "{{ buscadorEmpresa }}"
                         </span>
                       </div>
-
+                      
                       <button
                         v-for="emp in empresasFiltradasBusqueda"
                         :key="emp.id"
@@ -693,32 +639,21 @@ const tieneContextoEmpresa = computed(() => {
                   <!-- Mensaje cuando no hay resultados -->
                   <div
                     v-if="mostrarDropdownEmpresas && buscadorEmpresa && empresasFiltradasBusqueda.length === 0"
-                    class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl z-50 px-5 py-4"
+                    class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl z-50 px-6 py-5"
                   >
-                    <p class="text-gray-400 text-sm mb-3">
-                      No se encontró "<span class="text-white font-bold">{{ buscadorEmpresa }}</span>" en DuaLab.
-                    </p>
-                    <button
-                      @mousedown.prevent="abrirNuevaEmpresa"
-                      class="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white rounded-xl font-black text-xs tracking-widest uppercase transition-all hover:opacity-90 active:scale-95"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                      </svg>
-                      Registrar "{{ buscadorEmpresa }}" como nueva empresa
-                    </button>
+                    <p class="text-gray-400 text-sm">No se encontró ninguna empresa con ese nombre.</p>
                   </div>
                 </div>
               </div>
 
             <div v-if="empresaDetalle" class="bg-white rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
-
+  
             <div class="mb-8">
               <div class="flex items-center gap-3 mb-4">
                 <div class="w-2 h-6 bg-[#00A859] rounded-full"></div>
                 <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Ficha de Contacto</h3>
               </div>
-
+              
               <div v-if="empresaDetalle.razon_social" class="flex items-start gap-3 ml-1">
                 <svg class="w-5 h-5 mt-0.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"></path></svg>
                 <div>
@@ -727,20 +662,7 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
             </div>
-
-              <div class="flex justify-end mb-2">
-                <button
-                  @click="abrirEditarEmpresa"
-                  class="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-gray-200 hover:border-[#1F2937] text-[#1F2937] rounded-full font-black text-[10px] tracking-widest uppercase transition-all hover:shadow-sm active:scale-95"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                  </svg>
-                  Editar datos de la empresa
-                </button>
-              </div>
-
+              
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-gray-200/60">
                 <div v-if="empresaDetalle.persona_contacto || empresaDetalle.telefono || empresaDetalle.email_general">
                   <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Contacto Directo</p>
@@ -778,7 +700,7 @@ const tieneContextoEmpresa = computed(() => {
                     Busca una empresa o usa la Demo 👆
                   </span>
                 </div>
-
+                
                 <div>
                   <label class="label-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'text-red-500' : ''">Sector de Actividad *</label>
                   <input v-model="seleccion.empresaSector" :disabled="esModoDemo" class="input-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 placeholder:text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''" placeholder="¡FALTA INFO! Rellénalo por favor..." />
@@ -810,7 +732,7 @@ const tieneContextoEmpresa = computed(() => {
               <div class="absolute top-0 right-0 bg-gray-50 text-[#1F2937] px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-bl-3xl border-b border-l border-gray-100">
                 Entrevista de Diagnóstico
               </div>
-
+              
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#99CC33]/15 flex items-center justify-center text-[#00A859]">
@@ -834,7 +756,7 @@ const tieneContextoEmpresa = computed(() => {
                   </span>
 
                   <!--
-                  <button @click="cargarDemo" :disabled="esModoDemo"
+                  <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
@@ -848,7 +770,7 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
 
-              <div v-if="esModoDemo"
+              <div v-if="esModoDemo" 
                 class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
                 <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -880,7 +802,11 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 1)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 1)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-                  <textarea v-model="seleccion.diaANormal" :disabled="esModoDemo" class="input-style h-24" placeholder="Ej: Somos una empresa de servicios informáticos..."></textarea>
+                  <textarea v-model="seleccion.diaANormal" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.diaANormal.max" class="input-style h-24" placeholder="Ej: Somos una empresa de servicios informáticos..."></textarea>
+                  <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                    <span v-if="charInfo('diaANormal').isWarning && !charInfo('diaANormal').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                    <span class="text-[10px] transition-colors" :class="charInfo('diaANormal').isOver ? 'text-red-400 font-bold' : charInfo('diaANormal').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('diaANormal').len }}/{{ CHAR_LIMITS.diaANormal.max }}</span>
+                  </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -893,14 +819,22 @@ const tieneContextoEmpresa = computed(() => {
                       <button @click="abrirPopup('info', 2)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                       <button @click="abrirPopup('ejemplo', 2)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                     </div>
-                    <input v-model="seleccion.friccionArea" :disabled="esModoDemo" class="input-style" placeholder="Ej: Registro manual de albaranes..." />
+                    <textarea v-model="seleccion.friccionArea" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.friccionArea.max" class="input-style h-16" placeholder="Ej: Registro manual de albaranes..."></textarea>
+                    <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                      <span v-if="charInfo('friccionArea').isWarning && !charInfo('friccionArea').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                      <span class="text-[10px] transition-colors" :class="charInfo('friccionArea').isOver ? 'text-red-400 font-bold' : charInfo('friccionArea').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('friccionArea').len }}/{{ CHAR_LIMITS.friccionArea.max }}</span>
+                    </div>
                   </div>
                   <div>
                     <label class="label-style flex items-center gap-2 mb-3">
                       <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">2b</span>
                       ¿Por qué? Cuéntanos qué ocurre hoy
                     </label>
-                    <textarea v-model="seleccion.friccionProblema" :disabled="esModoDemo" class="input-style h-24" placeholder="Se pierde mucho tiempo porque... hay errores cuando..."></textarea>
+                    <textarea v-model="seleccion.friccionProblema" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.friccionProblema.max" class="input-style h-24" placeholder="Se pierde mucho tiempo porque... hay errores cuando..."></textarea>
+                    <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                      <span v-if="charInfo('friccionProblema').isWarning && !charInfo('friccionProblema').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                      <span class="text-[10px] transition-colors" :class="charInfo('friccionProblema').isOver ? 'text-red-400 font-bold' : charInfo('friccionProblema').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('friccionProblema').len }}/{{ CHAR_LIMITS.friccionProblema.max }}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -913,9 +847,9 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 3)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 3)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-
+                  
                   <div class="flex flex-wrap gap-2 mb-4">
-                    <button v-for="opt in limitacionesOpciones" :key="opt"
+                    <button v-for="opt in limitacionesOpciones" :key="opt" 
                       @click="!esModoDemo && (seleccion.restricciones.includes(opt) ? seleccion.restricciones = seleccion.restricciones.filter(c => c !== opt) : seleccion.restricciones.push(opt))"
                       :disabled="esModoDemo"
                       :class="seleccion.restricciones.includes(opt) ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white border-transparent shadow-md' : 'bg-[#1F2937] text-gray-300 border-transparent hover:border-[#00A859]/50'"
@@ -923,7 +857,11 @@ const tieneContextoEmpresa = computed(() => {
                       {{ opt }}
                     </button>
                   </div>
-                  <textarea v-model="seleccion.otraLimitacion" :disabled="esModoDemo" class="input-style h-20" placeholder="Describe aquí otros intentos de solución o detalles de las limitaciones..."></textarea>
+                  <textarea v-model="seleccion.otraLimitacion" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.otraLimitacion.max" class="input-style h-20" placeholder="Describe aquí otros intentos de solución o detalles de las limitaciones..."></textarea>
+                  <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                    <span v-if="charInfo('otraLimitacion').isWarning && !charInfo('otraLimitacion').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                    <span class="text-[10px] transition-colors" :class="charInfo('otraLimitacion').isOver ? 'text-red-400 font-bold' : charInfo('otraLimitacion').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('otraLimitacion').len }}/{{ CHAR_LIMITS.otraLimitacion.max }}</span>
+                  </div>
                 </div>
 
                 <div>
@@ -931,7 +869,11 @@ const tieneContextoEmpresa = computed(() => {
                     <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">3b</span>
                     ¿Qué NO quieren bajo ningún concepto?
                   </label>
-                  <input v-model="seleccion.loQueNoQuieren" :disabled="esModoDemo" class="input-style" placeholder="Ej: Nada que requiera suscripción mensual..." />
+                  <textarea v-model="seleccion.loQueNoQuieren" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.loQueNoQuieren.max" class="input-style h-16" placeholder="Ej: Nada que requiera suscripción mensual..."></textarea>
+                  <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                    <span v-if="charInfo('loQueNoQuieren').isWarning && !charInfo('loQueNoQuieren').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                    <span class="text-[10px] transition-colors" :class="charInfo('loQueNoQuieren').isOver ? 'text-red-400 font-bold' : charInfo('loQueNoQuieren').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('loQueNoQuieren').len }}/{{ CHAR_LIMITS.loQueNoQuieren.max }}</span>
+                  </div>
                 </div>
 
                 <div>
@@ -943,9 +885,9 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 4)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 4)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-
+                  
                   <div class="flex flex-wrap gap-2 mb-4">
-                    <button v-for="opt in consecuenciasOpciones" :key="opt"
+                    <button v-for="opt in consecuenciasOpciones" :key="opt" 
                       @click="!esModoDemo && (seleccion.consecuencias.includes(opt) ? seleccion.consecuencias = seleccion.consecuencias.filter(c => c !== opt) : seleccion.consecuencias.push(opt))"
                       :disabled="esModoDemo"
                       :class="seleccion.consecuencias.includes(opt) ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white border-transparent shadow-md' : 'bg-[#1F2937] text-gray-300 border-transparent hover:border-[#99CC33]/50'"
@@ -953,7 +895,11 @@ const tieneContextoEmpresa = computed(() => {
                       {{ opt }}
                     </button>
                   </div>
-                  <input v-model="seleccion.otraConsecuencia" :disabled="esModoDemo" class="input-style" placeholder="Otra mejora específica (Opcional)..." />
+                  <input v-model="seleccion.otraConsecuencia" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.otraConsecuencia.max" class="input-style" placeholder="Otra mejora específica (Opcional)..." />
+                  <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                    <span v-if="charInfo('otraConsecuencia').isWarning && !charInfo('otraConsecuencia').isOver" class="text-amber-400 text-[10px]">Cerca del límite</span>
+                    <span class="text-[10px] transition-colors" :class="charInfo('otraConsecuencia').isOver ? 'text-red-400 font-bold' : charInfo('otraConsecuencia').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('otraConsecuencia').len }}/{{ CHAR_LIMITS.otraConsecuencia.max }}</span>
+                  </div>
                 </div>
 
                 <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
@@ -965,7 +911,11 @@ const tieneContextoEmpresa = computed(() => {
                     <button @click="abrirPopup('info', 5)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 5)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>
                   </div>
-                  <textarea v-model="seleccion.expectativasAlumno" :disabled="esModoDemo" class="input-style h-24" placeholder="Ej: Que investigue herramientas gratuitas y proponga un prototipo sencillo..."></textarea>
+                  <textarea v-model="seleccion.expectativasAlumno" :disabled="esModoDemo" :maxlength="CHAR_LIMITS.expectativasAlumno.max" class="input-style h-24" placeholder="Ej: Que investigue herramientas gratuitas y proponga un prototipo sencillo..."></textarea>
+                  <div class="flex items-center justify-end gap-2 mt-1 h-4">
+                    <span v-if="charInfo('expectativasAlumno').isWarning && !charInfo('expectativasAlumno').isOver" class="text-amber-400 text-[10px]">Cerca del límite — sé conciso</span>
+                    <span class="text-[10px] transition-colors" :class="charInfo('expectativasAlumno').isOver ? 'text-red-400 font-bold' : charInfo('expectativasAlumno').isWarning ? 'text-amber-400' : 'text-gray-600'">{{ charInfo('expectativasAlumno').len }}/{{ CHAR_LIMITS.expectativasAlumno.max }}</span>
+                  </div>
                 </div>
 
               </div>
@@ -999,7 +949,7 @@ const tieneContextoEmpresa = computed(() => {
                   </span>
 
                   <!--
-                  <button @click="cargarDemo" :disabled="esModoDemo"
+                  <button @click="cargarDemo" :disabled="esModoDemo" 
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
@@ -1012,8 +962,8 @@ const tieneContextoEmpresa = computed(() => {
                   </button>
                 </div>
               </div>
-
-              <div v-if="esModoDemo"
+              
+              <div v-if="esModoDemo" 
                 class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
                 <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -1043,20 +993,20 @@ const tieneContextoEmpresa = computed(() => {
 
                 <div class="col-span-2 mt-4">
                   <label class="label-style !mb-4">Ciclo Formativo Implicado *</label>
-
+                  
                   <div v-if="ciclos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                     <button v-for="c in ciclos" :key="c.id"
+                     <button v-for="c in ciclos" :key="c.id" 
                         @click="!esModoDemo && (seleccion.cicloId = c.id)"
                         :disabled="esModoDemo"
-                        :class="seleccion.cicloId === c.id
-                            ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] border-transparent text-white'
+                        :class="seleccion.cicloId === c.id 
+                            ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] border-transparent text-white' 
                             : 'bg-[#1F2937] border-transparent text-gray-300 hover:border-[#00A859]/40'"
                         class="text-left px-5 py-4 rounded-2xl border-2 transition-all duration-200 flex items-center gap-3 relative overflow-hidden group shadow-sm">
-
+                        
                         <div class="shrink-0 transition-transform" :class="seleccion.cicloId === c.id ? 'scale-100' : 'scale-0 opacity-0 hidden'">
                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                         </div>
-
+                        
                         <div class="flex-1">
                             <span class="text-sm font-bold leading-tight">{{ c.nombre }}</span>
                         </div>
@@ -1070,15 +1020,15 @@ const tieneContextoEmpresa = computed(() => {
                 <div class="col-span-2 mt-6">
                   <label class="label-style !mb-3">Curso del Alumnado *</label>
                   <div class="flex bg-[#1F2937] p-1.5 rounded-2xl w-full md:w-1/2 shadow-inner">
-                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 1)"
+                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 1)" 
                       :disabled="esModoDemo"
-                      :class="seleccion.cursoSeleccionado === 1 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'"
+                      :class="seleccion.cursoSeleccionado === 1 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'" 
                       class="flex-1 py-3 rounded-xl text-sm transition-all">
                       1º Curso
                     </button>
-                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 2)"
+                    <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 2)" 
                       :disabled="esModoDemo"
-                      :class="seleccion.cursoSeleccionado === 2 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'"
+                      :class="seleccion.cursoSeleccionado === 2 ? 'bg-[#374151] text-white shadow font-black' : 'text-gray-400 hover:text-white'" 
                       class="flex-1 py-3 rounded-xl text-sm transition-all">
                       2º Curso
                     </button>
@@ -1091,7 +1041,7 @@ const tieneContextoEmpresa = computed(() => {
                       <label class="label-style !mb-0 !ml-0">Forzar Módulo Específico (Opcional)</label>
                       <span class="text-xs text-gray-400 italic">Si no eliges, la IA cruzará con todos.</span>
                     </div>
-
+                    
                     <select v-model="modulosSeleccionados" multiple :disabled="esModoDemo || modulosDelCurso.length === 0" class="input-style min-h-[120px]">
                       <option v-for="m in modulosDelCurso" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                     </select>
@@ -1119,7 +1069,7 @@ const tieneContextoEmpresa = computed(() => {
       </main>
 
       <div class="mt-16 flex flex-col items-center gap-6">
-
+        
         <div v-if="pasoActual === totalPasos && !crmActualizado" class="bg-yellow-50 border border-yellow-200 shadow-sm rounded-2xl p-5 flex items-start md:items-center gap-4 w-full max-w-4xl animate-in slide-in-from-bottom-2">
           <div class="bg-yellow-400 text-white p-2 rounded-full shrink-0">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -1134,8 +1084,8 @@ const tieneContextoEmpresa = computed(() => {
           <button v-if="pasoActual > 1" @click="retrocederPaso" class="flex-1 min-w-[150px] px-10 py-6 bg-white text-[#1F2937] border-2 border-gray-200 rounded-full font-black text-xs tracking-widest transition-all hover:bg-gray-50 hover:border-gray-300 active:scale-95">
             VOLVER
           </button>
-
-          <button v-if="pasoActual < totalPasos" @click="avanzarPaso"
+          
+          <button v-if="pasoActual < totalPasos" @click="avanzarPaso" 
             :disabled="(pasoActual === 1 && !paso1Valido) || (pasoActual === 2 && !paso2Valido)"
             class="flex-[2] min-w-[200px] px-10 py-6 bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white rounded-full font-black text-xs tracking-widest shadow-md hover:shadow-lg disabled:opacity-30 transition-all hover:scale-105 active:scale-95">
             SIGUIENTE PASO
@@ -1175,11 +1125,11 @@ const tieneContextoEmpresa = computed(() => {
       </div>
 
       <div v-if="microretosGenerados.length > 0" class="mt-24 pb-20 space-y-32 font-sans relative">
-
+        
         <div v-if="microretosGenerados.length > 1" class="flex justify-center md:justify-end mb-8 sticky top-4 z-50">
             <button @click="guardarTodos" :disabled="todosGuardados || guardandoTodos" class="px-8 py-4 bg-white border-2 border-gray-200 text-[#1F2937] hover:border-[#00A859] hover:text-[#00A859] rounded-full font-black text-xs md:text-sm uppercase tracking-widest shadow-lg transition-all hover:-translate-y-1 active:scale-95 disabled:hover:translate-y-0 disabled:opacity-80 flex items-center gap-2">
                 <template v-if="guardandoTodos">
-                  <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg>
+                  <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg> 
                   GUARDANDO TODOS...
                 </template>
                 <template v-else-if="todosGuardados">
@@ -1194,7 +1144,7 @@ const tieneContextoEmpresa = computed(() => {
         </div>
 
         <div v-for="(reto, index) in microretosGenerados" :key="index" class="relative animate-in slide-in-from-bottom-8 duration-700">
-
+          
           <div v-if="microretosGenerados.length > 1" class="absolute -top-16 left-0 w-full flex items-center justify-center z-10">
             <div class="w-full h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
             <span class="absolute px-6 py-2 bg-white border border-gray-200 text-gray-500 rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
@@ -1213,7 +1163,7 @@ const tieneContextoEmpresa = computed(() => {
               <span v-else>GUARDAR ESTA VERSIÓN</span>
             </button>
           </div>
-
+          
           <div class="bg-white rounded-[2rem] shadow-[0_20px_50px_rgb(0,0,0,0.06)] mx-auto max-w-5xl overflow-hidden border border-gray-100 relative z-20">
             <div class="bg-gray-50 border-b border-gray-100 p-10 md:px-16 pt-12">
               <p class="text-[#00A859] font-bold text-[10px] tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
@@ -1226,7 +1176,7 @@ const tieneContextoEmpresa = computed(() => {
               <h2 class="text-lg md:text-xl text-gray-500 font-medium leading-relaxed mb-8">
                 {{ reto.subtitulo }}
               </h2>
-
+              
               <div class="flex flex-wrap gap-3">
                 <span class="flex items-center gap-2 px-4 py-2 bg-[#1F2937] text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -1331,7 +1281,7 @@ const tieneContextoEmpresa = computed(() => {
                   <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                   RA/CE Seleccionados
                 </h3>
-
+                
                 <div class="space-y-6">
                   <div v-for="evalObj in reto.evaluacion_oficial" :key="evalObj.modulo" class="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm">
                     <p class="text-xs uppercase font-bold text-gray-400 mb-1">Módulo</p>
@@ -1370,8 +1320,8 @@ const tieneContextoEmpresa = computed(() => {
                 </ul>
               </div>
             </div>
-          </div>
-
+          </div> 
+          
           <div class="bg-gray-50 text-[#1F2937] p-10 md:p-16 rounded-[2rem] shadow-sm mx-auto max-w-5xl border border-gray-200 relative mt-12">
             <div class="absolute top-0 right-0 bg-white border-b border-l border-gray-200 text-gray-500 px-6 py-2 font-bold text-xs tracking-widest uppercase rounded-bl-xl shadow-sm">Uso Exclusivo Docente</div>
             <h2 class="text-2xl font-black text-[#1F2937] mb-2 mt-2 flex items-center gap-3">
@@ -1379,7 +1329,7 @@ const tieneContextoEmpresa = computed(() => {
               Guía de Implementación
             </h2>
             <p class="text-gray-500 text-sm mb-12">Recomendaciones pedagógicas para dinamizar el reto.</p>
-
+            
             <div class="grid grid-cols-1 gap-6">
               <div v-for="(tip, i) in reto.tips_profesorado" :key="i" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                 <div class="text-sm text-gray-700 leading-relaxed">
@@ -1414,26 +1364,10 @@ const tieneContextoEmpresa = computed(() => {
         </div>
       </transition>
 
-      <InsertModifyEmpresa
-        ref="modalesRef"
-        v-model:mostrarNuevaEmpresa="mostrarNuevaEmpresa"
-        v-model:mostrarEditarEmpresa="mostrarEditarEmpresa"
-        :nombreBuscado="buscadorEmpresa"
-        :empresaAEditar="empresaAEditar"
-        :familiasProfesionales="familiasProfesionalesGlobal"
-        :centrosDisponibles="centrosDisponibles"
-        @empresa-creada="onEmpresaCreada"
-        @empresa-actualizada="onEmpresaActualizada"
-        @necesita-login="onNecesitaLogin"
-      />
-
-      <LoginModal
-        v-model="mostrarLogin"
-        @login-success="onLoginSuccess"
-      />
-
     </div>
   </div>
+
+  <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
 </template>
 
 <style scoped>

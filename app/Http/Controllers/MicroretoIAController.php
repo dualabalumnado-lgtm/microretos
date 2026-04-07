@@ -6,54 +6,65 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\Microreto;
 use App\Models\Modulo;
+use App\Models\Empresa;
 
 class MicroretoIAController extends Controller
 {
+    public function index(Request $request)
+    {
+        // Límite de seguridad: máximo 500 registros por llamada.
+        // El frontend filtra en cliente, así que cargamos todo pero con techo.
+        // Cuando el volumen crezca habrá que añadir filtros server-side.
+        $limit = min((int) $request->query('limit', 500), 500);
 
-    public function index()
-{
-    // 1. Obtenemos todos y REASIGNAMOS el resultado del map
-    $microretos = \App\Models\Microreto::all()->map(function ($reto) {
-        
-        $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
-        
-        if ($empresa) {
-            $reto->centro_educativo = $empresa->centro_educativo;
-            $reto->familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
-                ->where('empresa_id', $empresa->id)
-                ->value('familia');
-        } else {
-            $reto->centro_educativo = 'Centro Desconocido';
-            $reto->familia = 'Familia Desconocida';
-        }
+        $microretos = Microreto::with([
+            'empresa.centroEducativo',
+            'empresa.familias',
+        ])
+        ->orderByDesc('created_at')
+        ->limit($limit)
+        ->get()
+        ->map(function ($reto) {
 
-        // ASEGURAMOS QUE EL FRONTEND RECIBA UN BOOLEANO PURO
-        $reto->es_simulado = (bool) $reto->es_simulado;
+            $reto->es_simulado = (bool) $reto->es_simulado;
 
-        return $reto;
-    });
+            if ($reto->empresa) {
+                $reto->centro_educativo = $reto->empresa->centroEducativo?->nombre
+                    ?? $reto->empresa->centro_educativo
+                    ?? 'Centro Desconocido';
 
-    return response()->json($microretos);
-}
+                $reto->familia = $reto->empresa->familias->first()?->nombre
+                    ?? 'Familia Desconocida';
+            } else {
+                $reto->centro_educativo = 'Centro Desconocido';
+                $reto->familia          = 'Familia Desconocida';
+            }
 
-    /**
-     * Devuelve un microreto por ID, enriquecido con centro_educativo y familia.
-     */
+            return $reto;
+        });
+
+        return response()->json($microretos);
+    }
+
     public function show($id)
     {
-        $reto = \App\Models\Microreto::findOrFail($id);
+        $reto = Microreto::with([
+            'empresa.centroEducativo',
+            'empresa.familias',
+        ])->findOrFail($id);
 
-        $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
+        $reto->es_simulado = (bool) $reto->es_simulado;
 
-        if ($empresa) {
-            $reto->centro_educativo = $empresa->centro_educativo;
-            $familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
-                ->where('empresa_id', $empresa->id)
-                ->value('familia');
-            $reto->familia = $familia;
+        if ($reto->empresa) {
+            $reto->centro_educativo = $reto->empresa->centroEducativo?->nombre
+                ?? $reto->empresa->centro_educativo
+                ?? 'Centro Desconocido';
+
+            $reto->familia = $reto->empresa->familias->first()?->nombre
+                ?? 'Familia Desconocida';
         } else {
             $reto->centro_educativo = 'Centro Desconocido';
-            $reto->familia = 'Familia Desconocida';
+            $reto->familia          = 'Familia Desconocida';
         }
 
         return response()->json($reto);
@@ -61,22 +72,28 @@ class MicroretoIAController extends Controller
 
     public function generar(Request $request)
     {
+        // El frontend manda empresaId (camelCase), normalizamos antes de validar
+        $request->merge([
+            'empresa_id' => $request->empresa_id ?? $request->empresaId,
+        ]);
+
         $request->validate([
-            'empresaNombre' => 'required|string',
-            'empresaSector' => 'required|string',
+            'empresa_id'       => 'required|integer|exists:empresas,id',
+            'empresaNombre'    => 'required|string',
+            'empresaSector'    => 'required|string',
             'friccionProblema' => 'required|string',
-            'ciclo_nombre' => 'required|string',
-            'ciclo_id' => 'required',
-            'nivelGrupo' => 'required|string',
-            'cursoSeleccionado' => 'required|integer',
-            'modulo_id' => 'nullable|array',
-            'cantidad' => 'required|integer|min:1|max:15' // ¡NUEVO! Validamos la cantidad
+            'ciclo_nombre'     => 'required|string',
+            'ciclo_id'         => 'required',
+            'nivelGrupo'       => 'required|string',
+            'cursoSeleccionado'=> 'required|integer',
+            'modulo_id'        => 'nullable|array',
+            'cantidad'         => 'required|integer|min:1|max:15',
         ]);
 
         $consecuencias = implode(", ", $request->consecuencias ?? []);
-        
+
         $query = Modulo::with(['ras.criteriosEvaluacion']);
-        
+
         if ($request->filled('modulo_id') && is_array($request->modulo_id) && count($request->modulo_id) > 0) {
             $query->whereIn('id', $request->modulo_id);
         } else {
@@ -97,26 +114,24 @@ class MicroretoIAController extends Controller
         }
         $curriculumTexto .= "\n--- FIN CURRÍCULO ---";
 
-        $esBasica = ($request->nivelGrupo === 'Básico');
-        $reglaExtra = $esBasica ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado." : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
+        $esBasica    = ($request->nivelGrupo === 'Básico');
+        $reglaExtra  = $esBasica
+            ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado."
+            : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
         $reglaExtra .= " TEN EN CUENTA QUE ES PARA ALUMNADO DE {$request->cursoSeleccionado}º CURSO. Adapta el prototipo a sus conocimientos.";
 
         $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector}). ";
-        if ($request->filled('empresaTamano')) $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
+        if ($request->filled('empresaTamano'))    $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
         if ($request->filled('empresaUbicacion')) $contextoEmpresa .= "Ubicación: {$request->empresaUbicacion}. ";
 
-        $contextoFriccion = "OPERATIVA Y OFERTA (P1): {$request->diaANormal}\n";
+        $contextoFriccion  = "OPERATIVA Y OFERTA (P1): {$request->diaANormal}\n";
         $contextoFriccion .= "PROCESO QUE DA TRABAJO EXTRA (P2): {$request->friccionArea}\n";
         $contextoFriccion .= "DETALLE DEL PROBLEMA (P2b): {$request->friccionProblema}\n";
         $contextoFriccion .= "OBJETIVOS DE MEJORA / CONSECUENCIAS (P4): {$consecuencias}\n";
-
         if ($request->filled('expectativasAlumno')) {
             $contextoFriccion .= "EXPECTATIVA DE LO QUE DEBE HACER EL ALUMNO (P5): {$request->expectativasAlumno}\n";
         }
 
-        // ======================================================================
-        // PROMPT OPTIMIZADO PARA ACEPTAR CANTIDAD DINÁMICA
-        // ======================================================================
         $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y metodologías ágiles (Design Thinking).
         REGLAS ESTRICTAS:
         1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar. El alumno debe idear la solución final.
@@ -126,10 +141,10 @@ class MicroretoIAController extends Controller
         $userPrompt = "
         {$contextoEmpresa}
         {$contextoFriccion}
-        LIMITACIONES TÉCNICAS Y LOGÍSTICAS (P3): {$request->restricciones}. 
+        LIMITACIONES TÉCNICAS Y LOGÍSTICAS (P3): {$request->restricciones}.
         LO QUE NO QUIEREN (P3b): {$request->loQueNoQuieren}.
         DURACIÓN: {$request->duracion}.
-        
+
         {$curriculumTexto}
         {$reglaExtra}
 
@@ -166,16 +181,16 @@ class MicroretoIAController extends Controller
             ]
         }";
 
-        $response = Http::withToken(env('OPENAI_API_KEY'))
-            ->timeout(120) // He subido el timeout a 120s porque si le pides 15 retos, tardará más en generar
+        $response = Http::withToken(config('services.openai.key'))
+            ->timeout(120)
             ->post("https://api.openai.com/v1/chat/completions", [
-                "model" => "gpt-4o",
-                "messages" => [
+                "model"           => "gpt-4o",
+                "messages"        => [
                     ["role" => "system", "content" => $systemPrompt],
-                    ["role" => "user", "content" => $userPrompt]
+                    ["role" => "user",   "content" => $userPrompt],
                 ],
                 "response_format" => ["type" => "json_object"],
-                "temperature" => 0.9
+                "temperature"     => 0.9,
             ]);
 
         if ($response->successful()) {
@@ -185,29 +200,27 @@ class MicroretoIAController extends Controller
         return response()->json(['error' => 'Error al contactar con la IA'], 500);
     }
 
-    // Guarda UN SOLO reto
     public function guardarEnBD(Request $request)
     {
         try {
-            $datos = $request->except(['_ui_guardado', '_ui_guardando']); //Limpieza defensiva
-            $microreto = Microreto::create($request->all());
+            $datos = $request->except(['_ui_guardado', '_ui_guardando']);
+            $microreto = Microreto::create($datos);
             return response()->json(['mensaje' => 'Micro-reto archivado', 'reto' => $microreto], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al guardar en BD: ' . $e->getMessage()], 500);
         }
     }
 
-    // ¡NUEVO! Guarda TODOS los retos del array de golpe
     public function guardarLote(Request $request)
     {
         $request->validate([
-            'microretos' => 'required|array'
+            'microretos' => 'required|array',
         ]);
 
         try {
             $insertados = [];
-            foreach($request->microretos as $retoData) {
-                unset($retoData['_ui_guardado'], $retoData['_ui_guardando']); //Limpieza defensiva
+            foreach ($request->microretos as $retoData) {
+                unset($retoData['_ui_guardado'], $retoData['_ui_guardando']);
                 $insertados[] = Microreto::create($retoData);
             }
             return response()->json(['mensaje' => count($insertados) . ' Micro-retos archivados en lote con éxito'], 201);
@@ -219,8 +232,7 @@ class MicroretoIAController extends Controller
     public function destroy($id)
     {
         try {
-            $microreto = Microreto::findOrFail($id);
-            $microreto->delete();
+            Microreto::findOrFail($id)->delete();
             return response()->json(['mensaje' => 'Micro-reto eliminado correctamente'], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 500);
