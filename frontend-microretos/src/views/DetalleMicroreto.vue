@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api.js';
+import { usePdfExport } from '../composables/usePdfExport.js';
+import { useAuthStore } from '../stores/auth.js';
+import LoginModal from '../components/LoginModal.vue';
 
 const route   = useRoute();
 const router  = useRouter();
@@ -24,6 +27,19 @@ onMounted(async () => {
 });
 
 const volver = () => router.push({ name: 'biblioteca' });
+
+const { descargarPDF } = usePdfExport();
+
+const authStore = useAuthStore();
+const showLoginModal = ref(false);
+
+function handleDescargarPDF() {
+  if (authStore.isAuthenticated) {
+    descargarPDF(reto.value);
+  } else {
+    showLoginModal.value = true;
+  }
+}
 
 // --- NUEVA LÓGICA PARA LA IMAGEN DE FONDO ---
 const imagenFondo = computed(() => {
@@ -62,8 +78,8 @@ const imagenFondo = computed(() => {
 
     <div class="relative z-10 max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-12">
 
-      <!-- ── Botón volver (cabecera) ── -->
-      <div class="mb-8 transition-all duration-700 ease-out"
+      <!-- ── Botón volver + descargar (cabecera) ── -->
+      <div class="mb-8 flex items-center gap-3 transition-all duration-700 ease-out"
            :class="isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'">
         <button @click="volver"
                 class="inline-flex items-center gap-2 px-5 py-2.5
@@ -76,6 +92,19 @@ const imagenFondo = computed(() => {
                   d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
           </svg>
           Volver a la Biblioteca
+        </button>
+
+        <button v-if="reto" @click="handleDescargarPDF"
+                class="inline-flex items-center gap-2 px-5 py-2.5
+                       bg-white border border-gray-200 rounded-full
+                       text-xs font-black uppercase tracking-widest text-[#1F2937]
+                       shadow-sm hover:border-[#00A859] hover:text-[#00A859]
+                       transition-all active:scale-95">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Descargar PDF
         </button>
       </div>
 
@@ -475,8 +504,8 @@ const imagenFondo = computed(() => {
           </div>
         </div>
 
-        <!-- Botón volver pie -->
-        <div class="flex justify-center mt-10 pb-8">
+        <!-- Botones volver + descargar pie -->
+        <div class="flex flex-wrap justify-center gap-4 mt-10 pb-8">
           <button @click="volver"
                   class="inline-flex items-center gap-2 px-8 py-4 bg-white border-2 border-gray-200
                          rounded-full text-xs font-black uppercase tracking-widest text-[#1F2937]
@@ -488,11 +517,28 @@ const imagenFondo = computed(() => {
             </svg>
             Volver a la Biblioteca
           </button>
+
+          <button @click="descargarPDF(reto)"
+                  class="inline-flex items-center gap-2 px-8 py-4 bg-[#00A859] border-2 border-[#00A859]
+                         rounded-full text-xs font-black uppercase tracking-widest text-white
+                         shadow-sm hover:bg-[#008f4a] hover:border-[#008f4a] transition-all
+                         hover:-translate-y-0.5 active:scale-95">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Descargar PDF
+          </button>
         </div>
 
       </template>
     </div>
   </div>
+
+  <LoginModal
+    v-model="showLoginModal"
+    @login-success="descargarPDF(reto)"
+  />
 </template>
 
 <style scoped>
