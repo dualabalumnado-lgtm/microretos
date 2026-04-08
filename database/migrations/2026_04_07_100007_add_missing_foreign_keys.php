@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -24,12 +23,6 @@ return new class extends Migration
 
     public function up(): void
     {
-        // ciclo_id quedó como BIGINT UNSIGNED del intento fallido anterior.
-        // ciclos_formativos.id es INT (firmado) → hay que igualar el tipo antes del constraint.
-        DB::statement('ALTER TABLE microretos MODIFY ciclo_id INT NULL');
-        // familias.id es INT UNSIGNED → familia_id debe ser INT UNSIGNED también
-        DB::statement('ALTER TABLE empresa_familia MODIFY familia_id INT UNSIGNED NULL');
-
         if (!$this->fkExists('microretos', 'microretos_ciclo_id_foreign')) {
             Schema::table('microretos', function (Blueprint $table) {
                 $table->foreign('ciclo_id')->references('id')->on('ciclos_formativos')->onDelete('restrict');

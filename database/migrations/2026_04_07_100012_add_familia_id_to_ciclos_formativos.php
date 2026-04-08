@@ -14,8 +14,7 @@ return new class extends Migration
         // la instrucción ALTER fallará con un error claro. La migramos explícitamente.
         if (!Schema::hasColumn('ciclos_formativos', 'familia_id')) {
             Schema::table('ciclos_formativos', function (Blueprint $table) {
-                // familias.id es INT UNSIGNED → el tipo debe coincidir exactamente
-                $table->unsignedInteger('familia_id')->nullable()->after('familia');
+                $table->unsignedBigInteger('familia_id')->nullable()->after('familia');
             });
         }
 
