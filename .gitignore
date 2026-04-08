@@ -1,4 +1,6 @@
 *.log
+INSERT_*.sql
+INSERT_*.sql.zip
 .DS_Store
 .env
 .env.local
