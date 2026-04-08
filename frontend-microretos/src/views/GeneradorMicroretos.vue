@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import api from '../api.js';
 import { useAuthStore } from '../stores/auth';
 import LoginModal from '../components/LoginModal.vue';
+import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue';
 
 const authStore = useAuthStore();
 const showLogin = ref(false);
@@ -23,7 +24,13 @@ const empresas = ref([]);
 const familiasFiltradas = ref([]); 
 const buscadorEmpresa = ref('');
 const mostrarDropdownEmpresas = ref(false);
-const empresaDetalle = ref(null); 
+const empresaDetalle = ref(null);
+
+// --- MODAL INSERT/MODIFY EMPRESA ---
+const mostrarNuevaEmpresa = ref(false);
+const mostrarEditarEmpresa = ref(false);
+const accionPendienteLogin = ref(null);
+const insertModifyRef = ref(null);
 
 // --- ETADO MODO DEMO Y SIMULACIÓN ---
 const esModoDemo = ref(false);
@@ -35,6 +42,11 @@ const centroFiltro = ref('');
 const centrosDisponibles = computed(() => {
   const centros = empresas.value.map(e => e.centro_educativo).filter(Boolean);
   return [...new Set(centros)].sort();
+});
+
+const todasLasFamilias = computed(() => {
+  const fams = empresas.value.map(e => e.familia).filter(Boolean);
+  return [...new Set(fams)].sort();
 });
 
 const seleccion = ref({
@@ -168,6 +180,38 @@ const seleccionarEmpresa = (emp) => {
   mostrarDropdownEmpresas.value = false;
 };
 
+const abrirModalEmpresa = () => {
+  if (seleccion.value.empresaId) {
+    mostrarEditarEmpresa.value = true;
+  } else {
+    mostrarNuevaEmpresa.value = true;
+  }
+};
+
+const onEmpresaCreada = (empresa) => {
+  empresas.value.push(empresa);
+  seleccionarEmpresa(empresa);
+};
+
+const onEmpresaActualizada = (empresa) => {
+  const idx = empresas.value.findIndex(e => String(e.id) === String(empresa.id));
+  if (idx !== -1) empresas.value[idx] = empresa;
+  if (String(seleccion.value.empresaId) === String(empresa.id)) {
+    empresaDetalle.value = empresa;
+    buscadorEmpresa.value = empresa.nombre_comercial;
+    seleccion.value.empresaNombre = empresa.nombre_comercial;
+    seleccion.value.empresaSector = empresa.sector || '';
+    seleccion.value.empresaTamano = empresa.tamano || '';
+    seleccion.value.empresaWeb = empresa.web || '';
+    seleccion.value.empresaCentro = empresa.centro_educativo || '';
+  }
+};
+
+const onNecesitaLoginEmpresa = (accion) => {
+  accionPendienteLogin.value = accion;
+  showLogin.value = true;
+};
+
 const onBuscadorInput = () => {
   mostrarDropdownEmpresas.value = true;
   // Si el usuario borra el campo, limpiamos la empresa seleccionada
@@ -273,6 +317,10 @@ const cargarEmpresas = async () => {
 const onLoginSuccess = async () => {
   showLogin.value = false;
   await cargarEmpresas();
+  if (accionPendienteLogin.value) {
+    insertModifyRef.value?.abrirTrasLogin(accionPendienteLogin.value);
+    accionPendienteLogin.value = null;
+  }
 };
 
 onMounted(async () => {
@@ -560,11 +608,22 @@ const tieneContextoEmpresa = computed(() => {
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Información Simulada
                   </button>
-                  <button @click="cargarDemo" :disabled="esModoDemo" 
+                  <button @click="cargarDemo" :disabled="esModoDemo"
                     :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
                     <span v-else> Cargar Demo</span>
+                  </button>
+                  <button @click="abrirModalEmpresa"
+                    :class="seleccion.empresaId
+                      ? 'bg-[#00A859] text-white border-[#00A859] hover:bg-[#007a42] shadow-md'
+                      : 'bg-white text-[#1F2937] hover:bg-gray-50 border-gray-200 shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path v-if="seleccion.empresaId" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7z"/>
+                    </svg>
+                    {{ seleccion.empresaId ? 'Modificar datos empresa' : 'Insertar nueva empresa' }}
                   </button>
                   <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -573,7 +632,7 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
               </div>
 
-              <div v-if="esModoDemo" 
+              <div v-if="esModoDemo"
                 class="mb-6 flex items-center gap-3 bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl px-5 py-3">
                 <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -582,7 +641,7 @@ const tieneContextoEmpresa = computed(() => {
                   Modo Demo activo — los campos están bloqueados. Pulsa "Vaciar" para editarlos.
                 </p>
               </div>
-              
+
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label class="label-style">Filtrar por Colegio/Centro (Opcional)</label>
@@ -1368,6 +1427,19 @@ const tieneContextoEmpresa = computed(() => {
   </div>
 
   <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
+
+  <InsertModifyEmpresa
+    ref="insertModifyRef"
+    v-model:mostrarNuevaEmpresa="mostrarNuevaEmpresa"
+    v-model:mostrarEditarEmpresa="mostrarEditarEmpresa"
+    :nombreBuscado="buscadorEmpresa"
+    :familiasProfesionales="todasLasFamilias"
+    :centrosDisponibles="centrosDisponibles"
+    :empresaAEditar="empresaDetalle"
+    @empresa-creada="onEmpresaCreada"
+    @empresa-actualizada="onEmpresaActualizada"
+    @necesita-login="onNecesitaLoginEmpresa"
+  />
 </template>
 
 <style scoped>
