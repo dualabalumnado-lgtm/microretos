@@ -39,10 +39,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
     // Empresas — datos completos solo para usuarios autenticados
-    Route::get('/empresas',              [DatosFPController::class, 'getEmpresas']);
-    Route::get('/empresas/{id}/familias',[DatosFPController::class, 'getFamiliasPorEmpresa']);
-    Route::post('/empresas',             [DatosFPController::class, 'guardarEmpresa']);
-    Route::put('/empresas/{id}',         [DatosFPController::class, 'actualizarEmpresa']);
+    Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);
+    Route::get('/empresas/dashboard',      [DatosFPController::class, 'getDashboardEmpresas']);
+    Route::get('/empresas/{id}/familias',  [DatosFPController::class, 'getFamiliasPorEmpresa']);
+    Route::post('/empresas',               [DatosFPController::class, 'guardarEmpresa']);
+    Route::put('/empresas/{id}',           [DatosFPController::class, 'actualizarEmpresa']);
+    Route::delete('/empresas/{id}',        [DatosFPController::class, 'eliminarEmpresa']);
 
     // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
     Route::middleware('throttle:5,1')->group(function () {

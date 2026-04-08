@@ -79,7 +79,7 @@ const imagenFondo = computed(() => {
     <div class="relative z-10 max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-12">
 
       <!-- ── Botón volver + descargar (cabecera) ── -->
-      <div class="mb-8 flex items-center gap-3 transition-all duration-700 ease-out"
+      <div class="mb-8 flex flex-wrap items-center gap-2 transition-all duration-700 ease-out"
            :class="isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'">
         <button @click="volver"
                 class="inline-flex items-center gap-2 px-5 py-2.5
@@ -247,7 +247,7 @@ const imagenFondo = computed(() => {
           <div class="px-6 py-8 md:px-14 md:py-12 space-y-10 md:space-y-14">
 
             <!-- Quién es / Día a día -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 lg:gap-10">
               <div v-if="reto.quien_es">
                 <h3 class="section-title text-[#00A859]">
                   <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,7 +304,7 @@ const imagenFondo = computed(() => {
             </div>
 
             <!-- Qué necesitan / Limitaciones -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 lg:gap-10">
               <div v-if="reto.que_necesitan?.length">
                 <h3 class="section-title text-[#00A859]">
                   <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,7 +342,7 @@ const imagenFondo = computed(() => {
             </div>
 
             <!-- Prototipos / ODS -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 lg:gap-10">
               <div v-if="reto.prototipos?.length">
                 <h3 class="section-title text-[#00A859]">
                   <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
