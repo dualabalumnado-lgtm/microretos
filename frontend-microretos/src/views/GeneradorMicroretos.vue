@@ -44,10 +44,7 @@ const centrosDisponibles = computed(() => {
   return [...new Set(centros)].sort();
 });
 
-const todasLasFamilias = computed(() => {
-  const fams = empresas.value.map(e => e.familia).filter(Boolean);
-  return [...new Set(fams)].sort();
-});
+const todasLasFamilias = ref([]);
 
 const seleccion = ref({
   empresaId: '', 
@@ -307,8 +304,12 @@ const cerrarDropdownFuera = (e) => {
 
 const cargarEmpresas = async () => {
   try {
-    const res = await api.get('/empresas');
-    empresas.value = res.data;
+    const [resEmpresas, resFamilias] = await Promise.all([
+      api.get('/empresas'),
+      api.get('/familias'),
+    ]);
+    empresas.value = resEmpresas.data;
+    todasLasFamilias.value = resFamilias.data.map(f => f.nombre ?? f).filter(Boolean).sort();
   } catch (e) {
     console.error(e);
   }
@@ -550,11 +551,11 @@ const tieneContextoEmpresa = computed(() => {
     <div class="max-w-6xl mx-auto">
       
       <header class="mb-10 text-center flex flex-col items-center">
-        <div class="inline-flex items-center mb-8 bg-[#1F2937] py-4 pr-10 pl-6 rounded-[3rem] shadow-lg border border-[#333333] transition-all duration-1000 ease-out transform"
+        <div class="inline-flex items-center mb-8 bg-[#1F2937] py-3 sm:py-4 pr-6 sm:pr-10 pl-4 sm:pl-6 rounded-[3rem] shadow-lg border border-[#333333] transition-all duration-1000 ease-out transform"
              :class="isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0'">
-          <img src="../assets/logo.png" alt="Logo DuaLab" class="h-32 md:h-40 w-auto object-contain -mr-4 md:-mr-8 relative z-10" />
-          <span class="font-black text-4xl md:text-5xl tracking-tighter uppercase text-white italic relative z-20">
-            Dua<span class="text-[#00A859]">Lab</span><span class="text-[#99CC33] not-italic text-lg md:text-xl ml-1">Studio Tool</span>
+          <img src="../assets/logo.png" alt="Logo DuaLab" class="h-20 sm:h-32 md:h-40 w-auto object-contain -mr-3 sm:-mr-4 md:-mr-8 relative z-10" />
+          <span class="font-black text-2xl sm:text-4xl md:text-5xl tracking-tighter uppercase text-white italic relative z-20">
+            Dua<span class="text-[#00A859]">Lab</span><span class="text-[#99CC33] not-italic text-sm sm:text-lg md:text-xl ml-1">Studio Tool</span>
           </span>
         </div>
         
@@ -567,6 +568,7 @@ const tieneContextoEmpresa = computed(() => {
            :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
           Convierte problemas empresariales reales en retos educativos clasificados por el currículo oficial.
         </p>
+
       </header>
 
       <div class="max-w-3xl mx-auto mb-16 relative transition-all duration-1000 delay-500 ease-out transform"
@@ -601,6 +603,15 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-2">
+                  <!-- Cargar Demo -->
+                  <button @click="cargarDemo" :disabled="esModoDemo"
+                    :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
+                    <span v-else>Cargar Demo</span>
+                  </button>
+
+                  <!-- Información Simulada -->
                   <button @click="esInfoSimulada = !esInfoSimulada"
                     :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
@@ -608,12 +619,25 @@ const tieneContextoEmpresa = computed(() => {
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Información Simulada
                   </button>
-                  <button @click="cargarDemo" :disabled="esModoDemo"
-                    :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
-                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
-                    <span v-else> Cargar Demo</span>
-                  </button>
+
+                  <!-- Separador vertical -->
+                  <span class="hidden sm:block w-px h-6 bg-gray-200 mx-1 rounded-full" />
+
+                  <!-- Ver base de datos -->
+                  <RouterLink
+                    to="/base-datos"
+                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border bg-white text-gray-600 hover:bg-gray-50 border-gray-200 hover:border-gray-400 shadow-sm"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                      <path d="M21 12c0 1.657-4.03 3-9 3S3 13.657 3 12"/>
+                      <path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/>
+                    </svg>
+                    Base de datos
+                  </RouterLink>
+
+                  <!-- Insertar / Modificar empresa -->
                   <button @click="abrirModalEmpresa"
                     :class="seleccion.empresaId
                       ? 'bg-[#00A859] text-white border-[#00A859] hover:bg-[#007a42] shadow-md'
@@ -625,6 +649,8 @@ const tieneContextoEmpresa = computed(() => {
                     </svg>
                     {{ seleccion.empresaId ? 'Modificar datos empresa' : 'Insertar nueva empresa' }}
                   </button>
+
+                  <!-- Vaciar -->
                   <button @click="limpiarFormulario" class="px-5 py-2.5 bg-white text-red-500 hover:bg-red-50 hover:border-red-500 border border-gray-200 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Vaciar
