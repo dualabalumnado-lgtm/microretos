@@ -41,10 +41,13 @@ const tabs = [
 // ════════════════════════════════════════════════════════════
 //  MODAL NUEVA EMPRESA
 // ════════════════════════════════════════════════════════════
-const tabNueva     = ref('basico')
-const nuevaLoading = ref(false)
-const nuevaErrors  = reactive({})
-const nuevaForm    = reactive({
+const tabNueva                = ref('basico')
+const nuevaLoading            = ref(false)
+const nuevaErrors             = reactive({})
+const nuevaCentroNuevo        = ref('')
+const nuevaCiclosDisponibles  = ref([])
+const nuevaCiclosSeleccionados = ref([])
+const nuevaForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
   web: '', centro_educativo: '', familia: '', persona_contacto: '',
   telefono: '', email_general: '', direccion: '', municipio: '',
@@ -56,9 +59,43 @@ watch(() => props.mostrarNuevaEmpresa, (v) => {
     Object.keys(nuevaErrors).forEach(k => delete nuevaErrors[k])
     Object.keys(nuevaForm).forEach(k => (nuevaForm[k] = ''))
     nuevaForm.nombre_comercial = props.nombreBuscado || ''
+    nuevaCentroNuevo.value = ''
+    nuevaCiclosDisponibles.value = []
+    nuevaCiclosSeleccionados.value = []
+    nuevaConfirmando.value = false
     tabNueva.value = 'basico'
   }
 })
+
+// Carga ciclos cuando se activa "nuevo centro" y hay familia elegida
+watch([() => nuevaForm.centro_educativo, () => nuevaForm.familia], async ([centro, familia]) => {
+  if (centro !== '__nuevo__' || !familia) {
+    nuevaCiclosDisponibles.value = []
+    nuevaCiclosSeleccionados.value = []
+    return
+  }
+  try {
+    const { data } = await api.get(`/familias/${encodeURIComponent(familia)}/ciclos`)
+    nuevaCiclosDisponibles.value = data
+    nuevaCiclosSeleccionados.value = []
+  } catch (e) {
+    console.error(e)
+  }
+})
+
+const nuevaConfirmando = ref(false)
+const nuevaCardRef     = ref(null)
+
+function nuevaAvisosDatosIncompletos() {
+  const avisos = []
+  if (!nuevaForm.persona_contacto && !nuevaForm.telefono && !nuevaForm.email_general)
+    avisos.push('Contacto: no hay persona, teléfono ni email.')
+  else if (!nuevaForm.persona_contacto)
+    avisos.push('Contacto: falta el nombre de la persona de contacto.')
+  if (!nuevaForm.direccion && !nuevaForm.municipio)
+    avisos.push('Ubicación: no hay dirección ni municipio.')
+  return avisos
+}
 
 function validarNueva() {
   Object.keys(nuevaErrors).forEach(k => delete nuevaErrors[k])
@@ -67,12 +104,29 @@ function validarNueva() {
   if (!nuevaForm.sector)           { nuevaErrors.sector           = 'Obligatorio'; ok = false }
   if (!nuevaForm.tamano)           { nuevaErrors.tamano           = 'Obligatorio'; ok = false }
   if (!nuevaForm.familia)          { nuevaErrors.familia          = 'Obligatorio'; ok = false }
+  if (!nuevaForm.centro_educativo) {
+    nuevaErrors.centro_educativo = 'Obligatorio'; ok = false
+  }
+  if (nuevaForm.centro_educativo === '__nuevo__' && !nuevaCentroNuevo.value.trim()) {
+    nuevaErrors.centro_educativo = 'Escribe el nombre del nuevo centro'; ok = false
+  }
+  if (nuevaForm.centro_educativo === '__nuevo__' && nuevaCiclosSeleccionados.value.length === 0) {
+    nuevaErrors.ciclos_centro = 'Selecciona al menos un ciclo que imparte este centro'; ok = false
+  }
   if (!ok) tabNueva.value = 'basico'
   return ok
 }
 
-async function guardarNueva() {
+function pedirConfirmacionNueva() {
   if (!validarNueva()) return
+  nuevaConfirmando.value = true
+  if (nuevaAvisosDatosIncompletos().length) {
+    nuevaCardRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+async function guardarNueva() {
+  nuevaConfirmando.value = false
   nuevaLoading.value = true
   try {
     const { data } = await api.post('/empresas', {
@@ -82,7 +136,10 @@ async function guardarNueva() {
       sector:          nuevaForm.sector,
       tamano:          nuevaForm.tamano,
       web:             nuevaForm.web              || null,
-      centroEducativo: nuevaForm.centro_educativo || null,
+      centroEducativo: nuevaForm.centro_educativo === '__nuevo__'
+        ? (nuevaCentroNuevo.value.trim() || null)
+        : (nuevaForm.centro_educativo || null),
+      ciclosIds: nuevaForm.centro_educativo === '__nuevo__' ? nuevaCiclosSeleccionados.value : [],
       familia:         nuevaForm.familia,
       personaContacto: nuevaForm.persona_contacto || null,
       telefono:        nuevaForm.telefono         || null,
@@ -111,10 +168,13 @@ async function guardarNueva() {
 // ════════════════════════════════════════════════════════════
 //  MODAL EDITAR EMPRESA
 // ════════════════════════════════════════════════════════════
-const tabEditar     = ref('basico')
-const editarLoading = ref(false)
-const editarErrors  = reactive({})
-const editarForm    = reactive({
+const tabEditar                = ref('basico')
+const editarLoading            = ref(false)
+const editarErrors             = reactive({})
+const editarCentroNuevo        = ref('')
+const editarCiclosDisponibles  = ref([])
+const editarCiclosSeleccionados = ref([])
+const editarForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
   web: '', centro_educativo: '', persona_contacto: '', telefono: '',
   email_general: '', direccion: '', municipio: '', provincia: '',
@@ -140,16 +200,44 @@ watch(() => props.mostrarEditarEmpresa, (v) => {
     editarForm.provincia        = e.provincia        || ''
     editarForm.codigo_postal    = e.codigo_postal    || ''
     editarForm.actividad        = e.actividad        || ''
+    editarCentroNuevo.value = ''
+    editarCiclosDisponibles.value = []
+    editarCiclosSeleccionados.value = []
     tabEditar.value = 'basico'
+  }
+})
+
+watch(() => editarForm.centro_educativo, async (centro) => {
+  if (centro !== '__nuevo__') {
+    editarCiclosDisponibles.value = []
+    editarCiclosSeleccionados.value = []
+    return
+  }
+  // Usamos la familia del formulario de nueva (en editar no hay campo familia, se toma de empresaAEditar)
+  const familia = props.empresaAEditar?.familias?.[0]?.nombre ?? props.empresaAEditar?.familia ?? ''
+  if (!familia) return
+  try {
+    const { data } = await api.get(`/familias/${encodeURIComponent(familia)}/ciclos`)
+    editarCiclosDisponibles.value = data
+    editarCiclosSeleccionados.value = []
+  } catch (e) {
+    console.error(e)
   }
 })
 
 async function guardarEdicion() {
   Object.keys(editarErrors).forEach(k => delete editarErrors[k])
+  let ok = true
   if (!editarForm.nombre_comercial) {
-    editarErrors.nombre_comercial = 'El nombre comercial es obligatorio'
-    tabEditar.value = 'basico'; return
+    editarErrors.nombre_comercial = 'El nombre comercial es obligatorio'; ok = false
   }
+  if (editarForm.centro_educativo === '__nuevo__' && !editarCentroNuevo.value.trim()) {
+    editarErrors.centro_educativo = 'Escribe el nombre del nuevo centro'; ok = false
+  }
+  if (editarForm.centro_educativo === '__nuevo__' && editarCiclosSeleccionados.value.length === 0) {
+    editarErrors.ciclos_centro = 'Selecciona al menos un ciclo que imparte este centro'; ok = false
+  }
+  if (!ok) { tabEditar.value = 'basico'; return }
   editarLoading.value = true
   try {
     const { data } = await api.put(`/empresas/${props.empresaAEditar.id}`, {
@@ -159,7 +247,10 @@ async function guardarEdicion() {
       sector:          editarForm.sector           || null,
       tamano:          editarForm.tamano           || null,
       web:             editarForm.web              || null,
-      centroEducativo: editarForm.centro_educativo || null,
+      centroEducativo: editarForm.centro_educativo === '__nuevo__'
+        ? (editarCentroNuevo.value.trim() || null)
+        : (editarForm.centro_educativo || null),
+      ciclosIds: editarForm.centro_educativo === '__nuevo__' ? editarCiclosSeleccionados.value : [],
       personaContacto: editarForm.persona_contacto || null,
       telefono:        editarForm.telefono         || null,
       emailGeneral:    editarForm.email_general    || null,
@@ -210,7 +301,7 @@ defineExpose({ abrirTrasLogin })
         @click.self="$emit('update:mostrarNuevaEmpresa', false)"
       >
         <Transition name="ime-card">
-          <div v-if="mostrarNuevaEmpresa" class="ime-card">
+          <div v-if="mostrarNuevaEmpresa" ref="nuevaCardRef" class="ime-card">
 
             <div class="ime-header">
               <div class="ime-icon-box" style="background:rgba(153,204,51,0.1)">
@@ -236,10 +327,40 @@ defineExpose({ abrirTrasLogin })
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="tab.icon"/>
                 </svg>
                 <span>{{ tab.label }}</span>
-                <span v-if="tab.id === 'basico' && (nuevaErrors.nombre_comercial || nuevaErrors.sector || nuevaErrors.tamano || nuevaErrors.familia)"
+                <!-- Punto rojo: errores de validación en básico -->
+                <span v-if="tab.id === 'basico' && (nuevaErrors.nombre_comercial || nuevaErrors.sector || nuevaErrors.tamano || nuevaErrors.familia || nuevaErrors.centro_educativo)"
                   class="w-2 h-2 rounded-full bg-red-500 shrink-0"/>
+                <!-- Punto ámbar: datos incompletos opcionales pero avisados -->
+                <span v-if="nuevaConfirmando && nuevaAvisosDatosIncompletos().length && (tab.id === 'contacto' || tab.id === 'ubicacion')"
+                  class="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse"/>
               </button>
             </div>
+
+            <!-- Toast sticky de aviso cuando hay datos incompletos -->
+            <Transition name="ime-fade">
+              <div v-if="nuevaConfirmando && nuevaAvisosDatosIncompletos().length"
+                class="sticky top-0 z-10 mt-4 -mx-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3 shadow-md">
+                <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <p class="font-black text-amber-700 text-xs uppercase tracking-widest mb-1">Revisa los tabs marcados en naranja</p>
+                  <ul class="space-y-0.5">
+                    <li v-for="aviso in nuevaAvisosDatosIncompletos()" :key="aviso"
+                      class="text-xs text-amber-700 flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"/>
+                      {{ aviso }}
+                    </li>
+                  </ul>
+                </div>
+                <button @click="nuevaConfirmando = false" class="text-amber-400 hover:text-amber-600 shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </Transition>
 
             <!-- Tab Básico -->
             <div v-show="tabNueva === 'basico'" class="space-y-5 mt-6">
@@ -288,11 +409,39 @@ defineExpose({ abrirTrasLogin })
               </div>
               <div class="ime-g2">
                 <div>
-                  <label class="ime-label">Centro Educativo</label>
-                  <select v-model="nuevaForm.centro_educativo" class="ime-input">
-                    <option value="">Sin asignar...</option>
+                  <label class="ime-label">Centro Educativo *</label>
+                  <select v-model="nuevaForm.centro_educativo" class="ime-input"
+                    :class="{'ime-input-err': nuevaErrors.centro_educativo}">
+                    <option value="">Selecciona un centro...</option>
                     <option v-for="c in centrosDisponibles" :key="c" :value="c">{{ c }}</option>
+                    <option value="__nuevo__">+ Añadir nuevo centro...</option>
                   </select>
+                  <p v-if="nuevaErrors.centro_educativo && nuevaForm.centro_educativo !== '__nuevo__'" class="ime-err">{{ nuevaErrors.centro_educativo }}</p>
+                  <input
+                    v-if="nuevaForm.centro_educativo === '__nuevo__'"
+                    v-model="nuevaCentroNuevo"
+                    class="ime-input mt-2"
+                    :class="{'ime-input-err': nuevaErrors.centro_educativo}"
+                    placeholder="Nombre del nuevo centro educativo"
+                  />
+                  <p v-if="nuevaErrors.centro_educativo && nuevaForm.centro_educativo === '__nuevo__'" class="ime-err">{{ nuevaErrors.centro_educativo }}</p>
+                  <!-- Ciclos que imparte el nuevo centro (obligatorio) -->
+                  <div v-if="nuevaForm.centro_educativo === '__nuevo__' && nuevaForm.familia" class="mt-3">
+                    <p class="ime-label mb-1">
+                      Ciclos que imparte este centro *
+                      <span class="font-normal text-gray-400 normal-case">(selecciona todos los que apliquen)</span>
+                    </p>
+                    <p v-if="nuevaErrors.ciclos_centro" class="ime-err mb-2">{{ nuevaErrors.ciclos_centro }}</p>
+                    <div v-if="nuevaCiclosDisponibles.length" class="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                      <label v-for="c in nuevaCiclosDisponibles" :key="c.id"
+                        class="flex items-center gap-2 text-sm text-[#1F2937] cursor-pointer hover:text-[#00A859]">
+                        <input type="checkbox" :value="c.id" v-model="nuevaCiclosSeleccionados"
+                          class="accent-[#00A859] w-4 h-4 shrink-0"/>
+                        {{ c.nombre }}
+                      </label>
+                    </div>
+                    <p v-else class="text-xs text-gray-400 italic">Selecciona primero una familia profesional para ver sus ciclos.</p>
+                  </div>
                 </div>
                 <div>
                   <label class="ime-label">Familia Profesional *</label>
@@ -360,16 +509,51 @@ defineExpose({ abrirTrasLogin })
               </div>
             </Transition>
 
+            <!-- Panel de confirmación antes de guardar -->
+            <Transition name="ime-fade">
+              <div v-if="nuevaConfirmando" class="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 space-y-3">
+                <div class="flex items-start gap-3">
+                  <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                  </svg>
+                  <div class="flex-1">
+                    <p class="font-black text-amber-700 text-sm uppercase tracking-widest mb-1">Revisa antes de guardar</p>
+                    <p class="text-amber-700 text-xs font-medium mb-2">
+                      Comprueba que todos los datos son correctos. Una vez registrada, la empresa quedará visible para todos los centros vinculados.
+                    </p>
+                    <ul v-if="nuevaAvisosDatosIncompletos().length" class="space-y-1 mb-2">
+                      <li v-for="aviso in nuevaAvisosDatosIncompletos()" :key="aviso"
+                        class="flex items-center gap-2 text-xs text-amber-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"/>
+                        {{ aviso }}
+                        <span class="text-amber-500 font-bold">(puedes completarlo más tarde)</span>
+                      </li>
+                    </ul>
+                    <p class="text-xs text-amber-600 font-semibold">¿Confirmas que los datos son correctos?</p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="nuevaConfirmando = false" class="ime-btn-ghost flex-1 !text-amber-700 !border-amber-300 hover:!bg-amber-100">
+                    Revisar datos
+                  </button>
+                  <button @click="guardarNueva" :disabled="nuevaLoading" class="ime-btn-green flex-[2]">
+                    <svg v-if="nuevaLoading" class="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                    </svg>
+                    Sí, registrar empresa
+                  </button>
+                </div>
+              </div>
+            </Transition>
+
             <div class="ime-actions">
               <button @click="$emit('update:mostrarNuevaEmpresa', false)" class="ime-btn-ghost flex-1">Cancelar</button>
-              <button @click="guardarNueva" :disabled="nuevaLoading" class="ime-btn-green flex-[2]">
-                <svg v-if="nuevaLoading" class="animate-spin w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
-                </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button @click="pedirConfirmacionNueva" :disabled="nuevaLoading || nuevaConfirmando" class="ime-btn-green flex-[2]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
-                {{ nuevaLoading ? 'Registrando...' : 'Registrar en DuaLab' }}
+                Registrar en DuaLab
               </button>
             </div>
 
@@ -474,7 +658,32 @@ defineExpose({ abrirTrasLogin })
                   <select v-model="editarForm.centro_educativo" class="ime-input">
                     <option value="">Sin asignar...</option>
                     <option v-for="c in centrosDisponibles" :key="c" :value="c">{{ c }}</option>
+                    <option value="__nuevo__">+ Añadir nuevo centro...</option>
                   </select>
+                  <input
+                    v-if="editarForm.centro_educativo === '__nuevo__'"
+                    v-model="editarCentroNuevo"
+                    class="ime-input mt-2"
+                    :class="{'ime-input-err': editarErrors.centro_educativo}"
+                    placeholder="Nombre del nuevo centro educativo"
+                  />
+                  <p v-if="editarErrors.centro_educativo" class="ime-err">{{ editarErrors.centro_educativo }}</p>
+                  <div v-if="editarForm.centro_educativo === '__nuevo__'" class="mt-3">
+                    <p class="ime-label mb-1">
+                      Ciclos que imparte este centro *
+                      <span class="font-normal text-gray-400 normal-case">(selecciona todos los que apliquen)</span>
+                    </p>
+                    <p v-if="editarErrors.ciclos_centro" class="ime-err mb-2">{{ editarErrors.ciclos_centro }}</p>
+                    <div v-if="editarCiclosDisponibles.length" class="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                      <label v-for="c in editarCiclosDisponibles" :key="c.id"
+                        class="flex items-center gap-2 text-sm text-[#1F2937] cursor-pointer hover:text-[#00A859]">
+                        <input type="checkbox" :value="c.id" v-model="editarCiclosSeleccionados"
+                          class="accent-[#00A859] w-4 h-4 shrink-0"/>
+                        {{ c.nombre }}
+                      </label>
+                    </div>
+                    <p v-else class="text-xs text-gray-400 italic">Cargando ciclos...</p>
+                  </div>
                 </div>
                 <div>
                   <label class="ime-label">Actividad</label>

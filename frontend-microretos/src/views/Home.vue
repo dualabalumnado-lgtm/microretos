@@ -128,7 +128,7 @@ const irABiblioteca = () => {
             </div>
           </div>
           
-          <div class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 z-20 bg-[#1F2937] text-white p-5 rounded-3xl shadow-2xl flex items-center gap-4 animate-bounce" style="animation-duration: 3s;">
+          <div class="hidden sm:flex absolute -bottom-4 -right-4 z-20 bg-[#1F2937] text-white p-4 sm:p-5 rounded-3xl shadow-2xl items-center gap-3 sm:gap-4 animate-bounce" style="animation-duration: 3s;">
             <div class="bg-[#99CC33] text-[#121212] rounded-full p-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
             </div>
