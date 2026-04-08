@@ -106,7 +106,12 @@ class DatosFPController extends Controller
                     ->pluck('ciclo_id');
             }
 
-            $query->whereIn('id', $ciclosDelCentro);
+            // Solo filtramos si el centro ya tiene ciclos vinculados.
+            // Si está vacío (centro recién creado o sin configurar), devolvemos
+            // todos los ciclos de la familia para que la empresa sea usable.
+            if ($ciclosDelCentro->isNotEmpty()) {
+                $query->whereIn('id', $ciclosDelCentro);
+            }
         }
 
         return response()->json($query->orderBy('nombre')->get());
@@ -185,10 +190,55 @@ class DatosFPController extends Controller
             ]);
         }
 
+        // Vinculamos los ciclos al nuevo centro si el usuario los seleccionó
+        if ($centroId && $request->filled('ciclosIds') && is_array($request->ciclosIds)) {
+            $rows = collect($request->ciclosIds)->map(fn($cicloId) => [
+                'centro_id'         => $centroId,
+                'centro_educativo'  => $request->centroEducativo,  // legacy
+                'ciclo_id'          => $cicloId,
+            ])->all();
+            DB::table('centro_ciclo')->insertOrIgnore($rows);
+        }
+
         return response()->json([
             'message' => 'Empresa creada correctamente',
-            'empresa' => $empresa->load('centroEducativo', 'familias'),
+            'empresa' => $empresa,
         ]);
+    }
+
+    /**
+     * GET /empresas/dashboard
+     * Devuelve todas las empresas con sus familias para el dashboard de base de datos.
+     */
+    public function getDashboardEmpresas()
+    {
+        $empresas = Empresa::with('familias')
+            ->orderBy('nombre_comercial')
+            ->get();
+
+        return response()->json($empresas->map(function ($empresa) {
+            $data = $empresa->toArray();
+            $data['familias_nombres'] = $empresa->familias->pluck('nombre')->toArray();
+            return $data;
+        }));
+    }
+
+    /**
+     * DELETE /empresas/{id}
+     * Elimina una empresa y sus relaciones pivot.
+     */
+    public function eliminarEmpresa($id)
+    {
+        $empresa = Empresa::find($id);
+
+        if (!$empresa) {
+            return response()->json(['error' => 'Empresa no encontrada'], 404);
+        }
+
+        DB::table('empresa_familia')->where('empresa_id', $id)->delete();
+        $empresa->delete();
+
+        return response()->json(['message' => 'Empresa eliminada correctamente']);
     }
 
     public function actualizarEmpresa(Request $request, $id)
@@ -245,9 +295,19 @@ class DatosFPController extends Controller
             );
         }
 
+        // Vinculamos los ciclos al nuevo centro si el usuario los seleccionó
+        if ($centroId && $request->filled('ciclosIds') && is_array($request->ciclosIds)) {
+            $rows = collect($request->ciclosIds)->map(fn($cicloId) => [
+                'centro_id'         => $centroId,
+                'centro_educativo'  => $request->centroEducativo,  // legacy
+                'ciclo_id'          => $cicloId,
+            ])->all();
+            DB::table('centro_ciclo')->insertOrIgnore($rows);
+        }
+
         return response()->json([
             'message' => 'Empresa actualizada correctamente',
-            'empresa' => $empresa->load('centroEducativo', 'familias'),
+            'empresa' => $empresa,
         ]);
     }
 }

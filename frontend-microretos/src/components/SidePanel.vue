@@ -13,7 +13,8 @@ const router    = useRouter()
 
 // 👇 controla el modal
 const showLogin = ref(false)
-const cargandoOut  = ref(false) 
+const cargandoOut  = ref(false)
+const destinoTrasLogin = ref('/microretos')
 
 // const estaAutenticado = computed(() => !!localStorage.getItem('admin_token'))
 
@@ -31,17 +32,28 @@ const isActive = (path) =>
 const irAGenerador = () => {
   closeOnMobile()
   if (authStore.isAuthenticated) {
-  // if (localStorage.getItem('admin_token')) {
     router.push('/microretos')
   } else {
+    destinoTrasLogin.value = '/microretos'
     showLogin.value = true
   }
 }
 
-// 👇 navega tras login exitoso
+// 👇 intercepta el click de base de datos
+const irABaseDatos = () => {
+  closeOnMobile()
+  if (authStore.isAuthenticated) {
+    router.push('/base-datos')
+  } else {
+    destinoTrasLogin.value = '/base-datos'
+    showLogin.value = true
+  }
+}
+
+// 👇 navega tras login exitoso al destino que corresponda
 const onLoginSuccess = () => {
   isOpen.value = false
-  router.push('/microretos')
+  router.push(destinoTrasLogin.value)
 }
 
 const cerrarSesion = async () => {
@@ -162,6 +174,20 @@ defineExpose({ isOpen, toggle, close })
             <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
           <span>Generador de microretos</span>
+        </button>
+
+        <button
+          @click="irABaseDatos"
+          class="nav-item w-full text-left"
+          :class="isActive('/base-datos') ? 'nav-item--active' : 'nav-item--idle'"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.657-4.03 3-9 3S3 13.657 3 12"/>
+            <path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/>
+          </svg>
+          <span>Base de datos</span>
         </button>
 
         <RouterLink
