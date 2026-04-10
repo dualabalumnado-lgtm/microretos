@@ -27,5 +27,7 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt(env('ADMIN_PASSWORD')),
         ]
     );
+
+    $this->call(DemosSeeder::class);
 }
 }
