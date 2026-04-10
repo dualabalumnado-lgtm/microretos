@@ -35,4 +35,9 @@ class Demo extends Model
         'curso_seleccionado'  => 'integer',
         'cantidad_microretos' => 'integer',
     ];
+
+    public function microretos()
+    {
+        return $this->hasMany(\App\Models\Microreto::class, 'demo_id');
+    }
 }

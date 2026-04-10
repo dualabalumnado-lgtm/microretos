@@ -34,6 +34,9 @@ const insertModifyRef = ref(null);
 
 // --- ETADO MODO DEMO Y SIMULACIÓN ---
 const esModoDemo = ref(false);
+const demoFamiliaActiva = ref('');
+const demoCicloNombre = ref('');
+const demoModuloNombre = ref('');
 const esInfoSimulada = ref(false); // NUEVO: Estado para el botón de Información Simulada
 let autoSelectDemoCycle = false;
 
@@ -41,6 +44,17 @@ let autoSelectDemoCycle = false;
 const demosDisponibles = ref([]);
 const mostrarSelectorDemo = ref(false);
 const demoSelectorRef = ref(null);
+
+// Mapa de iconos SVG por familia profesional
+const demosIconos = {
+  'Informática y Comunicaciones': 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  'Administración y Gestión':     'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+  'Comercio y Marketing':         'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z',
+  'Sanidad':                      'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',
+  'Electricidad y Electrónica':   'M13 10V3L4 14h7v7l9-11h-7z',
+  'Hostelería y Turismo':         'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z',
+};
+const iconoFallback = 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10';
 
 // --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
@@ -276,7 +290,7 @@ const cargarDemo = async (familiaProfesional) => {
     seleccion.value.empresaSector = demo.empresa_sector;
     seleccion.value.empresaTamano = demo.empresa_tamano;
     seleccion.value.empresaWeb = demo.empresa_web || '';
-    seleccion.value.empresaCentro = demo.empresa_centro || '';
+    seleccion.value.empresaCentro = demo.empresa_centro || 'IES DEMO';
 
     // Paso 2
     seleccion.value.diaANormal = demo.dia_a_normal;
@@ -294,19 +308,55 @@ const cargarDemo = async (familiaProfesional) => {
     seleccion.value.nivelGrupo = demo.nivel_grupo || 'Medio';
     seleccion.value.cursoSeleccionado = demo.curso_seleccionado || 2;
     seleccion.value.duracion = demo.duracion || '1 a 2 semanas';
-    seleccion.value.cantidadMicroretos = demo.cantidad_microretos || 3;
+    seleccion.value.cantidadMicroretos = 1;
 
     autoSelectDemoCycle = true;
     seleccion.value.familia = demo.familia_profesional;
+    demoFamiliaActiva.value = demo.familia_profesional;
+    demoCicloNombre.value  = demo.ciclo_nombre  || '';
+    demoModuloNombre.value = demo.modulo_nombre || '';
   } catch (e) {
     console.error('Error cargando demo:', e);
     alert('Error al cargar la demo seleccionada.');
   }
 };
 
+// --- FUNCIÓN PARA CARGAR MICRORETOS DE DEMO (simula procesado IA) ---
+const generarRetoDemo = async () => {
+  cargando.value = true;
+  todosGuardados.value = false;
+  try {
+    // Simula el tiempo de procesado de la IA
+    await new Promise(resolve => setTimeout(resolve, 2800));
+
+    const res = await api.get(`/demos/${encodeURIComponent(demoFamiliaActiva.value)}/microretos`);
+
+    if (res.data?.microretos?.length) {
+      res.data.microretos.forEach(reto => {
+        microretosGenerados.value.unshift({
+          ...reto,
+          _ui_guardado: true,   // ya están en BD, no se guardan de nuevo
+          _ui_guardando: false,
+        });
+      });
+      setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 300);
+    } else {
+      alert('No hay microretos guardados para esta demo todavía.');
+    }
+  } catch (e) {
+    console.error('Error cargando microretos demo:', e);
+    alert('Error al cargar los microretos de la demo.');
+  } finally {
+    cargando.value = false;
+  }
+};
+
 const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.value.empresaSector && seleccion.value.empresaTamano);
 const paso2Valido = computed(() => seleccion.value.diaANormal && seleccion.value.friccionProblema);
-const paso3Valido = computed(() => seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado); 
+const paso3Valido = computed(() => {
+  if (esModoDemo.value) return !!seleccion.value.familia;
+  return !!(seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado);
+});
 
 // Cierra el dropdown al hacer clic fuera
 const buscadorRef = ref(null);
@@ -408,11 +458,14 @@ watch(() => seleccion.value.familia, async (val) => {
   ciclos.value = res.data;
   
   if (autoSelectDemoCycle && ciclos.value.length > 0) {
-     const cicloWeb = ciclos.value.find(c => c.nombre.includes('Web') || c.nombre.includes('Aplicaciones') || c.nombre.includes('Sistemas'));
-     seleccion.value.cicloId = cicloWeb ? cicloWeb.id : ciclos.value[0].id;
-     autoSelectDemoCycle = false;
+    const nombreBuscado = demoCicloNombre.value;
+    const match = ciclos.value.find(c => c.nombre === nombreBuscado)
+               || ciclos.value.find(c => nombreBuscado && c.nombre.toLowerCase().includes(nombreBuscado.split(' ')[0].toLowerCase()))
+               || ciclos.value[0];
+    seleccion.value.cicloId = match.id;
+    autoSelectDemoCycle = false;
   } else {
-     seleccion.value.cicloId = ''; 
+    seleccion.value.cicloId = '';
   }
   
   modulos.value = []; modulosSeleccionados.value = [];
@@ -423,6 +476,15 @@ watch(() => seleccion.value.cicloId, async (val) => {
   const res = await api.get(`/ciclos/${val}/modulos`);
   modulos.value = res.data;
   modulosSeleccionados.value = [];
+
+  if (esModoDemo.value && demoModuloNombre.value) {
+    const nombreBuscado = demoModuloNombre.value;
+    const lista = modulos.value.filter(m => m.curso == seleccion.value.cursoSeleccionado);
+    const match = lista.find(m => m.nombre === nombreBuscado)
+               || lista.find(m => nombreBuscado && m.nombre.toLowerCase().includes(nombreBuscado.split(' ')[0].toLowerCase()))
+               || lista[0];
+    if (match) modulosSeleccionados.value = [match.id];
+  }
 });
 
 watch(() => seleccion.value.cursoSeleccionado, () => {
@@ -632,11 +694,16 @@ const tieneContextoEmpresa = computed(() => {
                   <!-- Cargar Demo -->
                   <div class="relative" ref="demoSelectorRef">
                     <button
-                      @click="esModoDemo ? null : (mostrarSelectorDemo = !mostrarSelectorDemo)"
-                      :disabled="esModoDemo"
-                      :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
+                      @click="mostrarSelectorDemo = !mostrarSelectorDemo"
+                      :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/30 hover:bg-[#00A859]/15' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
                       class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                      <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
+                      <template v-if="esModoDemo">
+                        <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                        <span>DEMO ACTIVA</span>
+                        <svg class="w-3 h-3 transition-transform duration-200" :class="mostrarSelectorDemo ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </template>
                       <template v-else>
                         <span>Cargar Demo</span>
                         <svg class="w-3 h-3 transition-transform duration-200" :class="mostrarSelectorDemo ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -651,16 +718,20 @@ const tieneContextoEmpresa = computed(() => {
                           v-for="demo in demosDisponibles"
                           :key="demo.id"
                           @click="cargarDemo(demo.familia_profesional)"
-                          class="w-full text-left px-5 py-3 text-sm font-semibold text-[#1F2937] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-colors border-b border-gray-100 last:border-0">
-                          {{ demo.etiqueta }}
+                          class="w-full text-left px-5 py-3 text-sm font-semibold text-[#1F2937] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-colors border-b border-gray-100 last:border-0 flex items-center gap-3">
+                          <svg class="w-4 h-4 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="demosIconos[demo.familia_profesional] || iconoFallback"/>
+                          </svg>
+                          {{ demo.familia_profesional }}
                         </button>
                       </div>
                     </Transition>
                   </div>
 
                   <!-- Información Simulada -->
-                  <button @click="esInfoSimulada = !esInfoSimulada"
-                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
+                    :disabled="esModoDemo"
+                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -718,7 +789,8 @@ const tieneContextoEmpresa = computed(() => {
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label class="label-style">Filtrar por Colegio/Centro (Opcional)</label>
-                  <select v-model="centroFiltro" class="input-style">
+                  <input v-if="esModoDemo" type="text" value="IES DEMO" disabled class="input-style opacity-70 cursor-not-allowed bg-gray-50" />
+                  <select v-else v-model="centroFiltro" class="input-style">
                     <option value="">Todos los centros...</option>
                     <option v-for="centro in centrosDisponibles" :key="centro" :value="centro">{{ centro }}</option>
                   </select>
@@ -768,9 +840,9 @@ const tieneContextoEmpresa = computed(() => {
                     </div>
                   </Transition>
 
-                  <!-- Mensaje cuando no hay resultados -->
+                  <!-- Mensaje cuando no hay resultados (oculto en modo demo) -->
                   <div
-                    v-if="mostrarDropdownEmpresas && buscadorEmpresa && empresasFiltradasBusqueda.length === 0"
+                    v-if="!esModoDemo && mostrarDropdownEmpresas && buscadorEmpresa && empresasFiltradasBusqueda.length === 0"
                     class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl z-50 px-6 py-5"
                   >
                     <p class="text-gray-400 text-sm">No se encontró ninguna empresa con ese nombre.</p>
@@ -874,8 +946,9 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                  <button @click="esInfoSimulada = !esInfoSimulada"
-                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
+                    :disabled="esModoDemo"
+                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -1067,8 +1140,9 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                  <button @click="esInfoSimulada = !esInfoSimulada"
-                    :class="esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
+                    :disabled="esModoDemo"
+                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -1126,24 +1200,36 @@ const tieneContextoEmpresa = computed(() => {
                 <div class="col-span-2 mt-4">
                   <label class="label-style !mb-4">Ciclo Formativo Implicado *</label>
                   
+                  <!-- Ciclos de BD -->
                   <div v-if="ciclos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                     <button v-for="c in ciclos" :key="c.id" 
+                     <button v-for="c in ciclos" :key="c.id"
                         @click="!esModoDemo && (seleccion.cicloId = c.id)"
                         :disabled="esModoDemo"
-                        :class="seleccion.cicloId === c.id 
-                            ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] border-transparent text-white' 
+                        :class="seleccion.cicloId === c.id
+                            ? 'bg-gradient-to-r from-[#00A859] to-[#99CC33] border-transparent text-white'
                             : 'bg-[#1F2937] border-transparent text-gray-300 hover:border-[#00A859]/40'"
                         class="text-left px-5 py-4 rounded-2xl border-2 transition-all duration-200 flex items-center gap-3 relative overflow-hidden group shadow-sm">
-                        
                         <div class="shrink-0 transition-transform" :class="seleccion.cicloId === c.id ? 'scale-100' : 'scale-0 opacity-0 hidden'">
                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                         </div>
-                        
                         <div class="flex-1">
                             <span class="text-sm font-bold leading-tight">{{ c.nombre }}</span>
                         </div>
                      </button>
                   </div>
+                  <!-- Tarjeta virtual cuando la familia no está en BD pero hay demo activa -->
+                  <div v-else-if="esModoDemo && demoCicloNombre" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="text-left px-5 py-4 rounded-2xl border-2 border-transparent bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white flex items-center gap-3 shadow-sm">
+                      <div class="shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <div class="flex-1">
+                        <span class="text-sm font-bold leading-tight">{{ demoCicloNombre }}</span>
+                        <p class="text-[10px] text-white/70 mt-0.5 uppercase tracking-wide">Ciclo de demo</p>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Estado vacío estándar -->
                   <div v-else class="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-6 text-center">
                       <p class="text-gray-500 text-sm">Selecciona una Familia Profesional para ver sus ciclos.</p>
                   </div>
@@ -1174,10 +1260,17 @@ const tieneContextoEmpresa = computed(() => {
                       <span class="text-xs text-gray-400 italic">Si no eliges, la IA cruzará con todos.</span>
                     </div>
                     
-                    <select v-model="modulosSeleccionados" multiple :disabled="esModoDemo || modulosDelCurso.length === 0" class="input-style min-h-[120px]">
+                    <!-- Módulo virtual cuando la demo no tiene ciclo en BD -->
+                    <div v-if="esModoDemo && modulosDelCurso.length === 0 && demoModuloNombre"
+                      class="input-style min-h-[60px] flex items-center gap-2 bg-[#00A859]/5 border-[#00A859]/20 text-[#1F2937] cursor-default">
+                      <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                      <span class="text-sm font-semibold">{{ demoModuloNombre }}</span>
+                      <span class="ml-auto text-[10px] text-gray-400 uppercase tracking-wide">Módulo de demo</span>
+                    </div>
+                    <select v-else v-model="modulosSeleccionados" multiple :disabled="esModoDemo || modulosDelCurso.length === 0" class="input-style min-h-[120px]">
                       <option v-for="m in modulosDelCurso" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                     </select>
-                    <p v-if="modulosDelCurso.length === 0 && seleccion.cicloId" class="text-xs text-red-500 mt-2 italic">No hay módulos cargados para este curso.</p>
+                    <p v-if="!esModoDemo && modulosDelCurso.length === 0 && seleccion.cicloId" class="text-xs text-red-500 mt-2 italic">No hay módulos cargados para este curso.</p>
                   </div>
                 </div>
 
@@ -1242,15 +1335,20 @@ const tieneContextoEmpresa = computed(() => {
             </template>
           </button>
 
-          <button v-if="pasoActual === totalPasos" @click="generarReto" :disabled="!paso3Valido || cargando"
-            class="flex-[2] min-w-[250px] px-8 py-6 bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white rounded-full font-black text-lg shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)] transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-40 flex items-center justify-center gap-3">
+          <button v-if="pasoActual === totalPasos" @click="esModoDemo ? generarRetoDemo() : generarReto()" :disabled="!paso3Valido || cargando"
+            :class="esModoDemo ? 'from-[#1F2937] to-[#374151] shadow-[0_10px_30px_rgba(31,41,55,0.3)] hover:shadow-[0_15px_40px_rgba(31,41,55,0.4)]' : 'from-[#00A859] to-[#99CC33] shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)]'"
+            class="flex-[2] min-w-[250px] px-8 py-6 bg-gradient-to-r text-white rounded-full font-black text-lg transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-40 flex items-center justify-center gap-3">
             <template v-if="!cargando">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-              <span class="uppercase tracking-wide">{{ microretosGenerados.length > 0 ? 'Generar más variantes' : 'Procesar con IA' }}</span>
+              <svg v-if="esModoDemo" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+              <span class="uppercase tracking-wide">
+                <template v-if="esModoDemo">{{ microretosGenerados.length > 0 ? 'Regenerar demo' : 'Procesar DEMO con IA' }}</template>
+                <template v-else>{{ microretosGenerados.length > 0 ? 'Generar más variantes' : 'Procesar con IA' }}</template>
+              </span>
             </template>
             <template v-else>
               <div class="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <span class="text-sm">GENERANDO {{ seleccion.cantidadMicroretos }} RETO(S)...</span>
+              <span class="text-sm">{{ esModoDemo ? 'CARGANDO DEMO...' : `GENERANDO ${seleccion.cantidadMicroretos} RETO(S)...` }}</span>
             </template>
           </button>
         </div>

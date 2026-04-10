@@ -29,5 +29,6 @@ class DatabaseSeeder extends Seeder
     );
 
     $this->call(DemosSeeder::class);
+    $this->call(MicorretosDemoSeeder::class);
 }
 }
