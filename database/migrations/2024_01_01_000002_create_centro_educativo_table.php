@@ -8,13 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('centro_educativo')) {
-            Schema::create('centro_educativo', function (Blueprint $table) {
-                $table->id();
-                $table->string('nombre')->unique();
-                $table->timestamps();
-            });
-        }
+        Schema::create('centro_educativo', function (Blueprint $table) {
+            $table->id(); // bigint unsigned
+            $table->string('nombre')->unique();
+            $table->timestamps();
+        });
     }
 
     public function down(): void
