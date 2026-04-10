@@ -8,6 +8,7 @@ class Microreto extends Model
 {
     protected $fillable = [
         'titulo',
+        'demo_id',          // FK → demos (para microretos de demo)
         'empresa_id',       // FK (nueva)
         'empresa_nombre',   // legacy — se mantiene hasta completar backfill
         'quien_es', 'dia_a_dia', 'pregunta_reto',
@@ -30,6 +31,11 @@ class Microreto extends Model
         'tips_profesorado'   => 'array',
         'es_simulado'        => 'boolean',
     ];
+
+    public function demo()
+    {
+        return $this->belongsTo(Demo::class, 'demo_id');
+    }
 
     public function empresa()
     {

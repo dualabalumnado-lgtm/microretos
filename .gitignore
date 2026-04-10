@@ -1,4 +1,5 @@
 *.log
+.claude/
 INSERT_*.sql
 INSERT_*.sql.zip
 .DS_Store
