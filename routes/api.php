@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DatosFPController;
 use App\Http\Controllers\MicroretoIAController;
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\DemoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,6 +27,9 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/ciclos/{idCiclo}/modulos',   [DatosFPController::class, 'getModulos']);
     Route::get('/modulos/{idModulo}/ra-ce',   [DatosFPController::class, 'getRaCe']);
 });
+
+Route::get('/demos', [DemoController::class, 'index']);
+Route::get('/demos/{familia}', [DemoController::class, 'show']);
 
 // Auth pública
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
