@@ -35,7 +35,12 @@ const insertModifyRef = ref(null);
 // --- ETADO MODO DEMO Y SIMULACIÓN ---
 const esModoDemo = ref(false);
 const esInfoSimulada = ref(false); // NUEVO: Estado para el botón de Información Simulada
-let autoSelectDemoCycle = false; 
+let autoSelectDemoCycle = false;
+
+// --- SELECTOR DE DEMOS ---
+const demosDisponibles = ref([]);
+const mostrarSelectorDemo = ref(false);
+const demoSelectorRef = ref(null);
 
 // --- FILTRO DE COLEGIOS ---
 const centroFiltro = ref('');
@@ -237,6 +242,7 @@ const limpiarFormulario = () => {
     diagnosticoRecuperado.value = false;
     todosGuardados.value = false;
     esModoDemo.value = false;
+    mostrarSelectorDemo.value = false;
     esInfoSimulada.value = false; // Añadido: desmarca el botón al vaciar
     modulosSeleccionados.value = [];
     
@@ -251,43 +257,51 @@ const limpiarFormulario = () => {
   }
 };
 
-// --- FUNCIÓN PARA CARGAR DATOS DEMO EXACTOS ---
-const cargarDemo = () => {
-  esModoDemo.value = true;
-  
-  seleccion.value.empresaId = '';
-  centroFiltro.value = "IES Ana Luisa de Benítez"; 
-  buscadorEmpresa.value = "VirtualNest SL"; 
-  empresaDetalle.value = null;
-  diagnosticoRecuperado.value = false;
-  
-  // Datos Paso 1
-  seleccion.value.empresaNombre = "VirtualNest SL";
-  seleccion.value.empresaSector = "Informática y Comunicaciones";
-  seleccion.value.empresaTamano = "Mediana (50-250)";
-  seleccion.value.empresaWeb = "www.virtualnest.demo";
-  seleccion.value.empresaCentro = "IES Ana Luisa de Benítez";
-  
-  // Datos Paso 2 
-  seleccion.value.diaANormal = "Desarrollamos software y simuladores de realidad virtual para formación corporativa e industrial. Tenemos un equipo de 20 programadores, 5 diseñadores 3D y personal de Calidad (QA).";
-  seleccion.value.friccionArea = "Testing y reporte de bugs en entornos 3D interactivos.";
-  seleccion.value.friccionProblema = "Los testers tienen que quitarse las gafas de realidad virtual (VR) cada vez que encuentran un fallo para anotarlo en un Excel o Jira en el ordenador. Esto corta la inmersión, pierden el hilo y se olvidan de detalles visuales exactos del bug.";
-  seleccion.value.restricciones = ["Software cerrado", "Falta de tiempo"];
-  seleccion.value.otraLimitacion = "No podemos integrar plugins externos pesados en el motor gráfico actual sin romper el rendimiento y los FPS del simulador.";
-  seleccion.value.loQueNoQuieren = "Un sistema de tickets tradicional fuera del entorno de las gafas VR.";
-  seleccion.value.consecuencias = ["Pérdida de tiempo", "Errores frecuentes"];
-  seleccion.value.otraConsecuencia = "Bugs difíciles de reproducir por falta de contexto visual y coordenadas exactas.";
-  seleccion.value.expectativasAlumno = "Que investigue soluciones de captura de datos in-app o proponga un flujo mediante scripts ligeros que permita registrar coordenadas (X, Y, Z) y capturas de pantalla pulsando un solo botón en los mandos VR, guardándolo automáticamente.";
-  
-  // Datos Paso 3 
-  familiasFiltradas.value = ["Informática y Comunicaciones"];
-  seleccion.value.nivelGrupo = "Alto";
-  seleccion.value.cursoSeleccionado = 2;
-  
-  autoSelectDemoCycle = true; 
-  seleccion.value.familia = "Informática y Comunicaciones";
-  
-  alert("¡Modo Demo activado! Se ha cargado el caso de VirtualNest SL.");
+// --- FUNCIÓN PARA CARGAR DATOS DEMO DESDE API ---
+const cargarDemo = async (familiaProfesional) => {
+  mostrarSelectorDemo.value = false;
+  try {
+    const res = await api.get(`/demos/${encodeURIComponent(familiaProfesional)}`);
+    const demo = res.data;
+
+    esModoDemo.value = true;
+    seleccion.value.empresaId = '';
+    centroFiltro.value = demo.empresa_centro || '';
+    buscadorEmpresa.value = demo.empresa_nombre;
+    empresaDetalle.value = null;
+    diagnosticoRecuperado.value = false;
+
+    // Paso 1
+    seleccion.value.empresaNombre = demo.empresa_nombre;
+    seleccion.value.empresaSector = demo.empresa_sector;
+    seleccion.value.empresaTamano = demo.empresa_tamano;
+    seleccion.value.empresaWeb = demo.empresa_web || '';
+    seleccion.value.empresaCentro = demo.empresa_centro || '';
+
+    // Paso 2
+    seleccion.value.diaANormal = demo.dia_a_normal;
+    seleccion.value.friccionArea = demo.friccion_area;
+    seleccion.value.friccionProblema = demo.friccion_problema;
+    seleccion.value.restricciones = demo.restricciones || [];
+    seleccion.value.otraLimitacion = demo.otra_limitacion || '';
+    seleccion.value.loQueNoQuieren = demo.lo_que_no_quieren || '';
+    seleccion.value.consecuencias = demo.consecuencias || [];
+    seleccion.value.otraConsecuencia = demo.otra_consecuencia || '';
+    seleccion.value.expectativasAlumno = demo.expectativas_alumno || '';
+
+    // Paso 3
+    familiasFiltradas.value = [demo.familia_profesional];
+    seleccion.value.nivelGrupo = demo.nivel_grupo || 'Medio';
+    seleccion.value.cursoSeleccionado = demo.curso_seleccionado || 2;
+    seleccion.value.duracion = demo.duracion || '1 a 2 semanas';
+    seleccion.value.cantidadMicroretos = demo.cantidad_microretos || 3;
+
+    autoSelectDemoCycle = true;
+    seleccion.value.familia = demo.familia_profesional;
+  } catch (e) {
+    console.error('Error cargando demo:', e);
+    alert('Error al cargar la demo seleccionada.');
+  }
 };
 
 const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.value.empresaSector && seleccion.value.empresaTamano);
@@ -299,6 +313,9 @@ const buscadorRef = ref(null);
 const cerrarDropdownFuera = (e) => {
   if (buscadorRef.value && !buscadorRef.value.contains(e.target)) {
     mostrarDropdownEmpresas.value = false;
+  }
+  if (demoSelectorRef.value && !demoSelectorRef.value.contains(e.target)) {
+    mostrarSelectorDemo.value = false;
   }
 };
 
@@ -327,6 +344,15 @@ const onLoginSuccess = async () => {
 onMounted(async () => {
   document.addEventListener('click', cerrarDropdownFuera);
   setTimeout(() => { isLoaded.value = true; }, 100);
+
+  // Carga pública: lista de demos disponibles (no requiere auth)
+  try {
+    const resDemos = await api.get('/demos');
+    demosDisponibles.value = resDemos.data;
+  } catch (e) {
+    console.error('Error cargando demos:', e);
+  }
+
   if (!authStore.isAuthenticated) {
     showLogin.value = true;
   } else {
@@ -604,12 +630,33 @@ const tieneContextoEmpresa = computed(() => {
                 
                 <div class="flex flex-wrap items-center gap-2">
                   <!-- Cargar Demo -->
-                  <button @click="cargarDemo" :disabled="esModoDemo"
-                    :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
-                    class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
-                    <span v-else>Cargar Demo</span>
-                  </button>
+                  <div class="relative" ref="demoSelectorRef">
+                    <button
+                      @click="esModoDemo ? null : (mostrarSelectorDemo = !mostrarSelectorDemo)"
+                      :disabled="esModoDemo"
+                      :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20 cursor-default' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
+                      class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
+                      <span v-if="esModoDemo">✓ DEMO ACTIVA</span>
+                      <template v-else>
+                        <span>Cargar Demo</span>
+                        <svg class="w-3 h-3 transition-transform duration-200" :class="mostrarSelectorDemo ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </template>
+                    </button>
+                    <Transition name="dropdown">
+                      <div v-if="mostrarSelectorDemo && demosDisponibles.length > 0"
+                        class="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 min-w-[230px] overflow-hidden">
+                        <button
+                          v-for="demo in demosDisponibles"
+                          :key="demo.id"
+                          @click="cargarDemo(demo.familia_profesional)"
+                          class="w-full text-left px-5 py-3 text-sm font-semibold text-[#1F2937] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-colors border-b border-gray-100 last:border-0">
+                          {{ demo.etiqueta }}
+                        </button>
+                      </div>
+                    </Transition>
+                  </div>
 
                   <!-- Información Simulada -->
                   <button @click="esInfoSimulada = !esInfoSimulada"
