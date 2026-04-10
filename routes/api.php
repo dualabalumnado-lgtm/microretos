@@ -29,6 +29,7 @@ Route::middleware('throttle:120,1')->group(function () {
 });
 
 Route::get('/demos', [DemoController::class, 'index']);
+Route::get('/demos/{familia}/microretos', [DemoController::class, 'microretos']);
 Route::get('/demos/{familia}', [DemoController::class, 'show']);
 
 // Auth pública

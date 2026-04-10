@@ -29,6 +29,25 @@ class DemoController extends Controller
     {
         $demo = Demo::where('familia_profesional', urldecode($familia))->firstOrFail();
 
+        // Añade ciclo y módulo del primer microreto asociado para que el frontend
+        // pueda pre-seleccionarlos automáticamente en el paso 3.
+        $primerReto = $demo->microretos()->first(['ciclo', 'modulo']);
+        $demo->ciclo_nombre  = $primerReto?->ciclo  ?? null;
+        $demo->modulo_nombre = $primerReto?->modulo ?? null;
+
         return response()->json($demo);
+    }
+
+    /**
+     * GET /demos/{familia}/microretos
+     * Devuelve los microretos pre-guardados asociados a una demo.
+     */
+    public function microretos(string $familia): JsonResponse
+    {
+        $demo = Demo::where('familia_profesional', urldecode($familia))->firstOrFail();
+
+        $microretos = $demo->microretos()->get();
+
+        return response()->json(['microretos' => $microretos]);
     }
 }
