@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\Microreto;
 use App\Models\Modulo;
+use App\Models\CicloFormativo;
 use App\Models\Empresa;
 
 class MicroretoIAController extends Controller
@@ -67,7 +68,79 @@ class MicroretoIAController extends Controller
             $reto->familia          = 'Familia Desconocida';
         }
 
+        // Derivar curso si no está guardado aún
+        if (is_null($reto->curso)) {
+            $reto->curso = $this->derivarCurso($reto->ciclo_id, $reto->ciclo, $reto->modulo);
+        }
+
+        // Fallback: intentar derivarlo de evaluacion_oficial cuando modulo es 'Transversal'
+        if (is_null($reto->curso) && $reto->evaluacion_oficial && $reto->ciclo_id) {
+            $reto->curso = $this->derivarCursoDeEvaluacion($reto->ciclo_id, $reto->evaluacion_oficial);
+        }
+
         return response()->json($reto);
+    }
+
+    /**
+     * Deduce el número de curso (1 o 2) a partir del módulo guardado en el microreto.
+     * Primero intenta por ciclo_id (FK), luego por nombre de ciclo (legacy).
+     * Tolerante al punto final en nombres de módulo (datos BOE vs. texto libre).
+     */
+    private function derivarCurso(?int $cicloId, ?string $cicloNombre, ?string $moduloTexto): ?int
+    {
+        if (!$moduloTexto || $moduloTexto === 'Transversal') {
+            return null;
+        }
+
+        // El campo 'modulo' puede ser "Módulo A y Módulo B" — tomamos el primero
+        $primerModulo = trim(explode(' y ', $moduloTexto)[0]);
+
+        $cicloIdResuelto = $cicloId;
+
+        if (!$cicloIdResuelto && $cicloNombre) {
+            $cicloIdResuelto = CicloFormativo::where('nombre', $cicloNombre)->value('id');
+        }
+
+        if (!$cicloIdResuelto) {
+            return null;
+        }
+
+        // Intento exacto primero; si falla, toleramos punto final (nombres BOE acaban en '.')
+        $curso = Modulo::where('idcicloformativo', $cicloIdResuelto)
+            ->where('nombre', $primerModulo)
+            ->value('curso');
+
+        if (is_null($curso)) {
+            $curso = Modulo::where('idcicloformativo', $cicloIdResuelto)
+                ->where('nombre', 'LIKE', rtrim($primerModulo, '.') . '%')
+                ->orderByRaw('LENGTH(nombre) ASC') // preferir el más corto (más específico)
+                ->value('curso');
+        }
+
+        return $curso;
+    }
+
+    /**
+     * Fallback: cuando modulo = 'Transversal', intentamos derivar el curso
+     * mirando los módulos referenciados en el JSON de evaluacion_oficial.
+     */
+    private function derivarCursoDeEvaluacion(int $cicloId, array $evaluacionOficial): ?int
+    {
+        foreach ($evaluacionOficial as $item) {
+            $nombreModulo = $item['modulo'] ?? null;
+            if (!$nombreModulo) continue;
+
+            $curso = Modulo::where('idcicloformativo', $cicloId)
+                ->where('nombre', 'LIKE', rtrim($nombreModulo, '.') . '%')
+                ->orderByRaw('LENGTH(nombre) ASC')
+                ->value('curso');
+
+            if (!is_null($curso)) {
+                return $curso;
+            }
+        }
+
+        return null;
     }
 
     public function generar(Request $request)
@@ -87,7 +160,7 @@ class MicroretoIAController extends Controller
             'nivelGrupo'       => 'required|string',
             'cursoSeleccionado'=> 'required|integer',
             'modulo_id'        => 'nullable|array',
-            'cantidad'         => 'required|integer|min:1|max:15',
+            'cantidad'         => 'required|integer|min:1|max:5',
         ]);
 
         $consecuencias = implode(", ", $request->consecuencias ?? []);
@@ -204,6 +277,15 @@ class MicroretoIAController extends Controller
     {
         try {
             $datos = $request->except(['_ui_guardado', '_ui_guardando']);
+
+            // Derivar y persistir el curso a partir del módulo y ciclo guardados
+            if (empty($datos['curso'])) {
+                $cicloId   = isset($datos['ciclo_id']) ? (int) $datos['ciclo_id'] : null;
+                $cicloNom  = $datos['ciclo']  ?? null;
+                $moduloNom = $datos['modulo'] ?? null;
+                $datos['curso'] = $this->derivarCurso($cicloId, $cicloNom, $moduloNom);
+            }
+
             $microreto = Microreto::create($datos);
             return response()->json(['mensaje' => 'Micro-reto archivado', 'reto' => $microreto], 201);
         } catch (\Exception $e) {
@@ -221,6 +303,14 @@ class MicroretoIAController extends Controller
             $insertados = [];
             foreach ($request->microretos as $retoData) {
                 unset($retoData['_ui_guardado'], $retoData['_ui_guardando']);
+
+                if (empty($retoData['curso'])) {
+                    $cicloId   = isset($retoData['ciclo_id']) ? (int) $retoData['ciclo_id'] : null;
+                    $cicloNom  = $retoData['ciclo']  ?? null;
+                    $moduloNom = $retoData['modulo'] ?? null;
+                    $retoData['curso'] = $this->derivarCurso($cicloId, $cicloNom, $moduloNom);
+                }
+
                 $insertados[] = Microreto::create($retoData);
             }
             return response()->json(['mensaje' => count($insertados) . ' Micro-retos archivados en lote con éxito'], 201);
