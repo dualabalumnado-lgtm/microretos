@@ -15,6 +15,7 @@ class Microreto extends Model
         'dificultades', 'que_necesitan', 'limitaciones', 'prototipos',
         'ods_sugeridos', 'soft_skills', 'evaluacion_oficial', 'tips_profesorado',
         'nivel_grupo',
+        'curso',
         'ciclo_id',         // FK (nueva)
         'ciclo',            // legacy — se mantiene hasta completar backfill
         'modulo', 'duracion', 'es_simulado',

@@ -64,14 +64,6 @@ const imagenFondo = computed(() => {
 <template>
   <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
 
-    <img
-      src="../assets/logo.png"
-      alt=""
-      aria-hidden="true"
-      class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[550px] max-w-none pointer-events-none select-none object-contain transition-opacity duration-1000 z-0"
-      :class="isLoaded ? 'opacity-20' : 'opacity-0'"
-    />
-
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
@@ -238,6 +230,20 @@ const imagenFondo = computed(() => {
                              01.665-6.479L12 14z"/>
                   </svg>
                   {{ reto.ciclo }}
+                </span>
+
+                <span v-if="reto.curso"
+                      class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13
+                             C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477
+                             14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247
+                             18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                  </svg>
+                  {{ reto.curso }}º Curso
                 </span>
               </div>
             </div>
