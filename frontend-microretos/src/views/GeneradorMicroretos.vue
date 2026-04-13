@@ -569,6 +569,7 @@ const guardarTodos = async () => {
         ciclo_id:   seleccion.value.cicloId   || null,
         ciclo: cicloStr,
         modulo: moduloStr,
+        curso: seleccion.value.cursoSeleccionado,
         duracion: seleccion.value.duracion,
         nivel_grupo: seleccion.value.nivelGrupo
       }));
@@ -606,6 +607,7 @@ const guardar = async (index) => {
       modulo: nombresModulosSeleccionados.length > 0
         ? nombresModulosSeleccionados.join(' y ')
         : 'Transversal',
+      curso: seleccion.value.cursoSeleccionado,
       duracion: seleccion.value.duracion,
       nivel_grupo: seleccion.value.nivelGrupo
     });
@@ -627,15 +629,7 @@ const tieneContextoEmpresa = computed(() => {
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden">
-
-    <img
-      src="../assets/logo.png"
-      alt=""
-      aria-hidden="true"
-      class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] md:w-[550px] max-w-none pointer-events-none select-none object-contain transition-opacity duration-1000 z-0"
-      :class="isLoaded ? 'opacity-20' : 'opacity-0'"
-    />
-
+    
     <div class="max-w-6xl mx-auto">
       
       <header class="mb-10 text-center flex flex-col items-center">
@@ -1278,7 +1272,7 @@ const tieneContextoEmpresa = computed(() => {
                   <div class="w-full md:w-1/3">
                     <label class="label-style !mb-3 text-[#1F2937]">Cantidad de Variantes a Generar *</label>
                     <select v-model="seleccion.cantidadMicroretos" :disabled="esModoDemo" class="input-style focus:!border-[#00A859]">
-                      <option v-for="n in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15]" :key="n" :value="n">
+                      <option v-for="n in [1, 2, 3, 4, 5]" :key="n" :value="n">
                         Generar {{ n }} Variante{{ n > 1 ? 's' : '' }}
                       </option>
                     </select>
