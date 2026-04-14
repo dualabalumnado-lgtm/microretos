@@ -719,23 +719,21 @@ const tieneContextoEmpresa = computed(() => {
         <div class="absolute top-6 left-0 h-1 bg-gradient-to-r from-[#00A859] to-[#99CC33] transition-all duration-700 -z-0 rounded-full" :style="{ width: ((pasoActual - 1) / (totalPasos - 1)) * 100 + '%' }"></div>
       </div>
 
-      <!-- Indicador de empresa activa -->
-      <transition name="fade">
-        <div v-if="seleccion.empresaNombre" class="flex justify-center mb-8 -mt-2">
-          <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1F2937] text-white text-xs font-bold tracking-wide shadow-sm">
-            <svg class="w-3.5 h-3.5 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-            {{ seleccion.empresaNombre }}
-          </span>
-        </div>
-      </transition>
-
       <main class="min-h-[400px]">
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
-              
+              <transition name="fade">
+                <div v-if="seleccion.empresaNombre" class="absolute -top-4 left-8">
+                  <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#1F2937] text-xs font-bold tracking-wide border border-gray-100 border-b-0 shadow-[0_-4px_8px_rgb(0,0,0,0.04)]">
+                    <svg class="w-3.5 h-3.5 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Empresa: {{ seleccion.empresaNombre }}
+                  </span>
+                </div>
+              </transition>
+
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
@@ -989,6 +987,16 @@ const tieneContextoEmpresa = computed(() => {
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 2" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
              <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
+              <transition name="fade">
+                <div v-if="seleccion.empresaNombre" class="absolute -top-4 left-8">
+                  <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#1F2937] text-xs font-bold tracking-wide border border-gray-100 border-b-0 shadow-[0_-4px_8px_rgb(0,0,0,0.04)]">
+                    <svg class="w-3.5 h-3.5 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Empresa: {{ seleccion.empresaNombre }}
+                  </span>
+                </div>
+              </transition>
               <div class="absolute top-0 right-0 bg-gray-50 text-[#1F2937] px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-bl-3xl border-b border-l border-gray-100">
                 Entrevista de Diagnóstico
               </div>
@@ -1189,6 +1197,16 @@ const tieneContextoEmpresa = computed(() => {
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 3" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <section class="bg-white rounded-[2.5rem] p-8 md:p-10 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.05)] relative z-10">
+              <transition name="fade">
+                <div v-if="seleccion.empresaNombre" class="absolute -top-4 left-8">
+                  <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#1F2937] text-xs font-bold tracking-wide border border-gray-100 border-b-0 shadow-[0_-4px_8px_rgb(0,0,0,0.04)]">
+                    <svg class="w-3.5 h-3.5 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Empresa: {{ seleccion.empresaNombre }}
+                  </span>
+                </div>
+              </transition>
               <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
