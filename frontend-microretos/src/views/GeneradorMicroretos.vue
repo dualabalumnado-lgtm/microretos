@@ -37,7 +37,8 @@ const esModoDemo = ref(false);
 const demoFamiliaActiva = ref('');
 const demoCicloNombre = ref('');
 const demoModuloNombre = ref('');
-const esInfoSimulada = ref(false); // NUEVO: Estado para el botón de Información Simulada
+const esInfoSimulada = ref(false);
+const cargandoSimulacion = ref(false);
 let autoSelectDemoCycle = false;
 
 // --- SELECTOR DE DEMOS ---
@@ -257,7 +258,8 @@ const limpiarFormulario = () => {
     todosGuardados.value = false;
     esModoDemo.value = false;
     mostrarSelectorDemo.value = false;
-    esInfoSimulada.value = false; // Añadido: desmarca el botón al vaciar
+    esInfoSimulada.value = false;
+    cargandoSimulacion.value = false;
     modulosSeleccionados.value = [];
     
     seleccion.value = {
@@ -519,6 +521,52 @@ const guardarInfoEmpresa = async () => {
   } catch(e) { alert("Error al procesar la empresa en la BD."); } finally { actualizandoCRM.value = false; }
 };
 
+const toggleInfoSimulada = async () => {
+  if (esModoDemo.value || cargandoSimulacion.value) return;
+
+  // Si ya está activo, simplemente desactivar
+  if (esInfoSimulada.value) {
+    esInfoSimulada.value = false;
+    return;
+  }
+
+  if (!seleccion.value.empresaNombre || !seleccion.value.empresaSector) {
+    alert('Selecciona una empresa con nombre y sector antes de generar información simulada.');
+    return;
+  }
+
+  cargandoSimulacion.value = true;
+  try {
+    const res = await api.post('/simular-info-empresa', {
+      empresaNombre:    seleccion.value.empresaNombre,
+      empresaSector:    seleccion.value.empresaSector,
+      empresaTamano:    seleccion.value.empresaTamano    || '',
+      empresaUbicacion: seleccion.value.empresaUbicacion || '',
+    });
+
+    const d = res.data;
+    seleccion.value.diaANormal         = d.diaANormal         || '';
+    seleccion.value.friccionArea       = d.friccionArea       || '';
+    seleccion.value.friccionProblema   = d.friccionProblema   || '';
+    seleccion.value.restricciones      = Array.isArray(d.restricciones)  ? d.restricciones  : [];
+    seleccion.value.otraLimitacion     = d.otraLimitacion     || '';
+    seleccion.value.loQueNoQuieren     = d.loQueNoQuieren     || '';
+    seleccion.value.consecuencias      = Array.isArray(d.consecuencias)  ? d.consecuencias  : [];
+    seleccion.value.otraConsecuencia   = d.otraConsecuencia   || '';
+    seleccion.value.expectativasAlumno = d.expectativasAlumno || '';
+
+    esInfoSimulada.value = true;
+
+    // Navegar al paso 2 para que el usuario vea los campos rellenos
+    if (pasoActual.value === 1) pasoActual.value = 2;
+  } catch (e) {
+    console.error(e);
+    alert('Error al generar información simulada. Inténtalo de nuevo.');
+  } finally {
+    cargandoSimulacion.value = false;
+  }
+};
+
 const generarReto = async () => {
   cargando.value = true;
   todosGuardados.value = false; 
@@ -671,6 +719,18 @@ const tieneContextoEmpresa = computed(() => {
         <div class="absolute top-6 left-0 h-1 bg-gradient-to-r from-[#00A859] to-[#99CC33] transition-all duration-700 -z-0 rounded-full" :style="{ width: ((pasoActual - 1) / (totalPasos - 1)) * 100 + '%' }"></div>
       </div>
 
+      <!-- Indicador de empresa activa -->
+      <transition name="fade">
+        <div v-if="seleccion.empresaNombre" class="flex justify-center mb-8 -mt-2">
+          <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1F2937] text-white text-xs font-bold tracking-wide shadow-sm">
+            <svg class="w-3.5 h-3.5 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            {{ seleccion.empresaNombre }}
+          </span>
+        </div>
+      </transition>
+
       <main class="min-h-[400px]">
         <transition name="fade" mode="out-in">
           <div v-if="pasoActual === 1" class="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -723,13 +783,15 @@ const tieneContextoEmpresa = computed(() => {
                   </div>
 
                   <!-- Información Simulada -->
-                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
-                    :disabled="esModoDemo"
-                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="toggleInfoSimulada()"
+                    :disabled="esModoDemo || cargandoSimulacion"
+                    :class="esModoDemo || cargandoSimulacion ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-if="cargandoSimulacion" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <svg v-else-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Información Simulada
+                    <span v-if="cargandoSimulacion">Generando...</span>
+                    <span v-else>Información Simulada</span>
                   </button>
 
                   <!-- Separador vertical -->
@@ -940,13 +1002,15 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
-                    :disabled="esModoDemo"
-                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="toggleInfoSimulada()"
+                    :disabled="esModoDemo || cargandoSimulacion"
+                    :class="esModoDemo || cargandoSimulacion ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-if="cargandoSimulacion" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <svg v-else-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Información Simulada
+                    <span v-if="cargandoSimulacion">Generando...</span>
+                    <span v-else>Información Simulada</span>
                   </button>
 
                   <span v-if="esModoDemo"
@@ -1134,13 +1198,15 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                  <button @click="!esModoDemo && (esInfoSimulada = !esInfoSimulada)"
-                    :disabled="esModoDemo"
-                    :class="esModoDemo ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button @click="toggleInfoSimulada()"
+                    :disabled="esModoDemo || cargandoSimulacion"
+                    :class="esModoDemo || cargandoSimulacion ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
-                    <svg v-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    <svg v-if="cargandoSimulacion" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <svg v-else-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Información Simulada
+                    <span v-if="cargandoSimulacion">Generando...</span>
+                    <span v-else>Información Simulada</span>
                   </button>
 
                   <span v-if="esModoDemo"
