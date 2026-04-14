@@ -143,6 +143,72 @@ class MicroretoIAController extends Controller
         return null;
     }
 
+    public function simularInfoEmpresa(Request $request)
+    {
+        $request->validate([
+            'empresaNombre'    => 'required|string',
+            'empresaSector'    => 'required|string',
+            'empresaTamano'    => 'nullable|string',
+            'empresaUbicacion' => 'nullable|string',
+        ]);
+
+        $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector})";
+        if ($request->filled('empresaTamano'))    $contextoEmpresa .= ", Tamaño: {$request->empresaTamano}";
+        if ($request->filled('empresaUbicacion')) $contextoEmpresa .= ", Ubicación: {$request->empresaUbicacion}";
+
+        $limitacionesOpciones  = ['Presupuesto Cero/Muy Bajo', 'Equipos obsoletos', 'Internet inestable', 'Software cerrado', 'Resistencia al cambio', 'Espacio reducido', 'Falta de tiempo', 'Normativa RGPD'];
+        $consecuenciasOpciones = ['Errores frecuentes', 'Costes innecesarios', 'Pérdida de tiempo', 'Insatisfacción del cliente', 'Riesgos de seguridad', 'Desperdicio de materiales', 'Falta de comunicación interna'];
+
+        $limitacionesStr  = implode('", "', $limitacionesOpciones);
+        $consecuenciasStr = implode('", "', $consecuenciasOpciones);
+
+        $systemPrompt = "Eres un responsable o empleado de la empresa '{$request->empresaNombre}' del sector '{$request->empresaSector}'. Conoces perfectamente la operativa diaria, los problemas internos, las limitaciones reales y los objetivos de mejora de tu empresa. Describes situaciones concretas, creíbles y propias del sector, sin inventar soluciones.";
+
+        $userPrompt = "Rellena el siguiente formulario de diagnóstico empresarial como si fueras un representante de {$contextoEmpresa}.
+
+FORMULARIO (responde en español, con detalle y realismo):
+- P1 (diaANormal): Describe brevemente el día a día de tu empresa y cómo funciona vuestro proceso o servicio principal (máx. 900 caracteres).
+- P2 (friccionArea): Nombra el área o proceso concreto que más trabajo extra genera actualmente (máx. 380 caracteres).
+- P2b (friccionProblema): Explica con detalle qué ocurre hoy en ese proceso y por qué genera problemas (máx. 1100 caracteres).
+- P3 (restricciones): De esta lista, devuelve SOLO los textos que aplican realmente a tu empresa: [\"{$limitacionesStr}\"]. Devuelve exactamente los textos tal como aparecen. Puede ser un array vacío.
+- P3b (otraLimitacion): Si tenéis alguna limitación adicional no incluida en la lista, descríbela brevemente (máx. 500 caracteres, puede estar vacío).
+- P3b2 (loQueNoQuieren): Describe qué tipo de soluciones no queréis bajo ningún concepto (máx. 450 caracteres).
+- P4 (consecuencias): De esta lista, devuelve SOLO los textos que describen consecuencias reales del problema en tu empresa: [\"{$consecuenciasStr}\"]. Devuelve exactamente los textos tal como aparecen. Puede ser un array vacío.
+- P4b (otraConsecuencia): Si hay alguna consecuencia adicional no incluida en la lista, descríbela (máx. 280 caracteres, puede estar vacío).
+- P5 (expectativasAlumno): ¿Qué esperáis que investigue o proponga el alumno de FP para ayudaros? (máx. 750 caracteres).
+
+Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
+{
+  \"diaANormal\": \"...\",
+  \"friccionArea\": \"...\",
+  \"friccionProblema\": \"...\",
+  \"restricciones\": [],
+  \"otraLimitacion\": \"\",
+  \"loQueNoQuieren\": \"...\",
+  \"consecuencias\": [],
+  \"otraConsecuencia\": \"\",
+  \"expectativasAlumno\": \"...\"
+}";
+
+        $response = Http::withToken(config('services.openai.key'))
+            ->timeout(60)
+            ->post("https://api.openai.com/v1/chat/completions", [
+                "model"           => "gpt-4o",
+                "messages"        => [
+                    ["role" => "system", "content" => $systemPrompt],
+                    ["role" => "user",   "content" => $userPrompt],
+                ],
+                "response_format" => ["type" => "json_object"],
+                "temperature"     => 0.8,
+            ]);
+
+        if ($response->successful()) {
+            return response()->json(json_decode($response->json()['choices'][0]['message']['content'], true));
+        }
+
+        return response()->json(['error' => 'Error al contactar con la IA'], 500);
+    }
+
     public function generar(Request $request)
     {
         // El frontend manda empresaId (camelCase), normalizamos antes de validar

@@ -53,7 +53,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
     Route::middleware('throttle:5,1')->group(function () {
-        Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
+        Route::post('/generar-microreto',      [MicroretoIAController::class, 'generar']);
+        Route::post('/simular-info-empresa',   [MicroretoIAController::class, 'simularInfoEmpresa']);
     });
 
     // Guardado y borrado de microretos
