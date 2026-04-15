@@ -1,0 +1,714 @@
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import api from '../api.js'
+
+const route  = useRoute()
+const router = useRouter()
+
+// ─── Estado del microreto seleccionado ────────────────────────────────────────
+const microretoSeleccionado = ref(null)
+const cargandoMicroreto     = ref(false)
+
+// ─── Formulario de sesión ──────────────────────────────────────────────────────
+const form = ref({
+  microreto_id:     '',
+  microreto_titulo: '',
+  fecha:            new Date().toISOString().slice(0, 10),
+  centro_educativo: '',
+  ciclo_formativo:  '',
+  curso:            '',
+  grupo:            '',
+  num_alumnos:      '',
+  notas:            '',
+})
+
+const guardando  = ref(false)
+const guardadoOk = ref(false)
+
+// ─── Historial de sesiones (localStorage) ─────────────────────────────────────
+const STORAGE_KEY = 'dualab_sesiones'
+const sesiones    = ref([])
+
+function cargarSesiones() {
+  try {
+    sesiones.value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+  } catch {
+    sesiones.value = []
+  }
+}
+
+// ─── Buscador / selector de microretos ───────────────────────────────────────
+const mostrarBuscador    = ref(false)
+const todosMicroretos    = ref([])      // todos los microretos de la API
+const cargandoCatalogo   = ref(false)
+const catalogoCargado    = ref(false)
+
+// Filtros en cascada
+const filtroCentro  = ref('')
+const filtroFamilia = ref('')
+const filtroCiclo   = ref('')
+const filtroCurso   = ref('')
+const busqueda      = ref('')
+
+// ── Derivados para los selects ────────────────────────────────────────────────
+
+const centrosDisponibles = computed(() => {
+  const set = new Set(
+    todosMicroretos.value
+      .map(m => m.centro_educativo || m.centro)
+      .filter(Boolean)
+  )
+  return [...set].sort()
+})
+
+// Familias filtradas por centro seleccionado
+const familiasDisponibles = computed(() => {
+  const base = filtroCentro.value
+    ? todosMicroretos.value.filter(m =>
+        (m.centro_educativo || m.centro) === filtroCentro.value
+      )
+    : todosMicroretos.value
+  const set = new Set(base.map(m => m.familia).filter(Boolean))
+  return [...set].sort()
+})
+
+// Ciclos filtrados por centro + familia
+const ciclosDisponibles = computed(() => {
+  let base = todosMicroretos.value
+  if (filtroCentro.value)
+    base = base.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
+  if (filtroFamilia.value)
+    base = base.filter(m => m.familia === filtroFamilia.value)
+  const set = new Set(base.map(m => m.ciclo).filter(Boolean))
+  return [...set].sort()
+})
+
+// Cursos filtrados por centro + familia + ciclo
+const cursosDisponibles = computed(() => {
+  let base = todosMicroretos.value
+  if (filtroCentro.value)
+    base = base.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
+  if (filtroFamilia.value)
+    base = base.filter(m => m.familia === filtroFamilia.value)
+  if (filtroCiclo.value)
+    base = base.filter(m => m.ciclo === filtroCiclo.value)
+  const set = new Set(
+    base.map(m => {
+      if (!m.curso) return null
+      const n = parseInt(m.curso)
+      return n === 1 ? '1º' : n === 2 ? '2º' : String(m.curso)
+    }).filter(Boolean)
+  )
+  return [...set].sort()
+})
+
+// Resultados finales
+const resultadosFiltrados = computed(() => {
+  let base = todosMicroretos.value
+
+  if (filtroCentro.value)
+    base = base.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
+  if (filtroFamilia.value)
+    base = base.filter(m => m.familia === filtroFamilia.value)
+  if (filtroCiclo.value)
+    base = base.filter(m => m.ciclo === filtroCiclo.value)
+  if (filtroCurso.value) {
+    const num = filtroCurso.value.replace('º', '')
+    base = base.filter(m => m.curso != null && String(m.curso) === num)
+  }
+  if (busqueda.value.trim()) {
+    const q = busqueda.value.trim().toLowerCase()
+    base = base.filter(m =>
+      (m.titulo    || '').toLowerCase().includes(q) ||
+      (m.ciclo     || '').toLowerCase().includes(q) ||
+      (m.familia   || '').toLowerCase().includes(q) ||
+      (m.curso != null && String(m.curso).includes(q))
+    )
+  }
+
+  return base.slice(0, 60)
+})
+
+// Limpiar filtros dependientes al cambiar el padre
+watch(filtroCentro,  () => { filtroFamilia.value = ''; filtroCiclo.value = ''; filtroCurso.value = '' })
+watch(filtroFamilia, () => { filtroCiclo.value = ''; filtroCurso.value = '' })
+watch(filtroCiclo,   () => { filtroCurso.value = '' })
+
+// ── Abrir buscador y cargar catálogo (una sola vez) ───────────────────────────
+async function abrirBuscador() {
+  mostrarBuscador.value = true
+  if (catalogoCargado.value) return
+  cargandoCatalogo.value = true
+  try {
+    const res = await api.get('/microretos')
+    todosMicroretos.value = res.data.filter(m => {
+      const centro  = m.centro_educativo || m.centro
+      const familia = m.familia
+      return (
+        centro  && centro  !== 'Centro Desconocido' &&
+        familia && familia !== 'Familia Desconocida'
+      )
+    })
+    catalogoCargado.value = true
+  } catch (e) {
+    console.error('Error cargando catálogo:', e)
+  } finally {
+    cargandoCatalogo.value = false
+  }
+}
+
+function cerrarBuscador() {
+  mostrarBuscador.value = false
+}
+
+function normalizarCurso(curso) {
+  if (!curso && curso !== 0) return ''
+  const n = parseInt(curso)
+  return n === 1 ? '1º' : n === 2 ? '2º' : String(curso)
+}
+
+function seleccionarMicroreto(m) {
+  microretoSeleccionado.value = m
+  form.value.microreto_id     = m.uuid || m.id
+  form.value.microreto_titulo = m.titulo
+  mostrarBuscador.value = false
+}
+
+// ─── Cargar microreto desde la URL (?microreto_id=...) ────────────────────────
+onMounted(async () => {
+  cargarSesiones()
+  const id = route.query.microreto_id
+  if (id) {
+    cargandoMicroreto.value = true
+    try {
+      const res = await api.get(`/microretos/${id}`)
+      microretoSeleccionado.value = res.data
+      form.value.microreto_id     = res.data.uuid || res.data.id
+      form.value.microreto_titulo = res.data.titulo
+    } catch (e) {
+      console.error('Error cargando microreto:', e)
+    } finally {
+      cargandoMicroreto.value = false
+    }
+  }
+})
+
+// ─── Guardar sesión ───────────────────────────────────────────────────────────
+function guardarSesion() {
+  if (!form.value.microreto_titulo || !form.value.fecha) return
+  guardando.value = true
+  const sesion = { id: Date.now(), ...form.value, creada_en: new Date().toISOString() }
+  const lista = [...sesiones.value, sesion]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
+  sesiones.value   = lista
+  guardando.value  = false
+  guardadoOk.value = true
+  setTimeout(() => { guardadoOk.value = false }, 2500)
+}
+
+// ─── Eliminar sesión ──────────────────────────────────────────────────────────
+function eliminarSesion(id) {
+  const lista = sesiones.value.filter(s => s.id !== id)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
+  sesiones.value = lista
+}
+
+// ─── Limpiar selección de microreto ──────────────────────────────────────────
+function limpiarFormulario() {
+  microretoSeleccionado.value = null
+  form.value.microreto_id     = ''
+  form.value.microreto_titulo = ''
+  router.replace({ path: '/dashboard' })
+}
+
+function irAMicroreto(id) {
+  router.push({ name: 'detalle-microreto', params: { id } })
+}
+
+const formularioValido = computed(() =>
+  form.value.microreto_titulo.trim() !== '' && form.value.fecha !== ''
+)
+
+function formatFecha(isoDate) {
+  if (!isoDate) return ''
+  const d = new Date(isoDate + 'T12:00:00')
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+</script>
+
+<template>
+  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
+
+    <!-- Fondo decorativo -->
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]
+                bg-[#00A859] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
+
+    <div class="relative z-10 max-w-5xl mx-auto px-4 py-8 md:px-8 md:py-12">
+
+      <!-- ─── Cabecera ─────────────────────────────────────────────────────── -->
+      <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/20
+                      flex items-center justify-center">
+            <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                       M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2
+                       m-6 9l2 2 4-4"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-black text-[#1F2937] tracking-tight">Dashboard docente</h1>
+            <p class="text-sm text-gray-400 font-medium">Registra las sesiones de trabajo con microretos</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        <!-- ─── COLUMNA IZQUIERDA: Formulario ───────────────────────────── -->
+        <div class="lg:col-span-3 space-y-4">
+
+          <!-- ══ SELECTOR DE MICRORETO ══════════════════════════════════════ -->
+          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                Microreto a trabajar
+              </p>
+              <button v-if="!mostrarBuscador && !microretoSeleccionado"
+                      @click="abrirBuscador"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                             bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859]
+                             text-[10px] font-black uppercase tracking-widest
+                             hover:bg-[#00A859]/20 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                Buscar microreto
+              </button>
+            </div>
+
+            <div class="px-6 py-5">
+
+              <!-- Cargando desde URL -->
+              <div v-if="cargandoMicroreto" class="flex items-center gap-3 text-gray-400">
+                <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                </svg>
+                <span class="text-sm">Cargando microreto...</span>
+              </div>
+
+              <!-- Microreto seleccionado -->
+              <div v-else-if="microretoSeleccionado && !mostrarBuscador"
+                   class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="w-2 h-2 rounded-full bg-[#00A859] flex-shrink-0" />
+                    <p class="text-xs font-black uppercase tracking-widest text-[#00A859]">
+                      Seleccionado
+                    </p>
+                  </div>
+                  <h3 class="font-black text-[#1F2937] text-base leading-snug">
+                    {{ microretoSeleccionado.titulo }}
+                  </h3>
+                  <p class="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-2">
+                    <span v-if="microretoSeleccionado.familia">{{ microretoSeleccionado.familia }}</span>
+                    <span v-if="microretoSeleccionado.ciclo">· {{ microretoSeleccionado.ciclo }}</span>
+                    <span v-if="microretoSeleccionado.curso">· {{ normalizarCurso(microretoSeleccionado.curso) }}</span>
+                  </p>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                  <button @click="irAMicroreto(microretoSeleccionado.uuid || microretoSeleccionado.id)"
+                          class="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200
+                                 text-[10px] font-black uppercase tracking-widest text-gray-500
+                                 hover:border-[#00A859] hover:text-[#00A859] transition-all">
+                    Ver ficha
+                  </button>
+                  <button @click="limpiarFormulario(); abrirBuscador()"
+                          class="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200
+                                 text-[10px] font-black uppercase tracking-widest text-gray-400
+                                 hover:border-[#00A859] hover:text-[#00A859] transition-all">
+                    Cambiar
+                  </button>
+                </div>
+              </div>
+
+              <!-- ── PANEL BUSCADOR ──────────────────────────────────────── -->
+              <div v-else-if="mostrarBuscador" class="space-y-4">
+
+                <!-- Barra de búsqueda por texto -->
+                <div class="relative">
+                  <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300
+                               pointer-events-none"
+                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                  </svg>
+                  <input v-model="busqueda"
+                         type="text"
+                         placeholder="Buscar por título, ciclo, familia, curso..."
+                         class="field-input pl-10" />
+                </div>
+
+                <!-- Filtros en cascada -->
+                <div class="grid grid-cols-2 gap-3">
+
+                  <!-- Centro -->
+                  <div>
+                    <label class="field-label">Centro</label>
+                    <select v-model="filtroCentro" class="field-input">
+                      <option value="">Todos los centros</option>
+                      <option v-for="c in centrosDisponibles" :key="c" :value="c">{{ c }}</option>
+                    </select>
+                  </div>
+
+                  <!-- Familia (filtrada por centro) -->
+                  <div>
+                    <label class="field-label">Familia profesional</label>
+                    <select v-model="filtroFamilia" class="field-input"
+                            :disabled="familiasDisponibles.length === 0">
+                      <option value="">Todas las familias</option>
+                      <option v-for="f in familiasDisponibles" :key="f" :value="f">{{ f }}</option>
+                    </select>
+                  </div>
+
+                  <!-- Ciclo (filtrado por centro + familia) -->
+                  <div>
+                    <label class="field-label">Ciclo formativo</label>
+                    <select v-model="filtroCiclo" class="field-input"
+                            :disabled="ciclosDisponibles.length === 0">
+                      <option value="">Todos los ciclos</option>
+                      <option v-for="c in ciclosDisponibles" :key="c" :value="c">{{ c }}</option>
+                    </select>
+                  </div>
+
+                  <!-- Curso (filtrado por todo lo anterior) -->
+                  <div>
+                    <label class="field-label">Curso</label>
+                    <div class="flex gap-2 mt-1">
+                      <button v-for="op in ['', '1º', '2º']" :key="op"
+                              @click="filtroCurso = op"
+                              class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase
+                                     tracking-widest border transition-all"
+                              :class="filtroCurso === op
+                                ? 'bg-[#00A859] border-[#00A859] text-white'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#00A859]/40 hover:text-[#00A859]'">
+                        {{ op === '' ? 'Todos' : op }}
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Contador resultados + limpiar -->
+                <div class="flex items-center justify-between">
+                  <p class="text-[10px] text-gray-400 font-medium">
+                    <span v-if="cargandoCatalogo">Cargando catálogo...</span>
+                    <span v-else>
+                      {{ resultadosFiltrados.length }}
+                      {{ resultadosFiltrados.length === 1 ? 'microreto' : 'microretos' }}
+                      encontrados
+                    </span>
+                  </p>
+                  <div class="flex gap-2">
+                    <button v-if="filtroCentro || filtroFamilia || filtroCiclo || filtroCurso || busqueda"
+                            @click="filtroCentro=''; filtroFamilia=''; filtroCiclo=''; filtroCurso=''; busqueda=''"
+                            class="text-[10px] font-black uppercase tracking-widest text-gray-400
+                                   hover:text-red-400 transition-colors">
+                      Limpiar filtros
+                    </button>
+                    <button @click="cerrarBuscador"
+                            class="text-[10px] font-black uppercase tracking-widest text-gray-400
+                                   hover:text-gray-600 transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Spinner mientras carga -->
+                <div v-if="cargandoCatalogo"
+                     class="flex justify-center py-8">
+                  <svg class="animate-spin w-6 h-6 text-[#00A859]" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                  </svg>
+                </div>
+
+                <!-- Lista de resultados -->
+                <ul v-else-if="resultadosFiltrados.length"
+                    class="space-y-2 max-h-72 overflow-y-auto pr-1 -mr-1">
+                  <li v-for="m in resultadosFiltrados" :key="m.uuid || m.id">
+                    <button @click="seleccionarMicroreto(m)"
+                            class="w-full text-left px-4 py-3 rounded-xl border border-gray-100
+                                   bg-gray-50 hover:border-[#00A859]/40 hover:bg-[#00A859]/5
+                                   transition-all group">
+                      <p class="text-sm font-black text-[#1F2937] leading-snug
+                                group-hover:text-[#00A859] transition-colors line-clamp-2">
+                        {{ m.titulo }}
+                      </p>
+                      <div class="flex flex-wrap gap-1.5 mt-1.5">
+                        <span v-if="m.familia" class="tag tag-gray">{{ m.familia }}</span>
+                        <span v-if="m.ciclo"   class="tag tag-gray truncate max-w-[180px]">{{ m.ciclo }}</span>
+                        <span v-if="m.curso"   class="tag tag-green">{{ normalizarCurso(m.curso) }}</span>
+                        <span v-if="m.centro_educativo || m.centro"
+                              class="tag tag-gray">
+                          {{ m.centro_educativo || m.centro }}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                </ul>
+
+                <!-- Sin resultados -->
+                <div v-else
+                     class="text-center py-8 text-gray-400">
+                  <svg class="w-8 h-8 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                  </svg>
+                  <p class="text-xs font-medium">Sin resultados para esos filtros</p>
+                </div>
+
+              </div>
+
+              <!-- Estado inicial sin buscador abierto ni microreto -->
+              <div v-else class="space-y-3">
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none"
+                       stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <p class="text-xs text-amber-700 font-medium leading-relaxed">
+                    Usa "Buscar microreto" (arriba) o ve a la
+                    <button @click="router.push('/biblioteca')"
+                            class="underline font-black hover:text-amber-900 transition-colors">
+                      Biblioteca
+                    </button>
+                    y pulsa "Trabajar este microreto".
+                  </p>
+                </div>
+                <div>
+                  <label class="field-label">O escribe el título manualmente</label>
+                  <input v-model="form.microreto_titulo"
+                         type="text"
+                         placeholder="Nombre del microreto..."
+                         class="field-input" />
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ══ DATOS DE LA SESIÓN ══════════════════════════════════════════ -->
+          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-50">
+              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                Datos de la sesión
+              </p>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+
+              <div>
+                <label class="field-label">Fecha de trabajo <span class="text-red-400">*</span></label>
+                <input v-model="form.fecha" type="date" class="field-input" />
+              </div>
+
+              <div>
+                <label class="field-label">Centro educativo</label>
+                <input v-model="form.centro_educativo" type="text"
+                       placeholder="Ej. IES Aguas Nuevas" class="field-input" />
+              </div>
+
+              <div>
+                <label class="field-label">Ciclo formativo</label>
+                <input v-model="form.ciclo_formativo" type="text"
+                       placeholder="Ej. CFGM Sistemas Microinformáticos" class="field-input" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="field-label">Curso</label>
+                  <div class="flex gap-2 mt-1">
+                    <button v-for="c in ['1º', '2º']" :key="c"
+                            @click="form.curso = c"
+                            class="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest
+                                   border transition-all"
+                            :class="form.curso === c
+                              ? 'bg-[#00A859] border-[#00A859] text-white shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#00A859]/40 hover:text-[#00A859]'">
+                      {{ c }}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label">Grupo</label>
+                  <div class="flex gap-1.5 mt-1 flex-wrap">
+                    <button v-for="g in ['A', 'B', 'C', 'D']" :key="g"
+                            @click="form.grupo = g"
+                            class="flex-1 min-w-[2rem] py-2 rounded-xl text-xs font-black uppercase
+                                   border transition-all"
+                            :class="form.grupo === g
+                              ? 'bg-[#99CC33] border-[#99CC33] text-white shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#99CC33]/40 hover:text-[#99CC33]'">
+                      {{ g }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="field-label">Número de alumnos</label>
+                <input v-model="form.num_alumnos" type="number" min="1" max="99"
+                       placeholder="Ej. 24" class="field-input w-32" />
+              </div>
+
+              <div>
+                <label class="field-label">Notas adicionales</label>
+                <textarea v-model="form.notas" rows="3"
+                          placeholder="Observaciones, adaptaciones realizadas, valoración..."
+                          class="field-input resize-none" />
+              </div>
+
+            </div>
+
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
+              <p class="text-[10px] text-gray-400 font-medium">
+                La sesión se guarda localmente en este navegador.
+              </p>
+              <button @click="guardarSesion"
+                      :disabled="!formularioValido || guardando"
+                      class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                             text-xs font-black uppercase tracking-widest
+                             transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      :class="guardadoOk
+                        ? 'bg-[#99CC33] text-white'
+                        : 'bg-[#00A859] hover:bg-[#00A859]/90 text-white shadow-sm'">
+                <svg v-if="guardadoOk" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg v-else-if="guardando" class="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3
+                           m-4 0V3m0 4l-2-2m2 2l2-2"/>
+                </svg>
+                {{ guardadoOk ? '¡Guardado!' : guardando ? 'Guardando...' : 'Guardar sesión' }}
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ─── COLUMNA DERECHA: Historial ──────────────────────────────── -->
+        <div class="lg:col-span-2">
+          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6">
+            <div class="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                Sesiones registradas
+              </p>
+              <span class="text-[10px] font-black bg-[#00A859]/10 text-[#00A859]
+                           px-2 py-0.5 rounded-full uppercase tracking-widest">
+                {{ sesiones.length }}
+              </span>
+            </div>
+
+            <div v-if="sesiones.length === 0" class="px-5 py-10 text-center">
+              <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100
+                          flex items-center justify-center mx-auto mb-3">
+                <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                </svg>
+              </div>
+              <p class="text-xs text-gray-400 font-medium leading-relaxed">
+                Aún no hay sesiones.<br>¡Registra la primera!
+              </p>
+            </div>
+
+            <ul v-else class="divide-y divide-gray-50 max-h-[calc(100vh-16rem)] overflow-y-auto">
+              <li v-for="s in [...sesiones].reverse()" :key="s.id"
+                  class="px-5 py-4 hover:bg-gray-50/60 transition-colors group">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-black text-[#1F2937] leading-snug truncate">
+                      {{ s.microreto_titulo || '(sin título)' }}
+                    </p>
+                    <p class="text-[10px] text-[#00A859] font-bold mt-0.5">
+                      {{ formatFecha(s.fecha) }}
+                    </p>
+                    <div class="flex flex-wrap gap-1 mt-1.5">
+                      <span v-if="s.centro_educativo" class="tag tag-gray">{{ s.centro_educativo }}</span>
+                      <span v-if="s.ciclo_formativo"  class="tag tag-gray truncate max-w-[120px]">{{ s.ciclo_formativo }}</span>
+                      <span v-if="s.curso"            class="tag tag-green">{{ s.curso }}</span>
+                      <span v-if="s.grupo"            class="tag tag-lime">Grupo {{ s.grupo }}</span>
+                      <span v-if="s.num_alumnos"      class="tag tag-gray">{{ s.num_alumnos }} alumnos</span>
+                    </div>
+                    <p v-if="s.notas" class="text-[10px] text-gray-400 mt-1.5 leading-relaxed line-clamp-2">
+                      {{ s.notas }}
+                    </p>
+                  </div>
+                  <button @click="eliminarSesion(s.id)"
+                          class="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1.5 rounded-lg
+                                 hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                            d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </li>
+            </ul>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.field-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6B7280;
+  margin-bottom: 0.375rem;
+}
+.field-input {
+  width: 100%;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1F2937;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field-input:focus {
+  border-color: #00A859;
+  box-shadow: 0 0 0 3px rgba(0, 168, 89, 0.12);
+  background: #fff;
+}
+.field-input::placeholder { color: #D1D5DB; font-weight: 400; }
+.field-input:disabled { opacity: 0.45; cursor: not-allowed; }
+select.field-input { cursor: pointer; }
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.tag-gray  { background: #F3F4F6; color: #6B7280; }
+.tag-green { background: rgba(0,168,89,0.1); color: #00A859; }
+.tag-lime  { background: rgba(153,204,51,0.12); color: #5a7a00; }
+</style>

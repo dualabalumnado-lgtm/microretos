@@ -150,7 +150,7 @@ const irADetalle = (reto) => {
     showLogin.value = true;
     return;
   }
-  router.push({ name: 'detalle-microreto', params: { id: reto.id } });
+  router.push({ name: 'detalle-microreto', params: { id: reto.uuid || reto.id } });
 };
 
 const onLoginSuccess = () => {
@@ -158,7 +158,7 @@ const onLoginSuccess = () => {
   const { tipo, payload } = accionPendiente.value;
   accionPendiente.value = null;
   if (tipo === 'eliminar') { retoAEliminar.value = payload; modalVisible.value = true; }
-  else if (tipo === 'ver') router.push({ name: 'detalle-microreto', params: { id: payload.id } });
+  else if (tipo === 'ver') router.push({ name: 'detalle-microreto', params: { id: payload.uuid || payload.id } });
 };
 
 const modalVisible   = ref(false);
