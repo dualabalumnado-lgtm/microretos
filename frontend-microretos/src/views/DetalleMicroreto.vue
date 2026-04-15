@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import QRCode from 'qrcode';
 import api from '../api.js';
 import { usePdfExport } from '../composables/usePdfExport.js';
 import { useAuthStore } from '../stores/auth.js';
@@ -41,24 +42,132 @@ function handleDescargarPDF() {
   }
 }
 
-// --- NUEVA LÓGICA PARA LA IMAGEN DE FONDO ---
+// --- IMAGEN DE FONDO ---
 const imagenFondo = computed(() => {
-  // Si todavía no hay reto o no tiene familia, devolvemos null (o podrías devolver el logo por defecto)
   if (!reto.value || !reto.value.familia) return null;
-
-  // 1. Convertimos el nombre (ej. "Imagen y Sonido" -> "imagen-y-sonido")
   const slugFamilia = reto.value.familia
     .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quita tildes
-    .replace(/\s+/g, '-')                             // Cambia espacios por guiones
-    .replace(/[^a-z0-9-]/g, '');                      // Limpia caracteres extraños
-
-  // 2. Construimos la URL usando la variable de entorno de Vite
-  // Importante: le quitamos el '/api' del final a tu VITE_API_URL para acceder a la carpeta public
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
   const baseUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '');
-  
   return `${baseUrl}/familias/${slugFamilia}.webp`;
 });
+
+// --- QR TEMPORAL ---
+const showQrModal  = ref(false);
+const qrCargando   = ref(false);  // consultando token existente (GET)
+const qrCreando    = ref(false);  // creando token nuevo (POST)
+const qrRevocar    = ref(false);  // revocando (DELETE)
+const qrToken      = ref(null);
+const qrExpira     = ref(null);
+const qrUrl        = ref('');
+const qrCanvas     = ref(null);
+const urlCopiada   = ref(false);
+const qrError      = ref('');
+
+const qrExpiraFormateado = computed(() => {
+  if (!qrExpira.value) return '';
+  return new Date(qrExpira.value).toLocaleString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+});
+
+function buildQrUrl(token) {
+  // Mismo patrón de detección de entorno que api.js
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const base = isLocal ? window.location.origin : 'https://dualab.es';
+  return `${base}/reto/${token}`;
+}
+
+async function pintarQR() {
+  await nextTick(); // esperar a que Vue renderice el <canvas>
+  await QRCode.toCanvas(qrCanvas.value, qrUrl.value, {
+    width: 240,
+    margin: 2,
+    color: { dark: '#1F2937', light: '#FFFFFF' },
+  });
+}
+
+// Abre el modal y consulta si ya hay un token activo. NO crea ninguno.
+async function abrirQR() {
+  if (!authStore.isAuthenticated) { showLoginModal.value = true; return; }
+  qrError.value = '';
+  showQrModal.value = true;
+
+  // Si ya tenemos el token en memoria, solo repintamos el canvas
+  if (qrToken.value) {
+    await pintarQR();
+    return;
+  }
+
+  qrCargando.value = true;
+  try {
+    const res = await api.get(`/microretos/${route.params.id}/token`);
+    if (res.data.token) {
+      qrToken.value    = res.data.token;
+      qrExpira.value   = res.data.expires_at;
+      qrUrl.value      = buildQrUrl(res.data.token);
+      qrCargando.value = false;
+      await pintarQR();
+    } else {
+      // No hay token activo → mostrar botón "Crear acceso QR"
+      qrCargando.value = false;
+    }
+  } catch (e) {
+    console.error('Error consultando token:', e);
+    qrError.value    = 'Error al consultar el acceso. Inténtalo de nuevo.';
+    qrCargando.value = false;
+  }
+}
+
+// Crea un token nuevo. Solo se llama cuando no hay ninguno activo.
+async function crearQR() {
+  qrCreando.value = true;
+  qrError.value   = '';
+  try {
+    const res = await api.post(`/microretos/${route.params.id}/token`);
+    qrToken.value    = res.data.token;
+    qrExpira.value   = res.data.expires_at;
+    qrUrl.value      = buildQrUrl(res.data.token);
+    qrCreando.value  = false;
+    await pintarQR();
+  } catch (e) {
+    console.error('Error creando QR:', e);
+    qrError.value   = 'No se pudo crear el acceso. Inténtalo de nuevo.';
+    qrCreando.value = false;
+  }
+}
+
+// Revoca el token: lo elimina en BD y limpia el estado local por completo.
+async function revocarQR() {
+  qrRevocar.value = true;
+  qrError.value   = '';
+  try {
+    await api.delete(`/microretos/${route.params.id}/token`);
+    qrToken.value     = null;
+    qrExpira.value    = null;
+    qrUrl.value       = '';
+    urlCopiada.value  = false;
+    showQrModal.value = false;
+  } catch (e) {
+    console.error('Error revocando token:', e);
+    qrError.value = 'No se pudo revocar el acceso. Inténtalo de nuevo.';
+  } finally {
+    qrRevocar.value = false;
+  }
+}
+
+async function copiarUrl() {
+  try {
+    await navigator.clipboard.writeText(qrUrl.value);
+    urlCopiada.value = true;
+    setTimeout(() => { urlCopiada.value = false; }, 2000);
+  } catch (e) {
+    console.error('No se pudo copiar:', e);
+  }
+}
 </script>
 
 <template>
@@ -97,6 +206,23 @@ const imagenFondo = computed(() => {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
           Descargar PDF
+        </button>
+
+        <!-- Botón QR — solo visible para admins -->
+        <button v-if="reto && authStore.isAuthenticated" @click="abrirQR"
+                class="inline-flex items-center gap-2 px-5 py-2.5
+                       bg-white border border-gray-200 rounded-full
+                       text-xs font-black uppercase tracking-widest text-[#1F2937]
+                       shadow-sm hover:border-[#00A859] hover:text-[#00A859]
+                       transition-all active:scale-95">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5
+                     4h2a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zm12 0h2a1 1 0 011
+                     1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V5a1 1 0 011-1zM5 16h2a1 1 0 011 1v2a1 1 0
+                     01-1 1H5a1 1 0 01-1-1v-2a1 1 0 011-1z"/>
+          </svg>
+          Generar QR
         </button>
       </div>
 
@@ -545,6 +671,157 @@ const imagenFondo = computed(() => {
     v-model="showLoginModal"
     @login-success="descargarPDF(reto)"
   />
+
+  <!-- ── MODAL QR ── -->
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div v-if="showQrModal"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4"
+           @click.self="showQrModal = false">
+
+        <!-- Fondo oscuro -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showQrModal = false" />
+
+        <!-- Panel -->
+        <div class="relative z-10 w-full max-w-sm bg-white rounded-[2rem] shadow-2xl
+                    overflow-hidden border border-gray-100">
+
+          <!-- Cabecera -->
+          <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#00A859] mb-0.5">
+                Acceso Alumnado
+              </p>
+              <h3 class="text-lg font-black text-[#1F2937]">QR del Microreto</h3>
+            </div>
+            <button @click="showQrModal = false"
+                    class="w-8 h-8 flex items-center justify-center rounded-full
+                           bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                      d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Cuerpo -->
+          <div class="px-6 py-6 flex flex-col items-center gap-5">
+
+            <!-- Estado 1: Consultando si existe token -->
+            <div v-if="qrCargando" class="py-10">
+              <svg class="animate-spin w-10 h-10 text-[#00A859]" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+              </svg>
+            </div>
+
+            <!-- Estado 2: Sin token activo → invita a crear -->
+            <template v-else-if="!qrToken">
+              <div class="flex flex-col items-center gap-3 py-6 text-center">
+                <div class="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200
+                            flex items-center justify-center mb-1">
+                  <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4
+                             m12 0h.01M5 4h2a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z
+                             m12 0h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V5a1 1 0 011-1z
+                             M5 16h2a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2a1 1 0 011-1z"/>
+                  </svg>
+                </div>
+                <p class="text-sm font-semibold text-[#1F2937]">No hay ningún acceso activo</p>
+                <p class="text-[11px] text-gray-400 leading-relaxed max-w-[220px]">
+                  Crea un código QR temporal para que el alumnado acceda a este microreto.
+                </p>
+
+                <!-- Error -->
+                <p v-if="qrError" class="text-[11px] text-red-500 font-semibold">{{ qrError }}</p>
+
+                <button @click="crearQR"
+                        :disabled="qrCreando"
+                        class="mt-2 flex items-center gap-2 px-6 py-3
+                               bg-[#00A859] text-white rounded-full
+                               text-xs font-black uppercase tracking-widest
+                               hover:bg-[#008f4a] transition-all active:scale-95 disabled:opacity-50">
+                  <svg v-if="!qrCreando" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                  <svg v-else class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                  </svg>
+                  {{ qrCreando ? 'Creando...' : 'Crear acceso QR' }}
+                </button>
+              </div>
+            </template>
+
+            <!-- Estado 3: Token activo → muestra QR -->
+            <template v-else>
+              <!-- Canvas del QR -->
+              <div class="p-3 bg-white border-2 border-gray-100 rounded-2xl shadow-sm">
+                <canvas ref="qrCanvas" class="block rounded-xl" />
+              </div>
+
+              <!-- Expiración -->
+              <div class="flex items-center gap-2 text-amber-700 bg-amber-50
+                          border border-amber-200 rounded-full px-4 py-1.5 text-xs font-semibold">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Caduca el {{ qrExpiraFormateado }}
+              </div>
+
+              <!-- URL con botón copiar -->
+              <div class="w-full bg-gray-50 rounded-xl border border-gray-200 flex items-center
+                          gap-2 px-4 py-2.5 text-xs text-gray-500 font-mono">
+                <span class="flex-1 truncate">{{ qrUrl }}</span>
+                <button @click="copiarUrl"
+                        :class="urlCopiada ? 'text-[#00A859]' : 'text-gray-400 hover:text-[#00A859]'"
+                        class="shrink-0 transition-colors"
+                        :title="urlCopiada ? 'Copiado' : 'Copiar URL'">
+                  <svg v-if="!urlCopiada" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2
+                             m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Info -->
+              <p class="text-[11px] text-gray-400 text-center leading-relaxed px-2">
+                El alumnado escanea este QR desde su dispositivo sin iniciar sesión.
+                El acceso caduca automáticamente a las 48h.
+              </p>
+
+              <!-- Error al revocar -->
+              <p v-if="qrError" class="text-[11px] text-red-500 font-semibold text-center">{{ qrError }}</p>
+
+              <!-- Revocar -->
+              <button @click="revocarQR"
+                      :disabled="qrRevocar"
+                      class="w-full flex items-center justify-center gap-2
+                             px-5 py-3 rounded-full border border-red-200
+                             text-red-500 text-xs font-black uppercase tracking-widest
+                             hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50">
+                <svg v-if="!qrRevocar" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0
+                           015.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                <svg v-else class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                </svg>
+                {{ qrRevocar ? 'Revocando...' : 'Revocar acceso' }}
+              </button>
+            </template>
+
+          </div>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -559,5 +836,19 @@ const imagenFondo = computed(() => {
   border-bottom: 1px solid #f3f4f6;
   padding-bottom: 8px;
   margin-bottom: 14px;
+}
+
+/* Transición del modal QR */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active .relative,
+.modal-fade-leave-active .relative {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 </style>
