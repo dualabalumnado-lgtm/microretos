@@ -5,6 +5,7 @@ use App\Http\Controllers\DatosFPController;
 use App\Http\Controllers\MicroretoIAController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\DemoController;
+use App\Http\Controllers\MicroretoTokenController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +21,10 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/microretos/{id}',    [MicroretoIAController::class, 'show']);
     Route::get('/familias',           [DatosFPController::class, 'getFamilias']);
 });
+
+// Acceso público por token temporal (QR para alumnado)
+Route::middleware('throttle:60,1')
+     ->get('/public/microreto/{token}', [MicroretoTokenController::class, 'show']);
 
 // Datos académicos (ciclos, módulos) — throttle estándar
 Route::middleware('throttle:120,1')->group(function () {
@@ -61,6 +66,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/guardar-microreto-bd',      [MicroretoIAController::class, 'guardarEnBD']);
     Route::post('/guardar-microretos-lote',   [MicroretoIAController::class, 'guardarLote']);
     Route::delete('/microretos/{id}',         [MicroretoIAController::class, 'destroy']);
+
+    // Tokens QR temporales (gestión exclusiva de admins)
+    Route::get('/microretos/{id}/token',      [MicroretoTokenController::class, 'get']);
+    Route::post('/microretos/{id}/token',     [MicroretoTokenController::class, 'generate']);
+    Route::delete('/microretos/{id}/token',   [MicroretoTokenController::class, 'destroy']);
 
 });
 
