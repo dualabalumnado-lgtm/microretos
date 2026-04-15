@@ -1,11 +1,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import api from '../api.js';
 import { useAuthStore } from '../stores/auth';
 import LoginModal from '../components/LoginModal.vue';
 import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue';
 
 const authStore = useAuthStore();
+const router = useRouter();
 const showLogin = ref(false);
 
 const familias = ref([]); 
@@ -394,6 +396,13 @@ const onLoginSuccess = async () => {
 };
 
 onMounted(async () => {
+  // Guarda de seguridad en componente: el router ya redirige antes de montar,
+  // pero este check actúa como barrera extra ante manipulaciones del token en memoria.
+  if (!authStore.isAuthenticated) {
+    router.replace({ path: '/', query: { redirect: '/microretos' } })
+    return
+  }
+
   document.addEventListener('click', cerrarDropdownFuera);
   setTimeout(() => { isLoaded.value = true; }, 100);
 

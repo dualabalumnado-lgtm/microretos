@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Microreto extends Model
 {
     protected $fillable = [
+        'uuid',
         'titulo',
         'demo_id',          // FK → demos (para microretos de demo)
         'empresa_id',       // FK (nueva)
@@ -20,6 +22,16 @@ class Microreto extends Model
         'ciclo',            // legacy — se mantiene hasta completar backfill
         'modulo', 'duracion', 'es_simulado',
     ];
+
+    // Genera un UUID automáticamente al crear cada microreto nuevo
+    protected static function booted(): void
+    {
+        static::creating(function (Microreto $microreto) {
+            if (empty($microreto->uuid)) {
+                $microreto->uuid = (string) Str::uuid();
+            }
+        });
+    }
 
     protected $casts = [
         'dificultades'       => 'array',

@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed  } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import LoginModal from './LoginModal.vue'  
+import LoginModal from './LoginModal.vue'
 import api from '../api.js'
 import { useAuthStore } from '../stores/auth'
 
@@ -11,12 +11,10 @@ const logoError = ref(false)
 const route     = useRoute()
 const router    = useRouter()
 
-// 👇 controla el modal
+// controla el modal
 const showLogin = ref(false)
 const cargandoOut  = ref(false)
 const destinoTrasLogin = ref('/microretos')
-
-// const estaAutenticado = computed(() => !!localStorage.getItem('admin_token'))
 
 const toggle = () => { isOpen.value = !isOpen.value }
 const close  = () => { isOpen.value = false }
@@ -28,7 +26,30 @@ const closeOnMobile = () => {
 const isActive = (path) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
 
-// 👇 intercepta el click del generador
+// Abre el panel por defecto en todas las vistas excepto home.
+// Al navegar a home se cierra; al navegar a cualquier otra se abre.
+const sincronizarConRuta = (path) => {
+  isOpen.value = path !== '/'
+}
+
+onMounted(() => sincronizarConRuta(route.path))
+
+watch(() => route.path, (path) => sincronizarConRuta(path))
+
+// Cuando el router redirige a / con ?redirect=/ruta (por acceso directo a URL
+// protegida sin sesión), abre el modal de login automáticamente y guarda el destino.
+watch(
+  () => route.query.redirect,
+  (redirect) => {
+    if (redirect && !authStore.isAuthenticated) {
+      destinoTrasLogin.value = String(redirect)
+      showLogin.value = true
+    }
+  },
+  { immediate: true }
+)
+
+// intercepta el click del generador
 const irAGenerador = () => {
   closeOnMobile()
   if (authStore.isAuthenticated) {
@@ -39,7 +60,7 @@ const irAGenerador = () => {
   }
 }
 
-// 👇 intercepta el click de base de datos
+// intercepta el click de base de datos
 const irABaseDatos = () => {
   closeOnMobile()
   if (authStore.isAuthenticated) {
@@ -50,10 +71,33 @@ const irABaseDatos = () => {
   }
 }
 
-// 👇 navega tras login exitoso al destino que corresponda
+// intercepta el click de biblioteca
+const irABiblioteca = () => {
+  closeOnMobile()
+  if (authStore.isAuthenticated) {
+    router.push('/biblioteca')
+  } else {
+    destinoTrasLogin.value = '/biblioteca'
+    showLogin.value = true
+  }
+}
+
+// intercepta el click de dashboard docente
+const irADashboard = () => {
+  closeOnMobile()
+  if (authStore.isAuthenticated) {
+    router.push('/dashboard')
+  } else {
+    destinoTrasLogin.value = '/dashboard'
+    showLogin.value = true
+  }
+}
+
+// Navega tras login exitoso. Usa el destino guardado y limpia el ?redirect de la URL.
 const onLoginSuccess = () => {
+  const destino = destinoTrasLogin.value || '/'
   isOpen.value = false
-  router.push(destinoTrasLogin.value)
+  router.push(destino)
 }
 
 const cerrarSesion = async () => {
@@ -190,10 +234,9 @@ defineExpose({ isOpen, toggle, close })
           <span>Base de datos</span>
         </button>
 
-        <RouterLink
-          to="/biblioteca"
-          @click="closeOnMobile"
-          class="nav-item"
+        <button
+          @click="irABiblioteca"
+          class="nav-item w-full text-left"
           :class="isActive('/biblioteca') ? 'nav-item--active' : 'nav-item--idle'"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -204,7 +247,27 @@ defineExpose({ isOpen, toggle, close })
             <line x1="9" y1="11" x2="15" y2="11"/>
           </svg>
           <span>Biblioteca de microretos</span>
-        </RouterLink>
+        </button>
+
+        <div class="my-4 border-t border-white/10" />
+
+        <p class="px-3 mb-3 text-[9px] font-black uppercase tracking-[0.2em] text-white/30 select-none">
+          Docente
+        </p>
+
+        <button
+          @click="irADashboard"
+          class="nav-item w-full text-left"
+          :class="isActive('/dashboard') ? 'nav-item--active' : 'nav-item--idle'"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span>Dashboard docente</span>
+        </button>
 
       </nav>
 
