@@ -15,11 +15,9 @@ use App\Http\Controllers\MicroretoTokenController;
 
 // --- RUTAS PÚBLICAS (sin autenticación) ---
 
-// Biblioteca pública: throttle para evitar scraping masivo
+// Datos académicos: familias públicas para formularios de contacto u otros usos
 Route::middleware('throttle:60,1')->group(function () {
-    Route::get('/microretos',         [MicroretoIAController::class, 'index']);
-    Route::get('/microretos/{id}',    [MicroretoIAController::class, 'show']);
-    Route::get('/familias',           [DatosFPController::class, 'getFamilias']);
+    Route::get('/familias', [DatosFPController::class, 'getFamilias']);
 });
 
 // Acceso público por token temporal (QR para alumnado)
@@ -47,6 +45,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+
+    // Biblioteca de microretos (requiere login — protege contra enumeración IDOR)
+    // Los IDs en URL son UUIDs, no secuenciales
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::get('/microretos',      [MicroretoIAController::class, 'index']);
+        Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
+    });
 
     // Empresas — datos completos solo para usuarios autenticados
     Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);

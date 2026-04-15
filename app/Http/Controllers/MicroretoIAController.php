@@ -49,10 +49,12 @@ class MicroretoIAController extends Controller
 
     public function show($id)
     {
+        // $id es ahora un UUID (no el ID numérico interno).
+        // Esto protege contra enumeración IDOR: el atacante no puede iterar 1,2,3,...
         $reto = Microreto::with([
             'empresa.centroEducativo',
             'empresa.familias',
-        ])->findOrFail($id);
+        ])->where('uuid', $id)->firstOrFail();
 
         $reto->es_simulado = (bool) $reto->es_simulado;
 

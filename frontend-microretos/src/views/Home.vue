@@ -15,23 +15,29 @@ onMounted(() => {
   }, 100);
 });
 
-// 👇 Ya no navega directamente, abre el modal
 const irAGenerador = () => {
-  // Si ya está logueado, navega directo
   if (authStore.isAuthenticated) {
     router.push({ name: 'microretos' });
   } else {
+    destinoTrasLogin.value = 'microretos'
     showLogin.value = true;
   }
 };
 
-// 👇 Solo navega si el login fue exitoso
+// Destino tras login (generador o biblioteca según desde dónde se abrió el modal)
+const destinoTrasLogin = ref('microretos')
+
 const onLoginSuccess = () => {
-  router.push({ name: 'microretos' });
+  router.push({ name: destinoTrasLogin.value });
 };
 
 const irABiblioteca = () => {
-  router.push({ name: 'biblioteca' });
+  if (authStore.isAuthenticated) {
+    router.push({ name: 'biblioteca' });
+  } else {
+    destinoTrasLogin.value = 'biblioteca'
+    showLogin.value = true;
+  }
 };
 </script>
 
