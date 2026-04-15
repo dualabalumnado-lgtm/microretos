@@ -47,7 +47,8 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Tokens expiran a las 24 horas (1440 minutos). Un token robado tiene ventana limitada.
+    'expiration' => 1440,
 
     /*
     |--------------------------------------------------------------------------

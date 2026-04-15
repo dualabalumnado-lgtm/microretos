@@ -14,7 +14,13 @@ const cargando = ref(true);
 const error   = ref(false);
 const isLoaded = ref(false);
 
+const authStore = useAuthStore();
+
 onMounted(async () => {
+  if (!authStore.isAuthenticated) {
+    router.replace({ path: '/', query: { redirect: route.fullPath } })
+    return
+  }
   setTimeout(() => { isLoaded.value = true; }, 100);
   try {
     const res = await api.get(`/microretos/${route.params.id}`);
@@ -27,11 +33,15 @@ onMounted(async () => {
   }
 });
 
-const volver = () => router.push({ name: 'biblioteca' });
+const volver = () => router.push({ name: 'biblioteca' })
+
+const trabajarMicroreto = () => {
+  const id = reto.value?.uuid || reto.value?.id
+  router.push({ name: 'dashboard-docente', query: { microreto_id: id } })
+};
 
 const { descargarPDF } = usePdfExport();
 
-const authStore = useAuthStore();
 const showLoginModal = ref(false);
 
 function handleDescargarPDF() {
@@ -223,6 +233,21 @@ async function copiarUrl() {
                      01-1 1H5a1 1 0 01-1-1v-2a1 1 0 011-1z"/>
           </svg>
           Generar QR
+        </button>
+
+        <button v-if="reto && authStore.isAuthenticated" @click="trabajarMicroreto"
+                class="inline-flex items-center gap-2 px-5 py-2.5
+                       bg-[#00A859] border border-[#00A859] rounded-full
+                       text-xs font-black uppercase tracking-widest text-white
+                       shadow-sm hover:bg-[#00A859]/90 hover:shadow-[0_0_0_3px_rgba(0,168,89,0.2)]
+                       transition-all active:scale-95">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                     M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2
+                     m-6 9l2 2 4-4"/>
+          </svg>
+          Trabajar este microreto
         </button>
       </div>
 
