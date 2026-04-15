@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick} from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js';
@@ -13,58 +13,86 @@ const cargando = ref(true);
 const familias = ref([]);
 const showLogin = ref(false);
 const accionPendiente = ref(null);
-
 const familiaSeleccionada = ref(null);
 
-const authStore = useAuthStore()
-const { descargarPDF } = usePdfExport()
+const authStore = useAuthStore();
+const { descargarPDF } = usePdfExport();
 
-// filtroCentro ahora actúa en AMBAS capas (familias y microretos)
+// ── FILTROS ──────────────────────────────────────────────
 const filtroCentro = ref('');
-const filtroCiclo = ref('');
+const filtroCiclo  = ref('');
+const filtroNivel  = ref('');   // '' | 'Bajo' | 'Medio' | 'Alto'
+const filtroCurso  = ref('');   // '' | '1' | '2'
+const busqueda     = ref('');
 
 const centrosDisponibles = computed(() => {
-  const centros = microretos.value.map(m => m.centro_educativo || m.centro).filter(Boolean);
-  return [...new Set(centros)].sort();
+  const c = microretos.value.map(m => m.centro_educativo || m.centro).filter(Boolean);
+  return [...new Set(c)].sort();
 });
 
 const ciclosDisponibles = computed(() => {
-  let datos = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
-  if (filtroCentro.value) {
-    datos = datos.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
-  }
-  return [...new Set(datos.map(m => m.ciclo).filter(Boolean))].sort();
+  let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
+  if (filtroCentro.value) d = d.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  return [...new Set(d.map(m => m.ciclo).filter(Boolean))].sort();
+});
+
+const cursosDisponibles = computed(() => {
+  let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
+  if (filtroCentro.value) d = d.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  return [...new Set(d.map(m => m.curso).filter(v => v != null))].sort((a, b) => a - b);
+});
+
+// Conteo por nivel dentro de familia+centro (sin aplicar otros filtros activos)
+const conteoNiveles = computed(() => {
+  const r = { Bajo: 0, Medio: 0, Alto: 0, total: 0 };
+  if (!familiaSeleccionada.value) return r;
+  let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
+  if (filtroCentro.value) d = d.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  d.forEach(m => { r.total++; if (m.nivel_grupo && m.nivel_grupo in r) r[m.nivel_grupo]++; });
+  return r;
 });
 
 const microretosFiltrados = computed(() => {
+  const q = busqueda.value.toLowerCase().trim();
   return microretos.value.filter(reto => {
-    const centroReto = reto.centro_educativo || reto.centro;
+    const centro = reto.centro_educativo || reto.centro;
     return (
       reto.familia === familiaSeleccionada.value &&
-      (filtroCentro.value === '' || centroReto === filtroCentro.value) &&
-      (filtroCiclo.value === '' || reto.ciclo === filtroCiclo.value)
+      (filtroCentro.value === '' || centro === filtroCentro.value) &&
+      (filtroCiclo.value  === '' || reto.ciclo === filtroCiclo.value) &&
+      (filtroNivel.value  === '' || reto.nivel_grupo === filtroNivel.value) &&
+      (filtroCurso.value  === '' || String(reto.curso) === filtroCurso.value) &&
+      (!q || [reto.titulo, reto.pregunta_reto, reto.empresa_nombre, reto.ciclo]
+        .some(f => f && f.toLowerCase().includes(q)))
     );
   });
 });
 
-// Solo cuenta retos del centro seleccionado para las tarjetas de familia
+const hayFiltrosActivos = computed(() =>
+  !!(filtroCiclo.value || filtroNivel.value || filtroCurso.value || busqueda.value)
+);
+
 const conteoPorFamilia = computed(() => {
   const mapa = {};
-  const datos = filtroCentro.value
+  const d = filtroCentro.value
     ? microretos.value.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
     : microretos.value;
-  datos.forEach(m => {
-    if (m.familia) mapa[m.familia] = (mapa[m.familia] || 0) + 1;
-  });
+  d.forEach(m => { if (m.familia) mapa[m.familia] = (mapa[m.familia] || 0) + 1; });
   return mapa;
 });
 
-// Familias que tienen al menos 1 reto en el centro seleccionado
 const familiasFiltradas = computed(() => {
   if (!filtroCentro.value) return familias.value;
   return familias.value.filter(f => (conteoPorFamilia.value[f.nombre] || 0) > 0);
 });
 
+const nivelClase = (nivel) => ({
+  Bajo:  'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
+  Medio: 'bg-[#F59E0B]/10 border-[#F59E0B]/20 text-[#F59E0B]',
+  Alto:  'bg-[#EF4444]/10 border-[#EF4444]/20 text-[#EF4444]',
+}[nivel] || 'bg-gray-100 border-gray-200 text-gray-500');
+
+// ── CICLO DE VIDA ─────────────────────────────────────────
 onMounted(async () => {
   setTimeout(() => { isLoaded.value = true; }, 100);
   try {
@@ -72,49 +100,49 @@ onMounted(async () => {
       api.get('/microretos'),
       api.get('/familias'),
     ]);
-
     microretos.value = resMicroretos.data.filter(m => {
       const centro = m.centro_educativo || m.centro;
-      const familia = m.familia;
-      return (
-        centro && centro !== 'Centro Desconocido' &&
-        familia && familia !== 'Familia Desconocida'
-      );
+      return centro && centro !== 'Centro Desconocido' && m.familia && m.familia !== 'Familia Desconocida';
     });
-
     familias.value = resFamilias.data.map(f =>
       typeof f === 'string' ? { nombre: f, imagen_url: null } : f
     );
-
     await nextTick();
-
-    if (centrosDisponibles.value.length > 0) {
-      filtroCentro.value = centrosDisponibles.value[0];
-    }
-
+    if (centrosDisponibles.value.length > 0) filtroCentro.value = centrosDisponibles.value[0];
   } catch (error) {
     console.error('Error al cargar la biblioteca:', error);
   } finally {
     cargando.value = false;
   }
-}); 
+});
+
+// ── ACCIONES ──────────────────────────────────────────────
+const resetFiltrosDetalle = () => {
+  filtroCiclo.value = '';
+  filtroNivel.value = '';
+  filtroCurso.value = '';
+  busqueda.value = '';
+};
+
+const seleccionarCentro = (centro) => {
+  filtroCentro.value = centro;
+  familiaSeleccionada.value = null;
+  resetFiltrosDetalle();
+};
+
 const seleccionarFamilia = (nombre) => {
   familiaSeleccionada.value = nombre;
-  filtroCiclo.value = '';
-  // filtroCentro se mantiene intacto al entrar en una familia
+  resetFiltrosDetalle();
 };
 
 const volverAFamilias = () => {
   familiaSeleccionada.value = null;
-  filtroCiclo.value = '';
-  // filtroCentro se mantiene al volver, para no perder la selección
+  resetFiltrosDetalle();
 };
 
-const limpiarFiltros = () => {
-  filtroCiclo.value = '';
-};
+const limpiarFiltros = () => resetFiltrosDetalle();
 
-const estaAutenticado = () => authStore.isAuthenticated
+const estaAutenticado = () => authStore.isAuthenticated;
 
 const irADetalle = (reto) => {
   if (!estaAutenticado()) {
@@ -129,18 +157,12 @@ const onLoginSuccess = () => {
   if (!accionPendiente.value) return;
   const { tipo, payload } = accionPendiente.value;
   accionPendiente.value = null;
-
-  if (tipo === 'eliminar') {
-    retoAEliminar.value = payload;
-    modalVisible.value = true;
-  } else if (tipo === 'ver') {
-    router.push({ name: 'detalle-microreto', params: { id: payload.id } });
-  }
+  if (tipo === 'eliminar') { retoAEliminar.value = payload; modalVisible.value = true; }
+  else if (tipo === 'ver') router.push({ name: 'detalle-microreto', params: { id: payload.id } });
 };
 
-// --- MODAL ---
-const modalVisible = ref(false);
-const retoAEliminar = ref(null);
+const modalVisible   = ref(false);
+const retoAEliminar  = ref(null);
 
 const abrirModalEliminar = (reto) => {
   if (!estaAutenticado()) {
@@ -152,10 +174,7 @@ const abrirModalEliminar = (reto) => {
   modalVisible.value = true;
 };
 
-const cancelarEliminar = () => {
-  modalVisible.value = false;
-  retoAEliminar.value = null;
-};
+const cancelarEliminar = () => { modalVisible.value = false; retoAEliminar.value = null; };
 
 const confirmarEliminar = async () => {
   if (!retoAEliminar.value) return;
@@ -214,9 +233,9 @@ const confirmarEliminar = async () => {
 
       <template v-else>
 
-        <!-- ============================================ -->
+        <!-- ========================================== -->
         <!-- SELECTOR DE CENTRO (visible en ambas capas) -->
-        <!-- ============================================ -->
+        <!-- ========================================== -->
         <div
           class="mb-8 transition-all duration-1000 delay-400 ease-out transform"
           :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
@@ -233,7 +252,7 @@ const confirmarEliminar = async () => {
                 <button
                   v-for="centro in centrosDisponibles"
                   :key="centro"
-                  @click="() => { filtroCentro = centro; familiaSeleccionada = null; filtroCiclo = ''; }"
+                  @click="seleccionarCentro(centro)"
                   class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 border"
                   :class="filtroCentro === centro
                     ? 'bg-[#00A859] text-white border-[#00A859] shadow-md'
@@ -299,7 +318,6 @@ const confirmarEliminar = async () => {
               </button>
             </div>
 
-            <!-- Sin familias para este centro -->
             <div v-else class="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-300 shadow-sm">
               <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-gray-100 shadow-inner">
                 <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,6 +338,7 @@ const confirmarEliminar = async () => {
         <Transition name="slide-up" mode="out-in">
           <div v-if="familiaSeleccionada" key="microretos">
 
+            <!-- Breadcrumb -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <div class="flex items-center gap-4">
                 <button @click="volverAFamilias"
@@ -338,16 +357,158 @@ const confirmarEliminar = async () => {
               </span>
             </div>
 
-            <!-- Filtro de Ciclo (el de centro ya está arriba, siempre visible) -->
-            <section class="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.04)] mb-10">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
+            <!-- ── CARDS DE DIFICULTAD ───────────────────────────── -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+
+              <!-- TODOS -->
+              <button
+                @click="filtroNivel = ''"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
+                :class="filtroNivel === ''
+                  ? 'bg-[#1F2937] border-[#1F2937] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-3">
+                  <div class="flex items-end gap-0.5">
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:8px"
+                      :class="filtroNivel === '' ? 'bg-white' : 'bg-gray-300'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:12px"
+                      :class="filtroNivel === '' ? 'bg-white' : 'bg-gray-300'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:16px"
+                      :class="filtroNivel === '' ? 'bg-white' : 'bg-gray-300'"></span>
+                  </div>
+                  <span class="text-2xl font-black leading-none"
+                    :class="filtroNivel === '' ? 'text-white' : 'text-gray-400'">
+                    {{ conteoNiveles.total }}
+                  </span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none"
+                  :class="filtroNivel === '' ? 'text-white' : 'text-gray-600'">Todos</p>
+                <p class="text-[9px] mt-1 leading-none"
+                  :class="filtroNivel === '' ? 'text-white/60' : 'text-gray-400'">los niveles</p>
+              </button>
+
+              <!-- BAJO -->
+              <button
+                @click="filtroNivel = filtroNivel === 'Bajo' ? '' : 'Bajo'"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#00A859]/30"
+                :class="filtroNivel === 'Bajo'
+                  ? 'bg-[#00A859] border-[#00A859] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#00A859]/50 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-3">
+                  <div class="flex items-end gap-0.5">
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:8px"
+                      :class="filtroNivel === 'Bajo' ? 'bg-white' : 'bg-[#00A859]'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:12px"
+                      :class="filtroNivel === 'Bajo' ? 'bg-white/30' : 'bg-gray-200'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:16px"
+                      :class="filtroNivel === 'Bajo' ? 'bg-white/30' : 'bg-gray-200'"></span>
+                  </div>
+                  <span class="text-2xl font-black leading-none"
+                    :class="filtroNivel === 'Bajo' ? 'text-white' : 'text-[#00A859]'">
+                    {{ conteoNiveles.Bajo }}
+                  </span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none"
+                  :class="filtroNivel === 'Bajo' ? 'text-white' : 'text-gray-600'">Bajo</p>
+                <p class="text-[9px] mt-1 leading-none"
+                  :class="filtroNivel === 'Bajo' ? 'text-white/60' : 'text-gray-400'">accesible</p>
+              </button>
+
+              <!-- MEDIO -->
+              <button
+                @click="filtroNivel = filtroNivel === 'Medio' ? '' : 'Medio'"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/30"
+                :class="filtroNivel === 'Medio'
+                  ? 'bg-[#F59E0B] border-[#F59E0B] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#F59E0B]/50 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-3">
+                  <div class="flex items-end gap-0.5">
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:8px"
+                      :class="filtroNivel === 'Medio' ? 'bg-white' : 'bg-[#F59E0B]'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:12px"
+                      :class="filtroNivel === 'Medio' ? 'bg-white' : 'bg-[#F59E0B]'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:16px"
+                      :class="filtroNivel === 'Medio' ? 'bg-white/30' : 'bg-gray-200'"></span>
+                  </div>
+                  <span class="text-2xl font-black leading-none"
+                    :class="filtroNivel === 'Medio' ? 'text-white' : 'text-[#F59E0B]'">
+                    {{ conteoNiveles.Medio }}
+                  </span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none"
+                  :class="filtroNivel === 'Medio' ? 'text-white' : 'text-gray-600'">Medio</p>
+                <p class="text-[9px] mt-1 leading-none"
+                  :class="filtroNivel === 'Medio' ? 'text-white/60' : 'text-gray-400'">retador</p>
+              </button>
+
+              <!-- ALTO -->
+              <button
+                @click="filtroNivel = filtroNivel === 'Alto' ? '' : 'Alto'"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#EF4444]/30"
+                :class="filtroNivel === 'Alto'
+                  ? 'bg-[#EF4444] border-[#EF4444] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#EF4444]/50 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-3">
+                  <div class="flex items-end gap-0.5">
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:8px"
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:12px"
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                    <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:16px"
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                  </div>
+                  <span class="text-2xl font-black leading-none"
+                    :class="filtroNivel === 'Alto' ? 'text-white' : 'text-[#EF4444]'">
+                    {{ conteoNiveles.Alto }}
+                  </span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none"
+                  :class="filtroNivel === 'Alto' ? 'text-white' : 'text-gray-600'">Alto</p>
+                <p class="text-[9px] mt-1 leading-none"
+                  :class="filtroNivel === 'Alto' ? 'text-white/60' : 'text-gray-400'">exigente</p>
+              </button>
+
+            </div>
+
+            <!-- ── BARRA DE FILTROS ──────────────────────────────── -->
+            <section class="bg-white/90 backdrop-blur-md rounded-[2rem] p-5 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.04)] mb-8">
+
+              <!-- Búsqueda -->
+              <div class="mb-4">
+                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
+                  Búsqueda por palabras clave
+                </label>
+                <div class="relative">
+                  <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    v-model="busqueda"
+                    type="text"
+                    placeholder="Título, empresa, ciclo, pregunta del reto..."
+                    class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-10 py-3.5 text-sm font-medium text-[#1F2937] placeholder-gray-400 focus:bg-white focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/10 outline-none transition-all"
+                  />
+                  <Transition name="fade">
+                    <button v-if="busqueda" @click="busqueda = ''"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 text-gray-500 transition-colors">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </Transition>
+                </div>
+              </div>
+
+              <!-- Ciclo + Curso -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
-                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-2 mb-2 block">
+                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
                     Ciclo Formativo
                   </label>
                   <select v-model="filtroCiclo"
-                    class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-[#1F2937] focus:bg-white focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/10 outline-none transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-[#1F2937] focus:bg-white focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/10 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     :disabled="ciclosDisponibles.length === 0">
                     <option value="">Todos los ciclos...</option>
                     <option v-for="ciclo in ciclosDisponibles" :key="ciclo" :value="ciclo">{{ ciclo }}</option>
@@ -355,29 +516,102 @@ const confirmarEliminar = async () => {
                 </div>
 
                 <div>
-                  <button @click="limpiarFiltros" :disabled="!filtroCiclo"
-                    class="w-full py-3.5 rounded-xl font-bold text-xs tracking-widest uppercase transition-all border flex items-center justify-center gap-2 shadow-sm"
-                    :class="filtroCiclo
-                      ? 'bg-white text-red-500 border-red-200 hover:bg-red-50 hover:border-red-400'
-                      : 'bg-gray-50 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed'">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 4h16v2a2 2 0 01-.586 1.414l-4.828 4.828A2 2 0 0014 13.657v4.586l-4 2v-6.586a2 2 0 00-.586-1.414L4.586 7.414A2 2 0 014 6V4z" />
-                    </svg>
-                    Quitar Filtros
-                  </button>
+                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
+                    Curso
+                  </label>
+                  <div class="flex gap-2">
+                    <button
+                      @click="filtroCurso = ''"
+                      class="flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border"
+                      :class="filtroCurso === ''
+                        ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-400 hover:text-[#1F2937]'">
+                      Todos
+                    </button>
+                    <button
+                      v-for="curso in cursosDisponibles"
+                      :key="curso"
+                      @click="filtroCurso = filtroCurso === String(curso) ? '' : String(curso)"
+                      class="flex-1 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border"
+                      :class="filtroCurso === String(curso)
+                        ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-sm'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-400 hover:text-[#1F2937]'">
+                      {{ curso }}º
+                    </button>
+                  </div>
                 </div>
 
               </div>
+
+              <!-- Chips de filtros activos -->
+              <Transition name="fade">
+                <div v-if="hayFiltrosActivos" class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                  <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Activos:</span>
+
+                  <span v-if="filtroNivel"
+                    class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                    Nivel {{ filtroNivel }}
+                    <button @click="filtroNivel = ''" class="ml-0.5 text-gray-400 hover:text-gray-700 transition-colors">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
+                  <span v-if="filtroCurso"
+                    class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                    Curso {{ filtroCurso }}º
+                    <button @click="filtroCurso = ''" class="ml-0.5 text-gray-400 hover:text-gray-700 transition-colors">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
+                  <span v-if="filtroCiclo"
+                    class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider max-w-[220px]">
+                    <span class="truncate">{{ filtroCiclo }}</span>
+                    <button @click="filtroCiclo = ''" class="ml-0.5 text-gray-400 hover:text-gray-700 transition-colors shrink-0">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
+                  <span v-if="busqueda"
+                    class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider max-w-[200px]">
+                    <svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span class="truncate italic">"{{ busqueda }}"</span>
+                    <button @click="busqueda = ''" class="ml-0.5 text-gray-400 hover:text-gray-700 transition-colors shrink-0">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
+                  <button @click="limpiarFiltros"
+                    class="ml-auto text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors flex items-center gap-1 shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Limpiar todo
+                  </button>
+                </div>
+              </Transition>
+
             </section>
 
-            <!-- Grid de microretos -->
+            <!-- ── GRID DE MICRORETOS ───────────────────────────── -->
             <div v-if="microretosFiltrados.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div v-for="reto in microretosFiltrados" :key="reto.id"
                 class="bg-white rounded-[1.5rem] border border-gray-100 hover:border-[#00A859]/40 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] shadow-sm transition-all duration-300 flex flex-col group relative overflow-hidden transform hover:-translate-y-1">
 
-                <div class="absolute top-4 right-4 bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859] px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full z-10">
-                  {{ reto.nivel_grupo || 'Nivel ND' }}
+                <!-- Badge nivel color-coded -->
+                <div class="absolute top-4 right-4 border px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full z-10"
+                  :class="nivelClase(reto.nivel_grupo)">
+                  {{ reto.nivel_grupo || 'N/D' }}
                 </div>
 
                 <div class="p-7 flex-1 flex flex-col pt-10">
@@ -404,9 +638,12 @@ const confirmarEliminar = async () => {
                   <p class="text-gray-600 text-sm leading-relaxed line-clamp-3 mb-6 flex-1">
                     {{ reto.pregunta_reto }}
                   </p>
-                  <div class="mt-auto">
-                    <span class="inline-block bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium truncate max-w-full shadow-sm" :title="reto.ciclo">
+                  <div class="mt-auto flex flex-wrap items-center gap-2">
+                    <span class="inline-block bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium truncate shadow-sm" :title="reto.ciclo">
                       {{ reto.ciclo }}
+                    </span>
+                    <span v-if="reto.curso" class="inline-block bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+                      {{ reto.curso }}º curso
                     </span>
                   </div>
                 </div>
@@ -441,6 +678,7 @@ const confirmarEliminar = async () => {
               </div>
             </div>
 
+            <!-- Empty state -->
             <div v-else class="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-300 shadow-sm">
               <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-gray-100 shadow-inner">
                 <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
