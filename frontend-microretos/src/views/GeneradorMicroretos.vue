@@ -594,9 +594,20 @@ const generarReto = async () => {
     });
 
     if (res.data && res.data.microretos) {
+        const cicloNombreSnapshot = ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre;
         res.data.microretos.forEach(reto => {
-            microretosGenerados.value.unshift({ 
+            microretosGenerados.value.unshift({
                 ...reto,
+                // Snapshot del contexto en el momento de generación para evitar
+                // que cambios posteriores en la selección sobreescriban estos valores
+                empresa_id:   seleccion.value.empresaId || null,
+                ciclo_id:     seleccion.value.cicloId   || null,
+                ciclo:        cicloNombreSnapshot,
+                modulo:       moduloNombreTxt,
+                curso:        seleccion.value.cursoSeleccionado,
+                duracion:     seleccion.value.duracion,
+                nivel_grupo:  seleccion.value.nivelGrupo,
+                _ui_familia:  seleccion.value.familia,
                 _ui_guardado: false,
                 _ui_guardando: false
             });
@@ -610,26 +621,9 @@ const generarReto = async () => {
 const guardarTodos = async () => {
   guardandoTodos.value = true;
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value
-      .map(id => modulos.value.find(m => m.id === id)?.nombre)
-      .filter(Boolean);
-    const moduloStr = nombresModulosSeleccionados.length > 0 
-      ? nombresModulosSeleccionados.join(' y ') 
-      : 'Transversal';
-    const cicloStr = ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre;
-
     const payload = microretosGenerados.value
       .filter(r => !r._ui_guardado)
-      .map(({ _ui_guardado, _ui_guardando, ...retoLimpio }) => ({  //Desestructuración para eliminar claves UI
-        ...retoLimpio,
-        empresa_id: seleccion.value.empresaId || null,
-        ciclo_id:   seleccion.value.cicloId   || null,
-        ciclo: cicloStr,
-        modulo: moduloStr,
-        curso: seleccion.value.cursoSeleccionado,
-        duracion: seleccion.value.duracion,
-        nivel_grupo: seleccion.value.nivelGrupo
-      }));
+      .map(({ _ui_guardado, _ui_guardando, _ui_familia, ...retoLimpio }) => retoLimpio); // Eliminar claves UI; el contexto ya fue snapshotado en cada reto al generarse
 
     if (payload.length > 0) {
       await api.post('/guardar-microretos-lote', { microretos: payload });
@@ -650,24 +644,9 @@ const guardar = async (index) => {
   const reto = microretosGenerados.value[index];
   reto._ui_guardando = true;
   try {
-    const nombresModulosSeleccionados = modulosSeleccionados.value
-      .map(id => modulos.value.find(m => m.id === id)?.nombre)
-      .filter(Boolean);
+    const { _ui_guardado, _ui_guardando, _ui_familia, ...retoLimpio } = reto; // Eliminar claves UI; el contexto ya fue snapshotado en el reto al generarse
 
-    const { _ui_guardado, _ui_guardando, ...retoLimpio } = reto; //Desestructuración para eliminar claves UI
-
-    await api.post('/guardar-microreto-bd', {
-      ...retoLimpio,
-      empresa_id: seleccion.value.empresaId || null,
-      ciclo_id:   seleccion.value.cicloId   || null,
-      ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
-      modulo: nombresModulosSeleccionados.length > 0
-        ? nombresModulosSeleccionados.join(' y ')
-        : 'Transversal',
-      curso: seleccion.value.cursoSeleccionado,
-      duracion: seleccion.value.duracion,
-      nivel_grupo: seleccion.value.nivelGrupo
-    });
+    await api.post('/guardar-microreto-bd', retoLimpio);
     reto._ui_guardado = true;
   } catch (e) { 
     console.error("Error al guardar:", e);
@@ -1278,7 +1257,7 @@ const tieneContextoEmpresa = computed(() => {
                 <div class="col-span-2 md:col-span-1">
                   <label class="label-style">Nivel del Grupo-Clase *</label>
                   <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
-                    <option value="Básico">Básico (Ej: FP Básica o 1º de GM)</option>
+                    <option value="Bajo">Básico (Ej: FP Básica o 1º de GM)</option>
                     <option value="Medio">Medio (Ej: 2º de GM o 1º de GS)</option>
                     <option value="Alto">Alto (Ej: 2º de GS o Especialización)</option>
                   </select>
@@ -1501,11 +1480,11 @@ const tieneContextoEmpresa = computed(() => {
                 </span>
                 <span class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-[#1F2937] rounded-lg text-xs font-bold uppercase tracking-wider">
                   <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2-2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                  {{ seleccion.familia }}
+                  {{ reto._ui_familia || seleccion.familia }}
                 </span>
                 <span class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-500 rounded-lg text-xs font-bold uppercase tracking-wider">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                  Nivel: {{ seleccion.nivelGrupo }} ({{ seleccion.cursoSeleccionado }}º)
+                  Nivel: {{ reto.nivel_grupo || seleccion.nivelGrupo }} ({{ reto.curso || seleccion.cursoSeleccionado }}º)
                 </span>
               </div>
             </div>
