@@ -1,15 +1,38 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
 import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue'
+import CentroEducativoModal from '../components/CentroEducativoModal.vue'
+import EliminarCentroModal from '../components/EliminarCentroModal.vue'
+import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
+// ─── Aviso de expiración de sesión ───────────────────────
+const minutosRestantes = ref(authStore.minutosRestantes)
+let tokenTimer = null
+onMounted(() => {
+  tokenTimer = setInterval(() => {
+    minutosRestantes.value = authStore.minutosRestantes
+    if (minutosRestantes.value === 0) {
+      clearInterval(tokenTimer)
+      authStore.logout()
+      router.push('/')
+    }
+  }, 60_000)
+})
+onUnmounted(() => clearInterval(tokenTimer))
+
+const mostrarAvisoToken = computed(() =>
+  minutosRestantes.value >= 0 && minutosRestantes.value <= 60
+)
+
 // ─── Datos ───────────────────────────────────────────────
 const empresas             = ref([])
+const centros              = ref([])   // todos los centros con sus ciclos
 const familiasProfesionales = ref([])
 const cargando             = ref(true)
 const errorCarga           = ref(null)
@@ -26,6 +49,53 @@ const familiasExpandidas  = ref(new Set())
 // ─── Empresa expandida (panel de detalle inline) ─────────
 const empresaExpandida = ref(null)
 
+// ─── Modal CREAR / EDITAR CENTRO EDUCATIVO ───────────────
+const mostrarNuevoCentro  = ref(false)
+const mostrarEditarCentro = ref(false)
+const centroAEditar       = ref(null)   // { id, nombre, ciclos[] }
+
+function onCentroCreado(centro) {
+  mostrarSnack(`Centro "${centro.nombre}" creado correctamente.`, 'ok')
+  cargarDatos()
+}
+
+function pedirEditarCentro(centroNombre) {
+  const datos = centros.value.find(c => c.nombre === centroNombre)
+  if (!datos?.id) return
+  centroAEditar.value       = datos        // { id, nombre, ciclos[] }
+  mostrarEditarCentro.value = true
+}
+
+function onCentroGuardado(centro) {
+  mostrarEditarCentro.value = false
+  mostrarSnack(`Centro "${centro.nombre}" actualizado correctamente.`, 'ok')
+  cargarDatos()
+}
+
+// ─── Modal ELIMINAR CENTRO ────────────────────────────────
+const mostrarEliminarCentro = ref(false)
+const centroAEliminar       = ref(null)   // { id, nombre, numEmpresas, numCiclos }
+
+function pedirEliminarCentro(centroNombre) {
+  const datos = centros.value.find(c => c.nombre === centroNombre)
+  if (!datos?.id) return   // solo centros del catálogo (con id real)
+  const numEmpresas = Object.values(datosPorCentro.value[centroNombre]?.familias ?? {})
+    .reduce((n, f) => n + f.empresas.length, 0)
+  centroAEliminar.value = {
+    id:          datos.id,
+    nombre:      datos.nombre,
+    numEmpresas,
+    numCiclos:   datos.ciclos.length,
+  }
+  mostrarEliminarCentro.value = true
+}
+
+function onCentroEliminado(centro) {
+  mostrarEliminarCentro.value = false
+  mostrarSnack(`Centro "${centro.nombre}" eliminado correctamente.`, 'ok')
+  cargarDatos()
+}
+
 // ─── Modal NUEVA EMPRESA ──────────────────────────────────
 const mostrarNuevaEmpresa = ref(false)
 
@@ -37,11 +107,9 @@ const empresaAEditar       = ref(null)
 const mostrarConfirmEdit   = ref(false)
 const empresaEditTemp      = ref(null)
 
-// ─── Confirmación ELIMINAR ────────────────────────────────
-const mostrarConfirmDelete = ref(false)
-const empresaAEliminar     = ref(null)
-const eliminando           = ref(false)
-const deleteNombre         = ref('')
+// ─── Modal ELIMINAR EMPRESA ───────────────────────────────
+const mostrarEliminarEmpresa = ref(false)
+const empresaParaEliminar    = ref(null)
 
 // ─── Snackbar de feedback ─────────────────────────────────
 const snackbar = ref({ visible: false, mensaje: '', tipo: 'ok' })
@@ -65,19 +133,29 @@ async function cargarDatos() {
   cargando.value  = true
   errorCarga.value = null
   try {
-    const [resEmpresas, resFamilias] = await Promise.all([
+    const [resEmpresas, resFamilias, resCentros] = await Promise.all([
       api.get('/empresas/dashboard'),
       api.get('/familias'),
+      api.get('/centros'),
     ])
     empresas.value              = resEmpresas.data
     familiasProfesionales.value = resFamilias.data
+    centros.value               = resCentros.data
 
     // Expandir todos los centros y familias por defecto
-    const centros = [...new Set(empresas.value.map(e => e.centro_educativo || '— Sin centro —'))]
-    centros.forEach(c => centrosExpandidos.value.add(c))
+    const todosLosCentros = [
+      ...centros.value.map(c => c.nombre),
+      ...empresas.value.map(e => e.centro_educativo).filter(Boolean),
+    ]
+    todosLosCentros.forEach(c => centrosExpandidos.value.add(c))
     const fams = [...new Set(empresas.value.flatMap(e => e.familias_nombres?.length ? e.familias_nombres : ['— Sin familia —']))]
     fams.forEach(f => familiasExpandidas.value.add(f))
   } catch (e) {
+    if (e.response?.status === 401) {
+      authStore.logout()
+      router.push('/')
+      return
+    }
     errorCarga.value = 'No se pudieron cargar los datos. Comprueba la conexión e inténtalo de nuevo.'
     console.error(e)
   } finally {
@@ -90,21 +168,47 @@ async function cargarDatos() {
 // ═══════════════════════════════════════════════════════════
 const totalEmpresas = computed(() => empresas.value.length)
 
-const totalCentros = computed(() =>
-  new Set(empresas.value.map(e => e.centro_educativo).filter(Boolean)).size
-)
+// Centros del catálogo + legacy sin normalizar
+const totalCentros = computed(() => {
+  const nombres = new Set(centros.value.map(c => c.nombre))
+  empresas.value.forEach(e => { if (e.centro_educativo) nombres.add(e.centro_educativo) })
+  return nombres.size
+})
 
 const todasLasFamilias = computed(() =>
   [...new Set(empresas.value.flatMap(e => e.familias_nombres || []).filter(Boolean))].sort()
 )
 
-const todosCentros = computed(() =>
-  [...new Set(empresas.value.map(e => e.centro_educativo).filter(Boolean))].sort()
-)
+// Opciones del filtro: todos los centros (catálogo + legacy de empresas)
+const todosCentros = computed(() => {
+  const nombres = new Set(centros.value.map(c => c.nombre))
+  empresas.value.forEach(e => { if (e.centro_educativo) nombres.add(e.centro_educativo) })
+  return [...nombres].sort()
+})
+
+// Empresas sin centro (se muestran en la sección huérfanas, fuera del acordeón)
+const empresasHuerfanas = computed(() => {
+  const q = busqueda.value.toLowerCase().trim()
+  return empresas.value.filter(e => {
+    if (e.centro_educativo || e.centro_id) return false   // tiene centro → no es huérfana
+    if (filtroCentro.value) return false                  // filtro de centro activo → ocultarlas
+    if (q) {
+      const coincide =
+        e.nombre_comercial?.toLowerCase().includes(q) ||
+        e.cif?.toLowerCase().includes(q) ||
+        e.municipio?.toLowerCase().includes(q) ||
+        e.persona_contacto?.toLowerCase().includes(q)
+      if (!coincide) return false
+    }
+    if (filtroFamilia.value && !e.familias_nombres?.includes(filtroFamilia.value)) return false
+    return true
+  })
+})
 
 const empresasFiltradas = computed(() => {
   const q = busqueda.value.toLowerCase().trim()
   return empresas.value.filter(e => {
+    if (!e.centro_educativo && !e.centro_id) return false  // huérfanas van a su propia sección
     if (q) {
       const coincide =
         e.nombre_comercial?.toLowerCase().includes(q) ||
@@ -119,21 +223,57 @@ const empresasFiltradas = computed(() => {
   })
 })
 
-const porCentroYFamilia = computed(() => {
-  const grupos = {}
-  for (const e of empresasFiltradas.value) {
-    const centro  = e.centro_educativo || '— Sin centro asignado —'
-    const familias = e.familias_nombres?.length ? e.familias_nombres : ['— Sin familia asignada —']
-    if (!grupos[centro]) grupos[centro] = {}
-    for (const fam of familias) {
-      if (!grupos[centro][fam]) grupos[centro][fam] = []
-      grupos[centro][fam].push(e)
+/**
+ * Estructura principal del acordeón.
+ * { [centroNombre]: { id, familias: { [familiaName]: { ciclos: [], empresas: [] } } } }
+ *
+ * - Parte de TODOS los centros del catálogo (aunque no tengan empresas).
+ * - Añade empresas filtradas encima.
+ * - Con filtros activos, oculta centros sin empresas coincidentes
+ *   (pero no oculta el centro si filtroCentro apunta directamente a él).
+ */
+const datosPorCentro = computed(() => {
+  const mapa = {}
+
+  // 1. Inicializar con todos los centros del catálogo y sus ciclos por familia
+  const centrosBase = filtroCentro.value
+    ? centros.value.filter(c => c.nombre === filtroCentro.value)
+    : centros.value
+
+  for (const centro of centrosBase) {
+    mapa[centro.nombre] = { id: centro.id, familias: {} }
+    for (const ciclo of centro.ciclos) {
+      const fam = ciclo.familia_nombre || '— Sin familia asignada —'
+      if (!mapa[centro.nombre].familias[fam])
+        mapa[centro.nombre].familias[fam] = { ciclos: [], empresas: [] }
+      mapa[centro.nombre].familias[fam].ciclos.push(ciclo)
     }
   }
-  return grupos
+
+  // 2. Incorporar empresas filtradas (incluyendo centros legacy sin normalizar)
+  for (const e of empresasFiltradas.value) {
+    const centroNombre = e.centro_educativo || '— Sin centro asignado —'
+    if (!mapa[centroNombre]) mapa[centroNombre] = { id: null, familias: {} }
+    const familias = e.familias_nombres?.length ? e.familias_nombres : ['— Sin familia asignada —']
+    for (const fam of familias) {
+      if (!mapa[centroNombre].familias[fam])
+        mapa[centroNombre].familias[fam] = { ciclos: [], empresas: [] }
+      mapa[centroNombre].familias[fam].empresas.push(e)
+    }
+  }
+
+  // 3. Con búsqueda o filtro de familia activo, ocultar centros sin empresas coincidentes
+  if ((busqueda.value || filtroFamilia.value) && !filtroCentro.value) {
+    for (const nombre of Object.keys(mapa)) {
+      const tieneEmpresas = Object.values(mapa[nombre].familias).some(f => f.empresas.length > 0)
+      if (!tieneEmpresas) delete mapa[nombre]
+    }
+  }
+
+  return mapa
 })
 
-const centrosOrdenados = computed(() => Object.keys(porCentroYFamilia.value).sort())
+const centrosOrdenados = computed(() => Object.keys(datosPorCentro.value).sort())
 
 const totalFiltradas = computed(() => empresasFiltradas.value.length)
 
@@ -187,41 +327,48 @@ function onEmpresaActualizada(empresaActualizada) {
 //  FLUJO ELIMINAR
 // ═══════════════════════════════════════════════════════════
 function pedirEliminacion(empresa) {
-  empresaAEliminar.value     = empresa
-  deleteNombre.value         = empresa.nombre_comercial
-  mostrarConfirmDelete.value = true
+  empresaParaEliminar.value    = empresa
+  mostrarEliminarEmpresa.value = true
 }
 
-async function confirmarEliminacion() {
-  if (!empresaAEliminar.value) return
-  eliminando.value = true
-  try {
-    await api.delete(`/empresas/${empresaAEliminar.value.id}`)
-    empresas.value             = empresas.value.filter(e => e.id !== empresaAEliminar.value.id)
-    mostrarConfirmDelete.value = false
-    mostrarSnack(`"${deleteNombre.value}" eliminada correctamente.`, 'ok')
-    empresaAEliminar.value     = null
-  } catch (e) {
-    mostrarSnack('Error al eliminar la empresa. Inténtalo de nuevo.', 'error')
-    console.error(e)
-  } finally {
-    eliminando.value = false
-  }
+function onEmpresaEliminada(data) {
+  mostrarEliminarEmpresa.value = false
+  mostrarSnack(`"${data.nombre}" eliminada correctamente.`, 'ok')
+  cargarDatos()
 }
 
-function cancelarDelete() {
-  mostrarConfirmDelete.value = false
-  empresaAEliminar.value     = null
-}
 
-// ─── centrosDisponibles para InsertModifyEmpresa ──────────
-const centrosDisponibles = computed(() =>
-  todosCentros.value
-)
 </script>
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] overflow-x-hidden">
+
+    <!-- ══════════════ AVISO EXPIRACIÓN DE SESIÓN ═══════════ -->
+    <Transition name="modal-fade">
+      <div
+        v-if="mostrarAvisoToken"
+        class="max-w-7xl mx-auto mb-4 flex items-center gap-3
+               px-5 py-3 rounded-2xl border
+               bg-amber-50 border-amber-300 text-amber-800"
+      >
+        <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-sm font-semibold flex-1">
+          Tu sesión expira en
+          <span class="font-black">{{ minutosRestantes }} minuto{{ minutosRestantes !== 1 ? 's' : '' }}</span>.
+          Guarda tu trabajo y vuelve a iniciar sesión para no perder el acceso.
+        </p>
+        <button
+          @click="authStore.logout(); router.push('/')"
+          class="text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-xl
+                 bg-amber-500 text-white hover:bg-amber-600 transition-all shrink-0"
+        >
+          Renovar sesión
+        </button>
+      </div>
+    </Transition>
 
     <!-- ══════════════════════ CABECERA ══════════════════════ -->
     <div class="max-w-7xl mx-auto">
@@ -241,6 +388,22 @@ const centrosDisponibles = computed(() =>
 
           <!-- Acciones de cabecera -->
           <div class="flex flex-wrap items-center gap-2">
+            <!-- Botón nuevo centro educativo -->
+            <button
+              @click="mostrarNuevoCentro = true"
+              :disabled="cargando"
+              class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
+                     bg-[#1F2937] text-white border border-[#333333]
+                     hover:bg-[#2d3748] transition-all duration-200 shadow-sm
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055"/>
+              </svg>
+              Nuevo centro
+            </button>
+
             <!-- Botón nueva empresa -->
             <button
               @click="mostrarNuevaEmpresa = true"
@@ -417,40 +580,88 @@ const centrosDisponibles = computed(() =>
           class="bg-white rounded-[1.75rem] border border-gray-100 shadow-sm overflow-hidden"
         >
           <!-- Cabecera del centro -->
-          <button
-            @click="toggleCentro(centro)"
-            class="w-full flex items-center gap-4 px-6 py-5
-                   hover:bg-gray-50/80 transition-colors duration-150 text-left"
-          >
-            <div class="w-10 h-10 rounded-2xl bg-[#1F2937] flex items-center justify-center shrink-0">
-              <svg class="w-5 h-5 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055"/>
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h2 class="font-black text-lg text-[#1F2937] truncate">{{ centro }}</h2>
-              <p class="text-xs text-gray-400 font-medium mt-0.5">
-                {{ Object.values(porCentroYFamilia[centro]).flat().length }}
-                {{ Object.values(porCentroYFamilia[centro]).flat().length === 1 ? 'empresa' : 'empresas' }}
-                ·
-                {{ Object.keys(porCentroYFamilia[centro]).length }}
-                {{ Object.keys(porCentroYFamilia[centro]).length === 1 ? 'familia' : 'familias' }}
-              </p>
-            </div>
-            <svg
-              class="w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0"
-              :class="centrosExpandidos.has(centro) ? 'rotate-180' : ''"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          <div class="flex items-center pr-3 gap-1">
+            <button
+              @click="toggleCentro(centro)"
+              class="flex-1 flex items-center gap-4 px-6 py-5
+                     hover:bg-gray-50/80 transition-colors duration-150 text-left min-w-0"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
+              <div class="w-10 h-10 rounded-2xl bg-[#1F2937] flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h2 class="font-black text-lg text-[#1F2937] truncate">{{ centro }}</h2>
+                <p class="text-xs text-gray-400 font-medium mt-0.5">
+                  {{ Object.values(datosPorCentro[centro].familias).reduce((n,f) => n + f.empresas.length, 0) }}
+                  {{ Object.values(datosPorCentro[centro].familias).reduce((n,f) => n + f.empresas.length, 0) === 1 ? 'empresa' : 'empresas' }}
+                  ·
+                  {{ Object.keys(datosPorCentro[centro].familias).length }}
+                  {{ Object.keys(datosPorCentro[centro].familias).length === 1 ? 'familia' : 'familias' }}
+                  ·
+                  {{ Object.values(datosPorCentro[centro].familias).reduce((n,f) => n + f.ciclos.length, 0) }}
+                  ciclos
+                </p>
+              </div>
+              <svg
+                class="w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0"
+                :class="centrosExpandidos.has(centro) ? 'rotate-180' : ''"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+
+            <!-- Acciones del centro (solo centros del catálogo con id real) -->
+            <template v-if="datosPorCentro[centro]?.id">
+              <!-- Botón editar -->
+              <div class="relative group/edit-tip shrink-0">
+                <button
+                  @click.stop="pedirEditarCentro(centro)"
+                  class="w-9 h-9 rounded-xl flex items-center justify-center
+                         text-gray-300 hover:text-[#00A859] hover:bg-[#00A859]/10
+                         border border-transparent hover:border-[#00A859]/30
+                         transition-all duration-150"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+                <!-- Tooltip -->
+                <div class="pointer-events-none absolute right-0 top-full mt-2 z-20
+                            w-max max-w-[180px] px-3 py-2 rounded-xl
+                            bg-[#1F2937] text-white text-[11px] font-semibold leading-snug
+                            shadow-lg opacity-0 group-hover/edit-tip:opacity-100
+                            translate-y-1 group-hover/edit-tip:translate-y-0
+                            transition-all duration-150">
+                  Editar centro, familias y ciclos
+                  <div class="absolute -top-1 right-3 w-2 h-2 bg-[#1F2937] rotate-45"></div>
+                </div>
+              </div>
+              <!-- Botón eliminar -->
+              <button
+                @click.stop="pedirEliminarCentro(centro)"
+                title="Eliminar centro educativo"
+                class="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center
+                       text-gray-300 hover:text-red-500 hover:bg-red-50
+                       border border-transparent hover:border-red-200
+                       transition-all duration-150"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </template>
+          </div>
 
           <!-- Familias del centro -->
           <div v-if="centrosExpandidos.has(centro)" class="border-t border-gray-100">
             <div
-              v-for="(empresasGrupo, familia) in porCentroYFamilia[centro]"
+              v-for="(familiaData, familia) in datosPorCentro[centro].familias"
               :key="familia"
               class="border-b border-gray-50 last:border-b-0"
             >
@@ -462,9 +673,17 @@ const centrosDisponibles = computed(() =>
               >
                 <div class="w-2 h-2 rounded-full bg-[#00A859] shrink-0" />
                 <span class="flex-1 font-bold text-sm text-gray-700 truncate">{{ familia }}</span>
-                <span class="text-[10px] font-black uppercase tracking-widest
-                             bg-[#00A859]/10 text-[#00A859] px-2.5 py-1 rounded-full shrink-0">
-                  {{ empresasGrupo.length }}
+                <!-- Badge ciclos -->
+                <span v-if="familiaData.ciclos.length"
+                  class="text-[10px] font-black uppercase tracking-widest
+                         bg-[#1F2937]/8 text-gray-500 px-2 py-0.5 rounded-full shrink-0">
+                  {{ familiaData.ciclos.length }} ciclos
+                </span>
+                <!-- Badge empresas -->
+                <span v-if="familiaData.empresas.length"
+                  class="text-[10px] font-black uppercase tracking-widest
+                         bg-[#00A859]/10 text-[#00A859] px-2.5 py-1 rounded-full shrink-0">
+                  {{ familiaData.empresas.length }}
                 </span>
                 <svg
                   class="w-4 h-4 text-gray-400 transition-transform duration-200 ml-1 shrink-0"
@@ -475,10 +694,33 @@ const centrosDisponibles = computed(() =>
                 </svg>
               </button>
 
-              <!-- Lista de empresas -->
+              <!-- Contenido expandido: ciclos + empresas -->
               <div v-if="familiasExpandidas.has(familiaKey(centro, familia))">
+
+                <!-- Lista de ciclos formativos del centro -->
+                <div v-if="familiaData.ciclos.length"
+                  class="pl-4 sm:pl-12 pr-4 sm:pr-6 py-3 border-t border-gray-50 bg-gray-50/40">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-1.5">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Ciclos formativos que imparte
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <span
+                      v-for="ciclo in familiaData.ciclos" :key="ciclo.id"
+                      class="text-[11px] font-semibold bg-white border border-gray-200
+                             text-gray-600 px-2.5 py-1 rounded-full"
+                    >
+                      {{ ciclo.nombre }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Lista de empresas -->
                 <div
-                  v-for="empresa in empresasGrupo"
+                  v-for="empresa in familiaData.empresas"
                   :key="empresa.id"
                   class="border-t border-gray-50"
                 >
@@ -749,6 +991,173 @@ const centrosDisponibles = computed(() =>
           </div>
         </div>
       </div>
+
+      <!-- ══════════════ EMPRESAS HUÉRFANAS ══════════════════ -->
+      <Transition name="expand">
+        <div
+          v-if="!cargando && !errorCarga && empresasHuerfanas.length > 0"
+          class="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50/60 overflow-hidden"
+        >
+          <!-- Cabecera sección -->
+          <div class="flex items-center gap-4 px-6 py-5 border-b border-amber-200/70">
+            <div class="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="font-black text-lg text-amber-800">Empresas sin centro asignado</h2>
+              <p class="text-xs text-amber-600 font-medium mt-0.5">
+                {{ empresasHuerfanas.length }}
+                {{ empresasHuerfanas.length === 1 ? 'empresa' : 'empresas' }}
+                sin centro educativo vinculado · Edítalas para reasignarlas
+              </p>
+            </div>
+          </div>
+
+          <!-- Lista de empresas huérfanas -->
+          <div>
+            <div
+              v-for="empresa in empresasHuerfanas"
+              :key="empresa.id"
+              class="border-b border-amber-100 last:border-b-0"
+            >
+              <!-- Fila empresa -->
+              <div class="flex items-center gap-2 sm:gap-3 pl-4 sm:pl-6 pr-3 sm:pr-4 py-3.5
+                          hover:bg-amber-100/50 transition-colors">
+                <button
+                  @click="toggleEmpresa(empresa.id)"
+                  class="flex-1 flex items-center gap-4 min-w-0 text-left"
+                >
+                  <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"/>
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-bold text-sm text-amber-900 truncate">
+                        {{ empresa.nombre_comercial }}
+                      </span>
+                      <span v-if="empresa.sector"
+                            class="text-[10px] font-bold uppercase tracking-wider
+                                   bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full shrink-0">
+                        {{ empresa.sector }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-amber-500 mt-0.5 truncate">
+                      <span v-if="empresa.municipio">{{ empresa.municipio }}</span>
+                      <span v-if="empresa.municipio && empresa.persona_contacto"> · </span>
+                      <span v-if="empresa.persona_contacto">{{ empresa.persona_contacto }}</span>
+                      <span v-if="!empresa.municipio && !empresa.persona_contacto" class="italic">Sin datos de contacto</span>
+                    </p>
+                  </div>
+                  <svg
+                    class="w-4 h-4 text-amber-400 transition-transform duration-200 shrink-0"
+                    :class="empresaExpandida === empresa.id ? 'rotate-180' : ''"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+
+                <!-- Acciones -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button
+                    @click="pedirEdicion(empresa)"
+                    title="Editar y reasignar centro"
+                    class="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl
+                           bg-amber-100 border border-amber-300 text-amber-700
+                           hover:bg-amber-200 hover:border-amber-400
+                           font-bold text-xs transition-all duration-150"
+                  >
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    <span class="hidden sm:inline">Editar</span>
+                  </button>
+                  <button
+                    @click="pedirEliminacion(empresa)"
+                    title="Eliminar empresa"
+                    class="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl
+                           bg-red-50 border border-red-200 text-red-500
+                           hover:bg-red-100 hover:border-red-300
+                           font-bold text-xs transition-all duration-150"
+                  >
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    <span class="hidden sm:inline">Eliminar</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Panel de detalle expandido (mismo que en el acordeón) -->
+              <Transition name="expand">
+                <div
+                  v-if="empresaExpandida === empresa.id"
+                  class="pl-3 sm:pl-6 pr-3 sm:pr-6 pb-5 pt-3 bg-amber-50/80 border-t border-amber-100"
+                >
+                  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                    <div class="bg-white rounded-2xl border border-amber-100 p-4 shadow-sm">
+                      <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Datos básicos</h4>
+                      <dl class="space-y-2 text-sm">
+                        <div v-if="empresa.sector" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Sector</dt>
+                          <dd class="font-medium text-gray-700">{{ empresa.sector }}</dd>
+                        </div>
+                        <div v-if="empresa.tamano" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Tamaño</dt>
+                          <dd class="font-medium text-gray-700">{{ empresa.tamano }}</dd>
+                        </div>
+                        <div v-if="empresa.web" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Web</dt>
+                          <dd class="font-medium text-[#00A859] break-all min-w-0">{{ empresa.web }}</dd>
+                        </div>
+                        <div v-if="empresa.familias_nombres?.length" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Familias</dt>
+                          <dd class="flex flex-wrap gap-1 min-w-0">
+                            <span
+                              v-for="f in empresa.familias_nombres" :key="f"
+                              class="text-[10px] font-bold bg-[#00A859]/10 text-[#00A859] px-2 py-0.5 rounded-full"
+                            >{{ f }}</span>
+                          </dd>
+                        </div>
+                        <p v-if="!empresa.sector && !empresa.tamano && !empresa.familias_nombres?.length"
+                           class="text-gray-300 text-xs italic">Sin datos básicos registrados</p>
+                      </dl>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-amber-100 p-4 shadow-sm">
+                      <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Contacto</h4>
+                      <dl class="space-y-2 text-sm">
+                        <div v-if="empresa.persona_contacto" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Persona</dt>
+                          <dd class="font-medium text-gray-700">{{ empresa.persona_contacto }}</dd>
+                        </div>
+                        <div v-if="empresa.telefono" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Teléfono</dt>
+                          <dd class="font-medium text-gray-700">{{ empresa.telefono }}</dd>
+                        </div>
+                        <div v-if="empresa.email_general" class="flex gap-2">
+                          <dt class="text-gray-400 shrink-0 w-24">Email</dt>
+                          <dd class="font-medium text-[#00A859] break-all min-w-0">{{ empresa.email_general }}</dd>
+                        </div>
+                        <p v-if="!empresa.persona_contacto && !empresa.telefono && !empresa.email_general"
+                           class="text-gray-300 text-xs italic">Sin datos de contacto registrados</p>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
     </div>
 
     <!-- ════════════════ MODAL: CONFIRMAR EDICIÓN ════════════════ -->
@@ -798,69 +1207,44 @@ const centrosDisponibles = computed(() =>
       </div>
     </Transition>
 
-    <!-- ════════════════ MODAL: CONFIRMAR ELIMINAR ════════════════ -->
-    <Transition name="modal-fade">
-      <div v-if="mostrarConfirmDelete"
-           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
-              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-              </svg>
-            </div>
-            <div>
-              <h3 class="font-black text-lg text-[#1F2937]">Eliminar empresa</h3>
-              <p class="text-xs text-red-400 font-semibold">Esta acción no se puede deshacer</p>
-            </div>
-          </div>
+    <!-- ════════════ MODAL: ELIMINAR EMPRESA ══════════════════ -->
+    <EliminarEmpresaModal
+      :visible="mostrarEliminarEmpresa"
+      :empresa="empresaParaEliminar"
+      @empresa-eliminada="onEmpresaEliminada"
+      @cerrar="mostrarEliminarEmpresa = false"
+    />
 
-          <div class="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5">
-            <p class="text-sm font-bold text-red-800 mb-1">
-              "{{ empresaAEliminar?.nombre_comercial }}"
-            </p>
-            <p class="text-xs text-red-600">
-              Se eliminarán permanentemente todos sus datos y sus relaciones con familias profesionales.
-              Los microretos generados con esta empresa permanecerán en la biblioteca.
-            </p>
-          </div>
+    <!-- ════════════ MODAL: ELIMINAR CENTRO ════════════════════ -->
+    <EliminarCentroModal
+      :visible="mostrarEliminarCentro"
+      :centro="centroAEliminar"
+      :num-empresas="centroAEliminar?.numEmpresas ?? 0"
+      :num-ciclos="centroAEliminar?.numCiclos ?? 0"
+      @centro-eliminado="onCentroEliminado"
+      @cerrar="mostrarEliminarCentro = false"
+    />
 
-          <div class="flex gap-3">
-            <button
-              @click="cancelarDelete"
-              :disabled="eliminando"
-              class="flex-1 py-2.5 rounded-xl border border-gray-200
-                     text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all
-                     disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              @click="confirmarEliminacion"
-              :disabled="eliminando"
-              class="flex-1 py-2.5 rounded-xl
-                     bg-red-500 text-white text-sm font-black
-                     hover:bg-red-600 transition-all shadow-sm
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     flex items-center justify-center gap-2"
-            >
-              <svg v-if="eliminando" class="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
-              </svg>
-              {{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <!-- ════════════ MODAL: NUEVO CENTRO EDUCATIVO ════════════ -->
+    <CentroEducativoModal
+      :visible="mostrarNuevoCentro"
+      @centro-creado="onCentroCreado"
+      @cerrar="mostrarNuevoCentro = false"
+    />
+
+    <!-- ════════════ MODAL: EDITAR CENTRO EDUCATIVO ════════════ -->
+    <CentroEducativoModal
+      :visible="mostrarEditarCentro"
+      :centro="centroAEditar"
+      @centro-guardado="onCentroGuardado"
+      @cerrar="mostrarEditarCentro = false"
+    />
 
     <!-- ════════════ MODALES: NUEVA / EDITAR EMPRESA ════════════ -->
     <InsertModifyEmpresa
       v-model:mostrarNuevaEmpresa="mostrarNuevaEmpresa"
       v-model:mostrarEditarEmpresa="mostrarEditarEmpresa"
       :familiasProfesionales="familiasProfesionales"
-      :centrosDisponibles="centrosDisponibles"
       :empresaAEditar="empresaAEditar"
       @empresa-creada="onEmpresaCreada"
       @empresa-actualizada="onEmpresaActualizada"

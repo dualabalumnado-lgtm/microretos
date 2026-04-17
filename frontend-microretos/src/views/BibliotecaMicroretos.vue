@@ -611,7 +611,7 @@ const confirmarEliminar = async () => {
                 <!-- Badge nivel color-coded -->
                 <div class="absolute top-4 right-4 border px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full z-10"
                   :class="nivelClase(reto.nivel_grupo)">
-                  {{ reto.nivel_grupo || 'N/D' }}
+                  Nivel microreto: {{ reto.nivel_grupo || 'N/D' }}
                 </div>
 
                 <div class="p-7 flex-1 flex flex-col pt-10">

@@ -29,6 +29,7 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::get('/familias/{familia}/ciclos',  [DatosFPController::class, 'getCiclos']);
     Route::get('/ciclos/{idCiclo}/modulos',   [DatosFPController::class, 'getModulos']);
     Route::get('/modulos/{idModulo}/ra-ce',   [DatosFPController::class, 'getRaCe']);
+    Route::get('/centros',                    [DatosFPController::class, 'getCentros']);
 });
 
 Route::get('/demos', [DemoController::class, 'index']);
@@ -52,6 +53,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/microretos',      [MicroretoIAController::class, 'index']);
         Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
     });
+
+    // Centros educativos — creación, edición y borrado protegidos
+    Route::post('/centros',           [DatosFPController::class, 'guardarCentro']);
+    Route::put('/centros/{id}',       [DatosFPController::class, 'actualizarCentro']);
+    Route::delete('/centros/{id}',    [DatosFPController::class, 'eliminarCentro']);
 
     // Empresas — datos completos solo para usuarios autenticados
     Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);

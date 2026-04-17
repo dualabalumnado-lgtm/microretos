@@ -365,7 +365,7 @@ async function copiarUrl() {
                              a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2
                              2h-2a2 2 0 01-2-2z"/>
                   </svg>
-                  Nivel {{ reto.nivel_grupo }}
+                  Nivel microreto: {{ reto.nivel_grupo }}
                 </span>
 
                 <span v-if="reto.ciclo"
