@@ -137,6 +137,150 @@ class DatosFPController extends Controller
     }
 
     // ==========================================
+    // CENTROS EDUCATIVOS
+    // ==========================================
+
+    /**
+     * GET /centros
+     * Devuelve todos los centros con sus ciclos agrupados por familia.
+     */
+    public function getCentros()
+    {
+        $centros = CentroEducativo::orderBy('nombre')->get();
+
+        return response()->json($centros->map(function ($centro) {
+            $ciclos = DB::table('centro_ciclo')
+                ->where('centro_id', $centro->id)
+                ->join('ciclos_formativos', 'ciclos_formativos.id', '=', 'centro_ciclo.ciclo_id')
+                ->leftJoin('familias', 'familias.id', '=', 'ciclos_formativos.familia_id')
+                ->select(
+                    'ciclos_formativos.id',
+                    'ciclos_formativos.nombre',
+                    'familias.id as familia_id',
+                    'familias.nombre as familia_nombre'
+                )
+                ->distinct()
+                ->orderBy('familias.nombre')
+                ->orderBy('ciclos_formativos.nombre')
+                ->get();
+
+            return [
+                'id'     => $centro->id,
+                'nombre' => $centro->nombre,
+                'ciclos' => $ciclos,
+            ];
+        }));
+    }
+
+    /**
+     * DELETE /centros/{id}
+     * Elimina un centro: desvincula sus ciclos y deja sus empresas sin centro asignado.
+     */
+    public function eliminarCentro($id)
+    {
+        $centro = CentroEducativo::find($id);
+
+        if (!$centro) {
+            return response()->json(['error' => 'Centro no encontrado'], 404);
+        }
+
+        $numEmpresas = Empresa::where('centro_id', $id)->count();
+
+        // Desvincular empresas (quedan sin centro asignado)
+        Empresa::where('centro_id', $id)->update([
+            'centro_id'        => null,
+            'centro_educativo' => null,
+        ]);
+
+        // Eliminar relaciones ciclo-centro
+        DB::table('centro_ciclo')->where('centro_id', $id)->delete();
+
+        // Eliminar el centro
+        $centro->delete();
+
+        return response()->json([
+            'message'           => 'Centro eliminado correctamente',
+            'empresas_afectadas' => $numEmpresas,
+        ]);
+    }
+
+    /**
+     * PUT /centros/{id}
+     * Actualiza el nombre y los ciclos de un centro educativo.
+     * Los ciclos anteriores se reemplazan completamente por los nuevos.
+     */
+    public function actualizarCentro(Request $request, $id)
+    {
+        $centro = CentroEducativo::find($id);
+
+        if (!$centro) {
+            return response()->json(['error' => 'Centro no encontrado'], 404);
+        }
+
+        $request->validate([
+            'nombre'      => 'required|string|max:255|unique:centro_educativo,nombre,' . $id,
+            'ciclosIds'   => 'required|array|min:1',
+            'ciclosIds.*' => 'integer|exists:ciclos_formativos,id',
+        ]);
+
+        $nombreAnterior = $centro->nombre;
+        $centro->update(['nombre' => $request->nombre]);
+
+        // Si cambió el nombre, actualizar el campo legacy en empresas y en centro_ciclo
+        if ($nombreAnterior !== $request->nombre) {
+            Empresa::where('centro_educativo', $nombreAnterior)
+                ->update(['centro_educativo' => $request->nombre]);
+            DB::table('centro_ciclo')
+                ->where('centro_id', $id)
+                ->update(['centro_educativo' => $request->nombre]);
+        }
+
+        // Reemplazar todos los ciclos del centro
+        DB::table('centro_ciclo')->where('centro_id', $id)->delete();
+
+        $rows = collect($request->ciclosIds)->map(fn($cicloId) => [
+            'centro_id'        => $id,
+            'centro_educativo' => $centro->nombre,
+            'ciclo_id'         => $cicloId,
+        ])->all();
+
+        DB::table('centro_ciclo')->insertOrIgnore($rows);
+
+        return response()->json([
+            'message' => 'Centro actualizado correctamente',
+            'centro'  => ['id' => $centro->id, 'nombre' => $centro->nombre],
+        ]);
+    }
+
+    /**
+     * POST /centros
+     * Crea un centro educativo con sus ciclos asociados.
+     */
+    public function guardarCentro(Request $request)
+    {
+        $request->validate([
+            'nombre'      => 'required|string|max:255|unique:centro_educativo,nombre',
+            'ciclosIds'   => 'required|array|min:1',
+            'ciclosIds.*' => 'integer|exists:ciclos_formativos,id',
+        ]);
+
+        $centro = CentroEducativo::create(['nombre' => $request->nombre]);
+
+        $rows = collect($request->ciclosIds)->map(fn($cicloId) => [
+            'centro_id'        => $centro->id,
+            'centro_educativo' => $centro->nombre,
+            'ciclo_id'         => $cicloId,
+        ])->all();
+
+        DB::table('centro_ciclo')->insertOrIgnore($rows);
+
+        return response()->json([
+            'message' => 'Centro educativo creado correctamente',
+            'centro'  => ['id' => $centro->id, 'nombre' => $centro->nombre],
+        ], 201);
+    }
+
+    // ==========================================
     // GUARDADO Y ACTUALIZACIÓN DE EMPRESAS
     // ==========================================
 
