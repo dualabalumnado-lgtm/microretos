@@ -15,14 +15,14 @@ class MicroretoTokenController extends Controller
      */
     public function get($id)
     {
-        Microreto::findOrFail($id);
+        $microreto = Microreto::where('uuid', $id)->firstOrFail();
 
         // Limpia tokens expirados de este microreto antes de consultar
-        MicroretoToken::where('microreto_id', $id)
+        MicroretoToken::where('microreto_id', $microreto->id)
                        ->where('expires_at', '<=', now())
                        ->delete();
 
-        $token = MicroretoToken::where('microreto_id', $id)->first();
+        $token = MicroretoToken::where('microreto_id', $microreto->id)->first();
 
         if (! $token) {
             return response()->json(['token' => null]);
@@ -42,13 +42,13 @@ class MicroretoTokenController extends Controller
      */
     public function generate($id)
     {
-        Microreto::findOrFail($id);
+        $microreto = Microreto::where('uuid', $id)->firstOrFail();
 
         // Elimina cualquier token previo (activo o expirado) de este microreto
-        MicroretoToken::where('microreto_id', $id)->delete();
+        MicroretoToken::where('microreto_id', $microreto->id)->delete();
 
         $token = MicroretoToken::create([
-            'microreto_id' => $id,
+            'microreto_id' => $microreto->id,
             'token'        => Str::random(48),
             'expires_at'   => now()->addHours(48),
         ]);
@@ -103,8 +103,8 @@ class MicroretoTokenController extends Controller
      */
     public function destroy($id)
     {
-        Microreto::findOrFail($id);
-        MicroretoToken::where('microreto_id', $id)->delete();
+        $microreto = Microreto::where('uuid', $id)->firstOrFail();
+        MicroretoToken::where('microreto_id', $microreto->id)->delete();
 
         return response()->json(['message' => 'Acceso QR revocado correctamente']);
     }

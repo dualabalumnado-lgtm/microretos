@@ -255,7 +255,7 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
         }
         $curriculumTexto .= "\n--- FIN CURRÍCULO ---";
 
-        $esBasica    = ($request->nivelGrupo === 'Básico');
+        $esBasica    = ($request->nivelGrupo === 'Bajo');
         $reglaExtra  = $esBasica
             ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado."
             : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
