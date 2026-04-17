@@ -661,6 +661,8 @@ const tieneContextoEmpresa = computed(() => {
   return !!(seleccion.value.empresaId || seleccion.value.empresaNombre || buscadorEmpresa.value);
 });
 
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
 </script>
 
 <template>
@@ -829,17 +831,27 @@ const tieneContextoEmpresa = computed(() => {
               </div>
 
               <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label class="label-style">Filtrar por Colegio/Centro (Opcional)</label>
+                <!-- PASO 1: Centro educativo obligatorio -->
+                <div class="rounded-2xl transition-all duration-300" :class="!centroFiltro && !esModoDemo ? 'step-glow-active' : ''">
+                  <label class="label-style" :class="!centroFiltro && !esModoDemo ? '!text-[#00A859]' : ''">
+                    {{ !centroFiltro && !esModoDemo ? '① Centro Educativo *' : 'Centro Educativo *' }}
+                  </label>
                   <input v-if="esModoDemo" type="text" value="IES DEMO" disabled class="input-style opacity-70 cursor-not-allowed bg-gray-50" />
                   <select v-else v-model="centroFiltro" class="input-style">
-                    <option value="">Todos los centros...</option>
+                    <option value="">Selecciona tu centro...</option>
                     <option v-for="centro in centrosDisponibles" :key="centro" :value="centro">{{ centro }}</option>
                   </select>
                 </div>
-                
-                <div class="relative" ref="buscadorRef">
-                  <label class="label-style">Escribe para buscar empresa</label>
+
+                <!-- PASO 2: Buscar empresa (bloqueado hasta elegir centro) -->
+                <div class="relative rounded-2xl transition-all duration-300" ref="buscadorRef"
+                     :class="centroFiltro && !seleccion.empresaId && !esModoDemo ? 'step-glow-empresa' : ''">
+                  <label class="label-style"
+                    :class="centroFiltro && !seleccion.empresaId && !esModoDemo ? '!text-[#00A859]' : (!centroFiltro && !esModoDemo ? 'opacity-40' : '')">
+                    <template v-if="centroFiltro && !seleccion.empresaId && !esModoDemo">② Elige empresa</template>
+                    <template v-else-if="!centroFiltro && !esModoDemo">Empresa (elige primero un centro)</template>
+                    <template v-else>Buscar empresa</template>
+                  </label>
                   <div class="absolute left-5 top-[38px] flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -850,11 +862,12 @@ const tieneContextoEmpresa = computed(() => {
                     v-model="buscadorEmpresa"
                     @input="onBuscadorInput"
                     @focus="mostrarDropdownEmpresas = true"
+                    :disabled="!centroFiltro && !esModoDemo"
                     autocomplete="new-password"
                     name="buscar-empresa-dualab"
                     type="search"
                     class="input-style pl-14 text-lg"
-                    placeholder="Ej: Fundación Sergio Alonso..."
+                    :placeholder="!centroFiltro && !esModoDemo ? 'Selecciona primero un centro...' : 'Ej: Fundación Sergio Alonso...'"
                   />
                   
                   <Transition name="dropdown">
@@ -942,9 +955,22 @@ const tieneContextoEmpresa = computed(() => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
 
                 <div v-if="!tieneContextoEmpresa" class="absolute inset-0 bg-white/70 z-10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                  <span class="bg-[#1F2937] text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg">
-                    Busca una empresa o usa la Demo 👆
-                  </span>
+                  <div class="bg-[#1F2937] text-white px-5 py-4 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center gap-3 mx-4">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-[#00A859] text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black shrink-0">1</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest">Elige tu centro</span>
+                    </div>
+                    <span class="text-gray-500 text-xs hidden sm:block">·</span>
+                    <div class="flex items-center gap-2">
+                      <span class="bg-[#00A859] text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black shrink-0">2</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest">Elige empresa</span>
+                    </div>
+                    <span class="text-gray-500 text-xs hidden sm:block">·</span>
+                    <div class="flex items-center gap-2">
+                      <span class="bg-gray-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black shrink-0">3</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest">o usa la Demo 👆</span>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
@@ -1255,11 +1281,11 @@ const tieneContextoEmpresa = computed(() => {
                 </div>
 
                 <div class="col-span-2 md:col-span-1">
-                  <label class="label-style">Nivel del Grupo-Clase *</label>
+                  <label class="label-style">Nivel de exigencia del microreto *</label>
                   <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
-                    <option value="Bajo">Básico (Ej: FP Básica o 1º de GM)</option>
-                    <option value="Medio">Medio (Ej: 2º de GM o 1º de GS)</option>
-                    <option value="Alto">Alto (Ej: 2º de GS o Especialización)</option>
+                    <option value="Básico">Básico — El grupo tiene un nivel de comprensión inicial; el microreto debe ser sencillo y guiado</option>
+                    <option value="Medio">Medio — El grupo maneja conceptos con soltura; el microreto puede tener cierta complejidad y autonomía</option>
+                    <option value="Alto">Alto — El grupo domina la materia; el microreto es exigente, abierto y requiere criterio propio</option>
                   </select>
                 </div>
 
@@ -1663,6 +1689,20 @@ const tieneContextoEmpresa = computed(() => {
     </div>
   </div>
 
+  <!-- Botón volver arriba: visible en paso 3 -->
+  <transition name="fade">
+    <button
+      v-if="pasoActual === 3"
+      @click="scrollToTop"
+      class="fixed bottom-8 right-8 z-50 w-14 h-14 bg-[#1F2937] text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-[#00A859] transition-all duration-300 hover:-translate-y-1 active:scale-95 border-2 border-white/10"
+      title="Volver arriba"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+      </svg>
+    </button>
+  </transition>
+
   <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
 
   <InsertModifyEmpresa
@@ -1721,5 +1761,21 @@ const tieneContextoEmpresa = computed(() => {
 .dropdown-enter-from, .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* Brillo guía de pasos */
+.step-glow-active {
+  animation: glow-green 2s ease-in-out infinite;
+}
+.step-glow-empresa {
+  animation: glow-lime 2s ease-in-out infinite;
+}
+@keyframes glow-green {
+  0%, 100% { box-shadow: 0 0 0 2px #00A859, 0 0 14px rgba(0, 168, 89, 0.25); }
+  50%       { box-shadow: 0 0 0 3px #00A859, 0 0 24px rgba(0, 168, 89, 0.45); }
+}
+@keyframes glow-lime {
+  0%, 100% { box-shadow: 0 0 0 2px #99CC33, 0 0 14px rgba(153, 204, 51, 0.25); }
+  50%       { box-shadow: 0 0 0 3px #99CC33, 0 0 24px rgba(153, 204, 51, 0.45); }
 }
 </style>

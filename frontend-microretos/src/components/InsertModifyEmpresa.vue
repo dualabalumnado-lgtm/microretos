@@ -12,8 +12,9 @@
  *     this.$refs.modalesRef.abrirTrasLogin(accion)
  *  4. Este componente abre el modal correspondiente
  */
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import api from '../api.js'
+import CentroEducativoModal from './CentroEducativoModal.vue'
 
 const props = defineProps({
   mostrarNuevaEmpresa:   { type: Boolean, default: false },
@@ -39,14 +40,40 @@ const tabs = [
 ]
 
 // ════════════════════════════════════════════════════════════
+//  CENTROS (cargados internamente desde la API)
+// ════════════════════════════════════════════════════════════
+const centrosInternos   = ref([])          // [{ id, nombre }]
+const mostrarModalCentro = ref(false)
+
+async function cargarCentros() {
+  try {
+    const { data } = await api.get('/centros')
+    centrosInternos.value = data
+  } catch (e) {
+    console.error('Error cargando centros:', e)
+  }
+}
+
+onMounted(cargarCentros)
+
+function onCentroCreado(centro) {
+  // Añadir a la lista interna si no existe ya
+  if (!centrosInternos.value.find(c => c.id === centro.id)) {
+    centrosInternos.value = [...centrosInternos.value, centro]
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  }
+  mostrarModalCentro.value = false
+  // Auto-seleccionar el nuevo centro en el formulario activo
+  if (props.mostrarNuevaEmpresa)  nuevaForm.centro_educativo  = centro.nombre
+  if (props.mostrarEditarEmpresa) editarForm.centro_educativo = centro.nombre
+}
+
+// ════════════════════════════════════════════════════════════
 //  MODAL NUEVA EMPRESA
 // ════════════════════════════════════════════════════════════
 const tabNueva                = ref('basico')
 const nuevaLoading            = ref(false)
 const nuevaErrors             = reactive({})
-const nuevaCentroNuevo        = ref('')
-const nuevaCiclosDisponibles  = ref([])
-const nuevaCiclosSeleccionados = ref([])
 const nuevaForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
   web: '', centro_educativo: '', familia: '', persona_contacto: '',
@@ -59,27 +86,16 @@ watch(() => props.mostrarNuevaEmpresa, (v) => {
     Object.keys(nuevaErrors).forEach(k => delete nuevaErrors[k])
     Object.keys(nuevaForm).forEach(k => (nuevaForm[k] = ''))
     nuevaForm.nombre_comercial = props.nombreBuscado || ''
-    nuevaCentroNuevo.value = ''
-    nuevaCiclosDisponibles.value = []
-    nuevaCiclosSeleccionados.value = []
     nuevaConfirmando.value = false
     tabNueva.value = 'basico'
   }
 })
 
-// Carga ciclos cuando se activa "nuevo centro" y hay familia elegida
-watch([() => nuevaForm.centro_educativo, () => nuevaForm.familia], async ([centro, familia]) => {
-  if (centro !== '__nuevo__' || !familia) {
-    nuevaCiclosDisponibles.value = []
-    nuevaCiclosSeleccionados.value = []
-    return
-  }
-  try {
-    const { data } = await api.get(`/familias/${encodeURIComponent(familia)}/ciclos`)
-    nuevaCiclosDisponibles.value = data
-    nuevaCiclosSeleccionados.value = []
-  } catch (e) {
-    console.error(e)
+// Interceptar "nuevo centro" → abrir modal en lugar de flujo inline
+watch(() => nuevaForm.centro_educativo, (val) => {
+  if (val === '__nuevo__') {
+    nuevaForm.centro_educativo = ''
+    mostrarModalCentro.value = true
   }
 })
 
@@ -104,15 +120,7 @@ function validarNueva() {
   if (!nuevaForm.sector)           { nuevaErrors.sector           = 'Obligatorio'; ok = false }
   if (!nuevaForm.tamano)           { nuevaErrors.tamano           = 'Obligatorio'; ok = false }
   if (!nuevaForm.familia)          { nuevaErrors.familia          = 'Obligatorio'; ok = false }
-  if (!nuevaForm.centro_educativo) {
-    nuevaErrors.centro_educativo = 'Obligatorio'; ok = false
-  }
-  if (nuevaForm.centro_educativo === '__nuevo__' && !nuevaCentroNuevo.value.trim()) {
-    nuevaErrors.centro_educativo = 'Escribe el nombre del nuevo centro'; ok = false
-  }
-  if (nuevaForm.centro_educativo === '__nuevo__' && nuevaCiclosSeleccionados.value.length === 0) {
-    nuevaErrors.ciclos_centro = 'Selecciona al menos un ciclo que imparte este centro'; ok = false
-  }
+  if (!nuevaForm.centro_educativo) { nuevaErrors.centro_educativo = 'Obligatorio'; ok = false }
   if (!ok) tabNueva.value = 'basico'
   return ok
 }
@@ -136,10 +144,8 @@ async function guardarNueva() {
       sector:          nuevaForm.sector,
       tamano:          nuevaForm.tamano,
       web:             nuevaForm.web              || null,
-      centroEducativo: nuevaForm.centro_educativo === '__nuevo__'
-        ? (nuevaCentroNuevo.value.trim() || null)
-        : (nuevaForm.centro_educativo || null),
-      ciclosIds: nuevaForm.centro_educativo === '__nuevo__' ? nuevaCiclosSeleccionados.value : [],
+      centroEducativo: nuevaForm.centro_educativo || null,
+      ciclosIds: [],
       familia:         nuevaForm.familia,
       personaContacto: nuevaForm.persona_contacto || null,
       telefono:        nuevaForm.telefono         || null,
@@ -168,12 +174,9 @@ async function guardarNueva() {
 // ════════════════════════════════════════════════════════════
 //  MODAL EDITAR EMPRESA
 // ════════════════════════════════════════════════════════════
-const tabEditar                = ref('basico')
-const editarLoading            = ref(false)
-const editarErrors             = reactive({})
-const editarCentroNuevo        = ref('')
-const editarCiclosDisponibles  = ref([])
-const editarCiclosSeleccionados = ref([])
+const tabEditar     = ref('basico')
+const editarLoading = ref(false)
+const editarErrors  = reactive({})
 const editarForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
   web: '', centro_educativo: '', persona_contacto: '', telefono: '',
@@ -200,44 +203,25 @@ watch(() => props.mostrarEditarEmpresa, (v) => {
     editarForm.provincia        = e.provincia        || ''
     editarForm.codigo_postal    = e.codigo_postal    || ''
     editarForm.actividad        = e.actividad        || ''
-    editarCentroNuevo.value = ''
-    editarCiclosDisponibles.value = []
-    editarCiclosSeleccionados.value = []
     tabEditar.value = 'basico'
   }
 })
 
-watch(() => editarForm.centro_educativo, async (centro) => {
-  if (centro !== '__nuevo__') {
-    editarCiclosDisponibles.value = []
-    editarCiclosSeleccionados.value = []
-    return
-  }
-  // Usamos la familia del formulario de nueva (en editar no hay campo familia, se toma de empresaAEditar)
-  const familia = props.empresaAEditar?.familias?.[0]?.nombre ?? props.empresaAEditar?.familia ?? ''
-  if (!familia) return
-  try {
-    const { data } = await api.get(`/familias/${encodeURIComponent(familia)}/ciclos`)
-    editarCiclosDisponibles.value = data
-    editarCiclosSeleccionados.value = []
-  } catch (e) {
-    console.error(e)
+// Interceptar "nuevo centro" → abrir modal
+watch(() => editarForm.centro_educativo, (val) => {
+  if (val === '__nuevo__') {
+    editarForm.centro_educativo = ''
+    mostrarModalCentro.value = true
   }
 })
 
 async function guardarEdicion() {
   Object.keys(editarErrors).forEach(k => delete editarErrors[k])
-  let ok = true
   if (!editarForm.nombre_comercial) {
-    editarErrors.nombre_comercial = 'El nombre comercial es obligatorio'; ok = false
+    editarErrors.nombre_comercial = 'El nombre comercial es obligatorio'
+    tabEditar.value = 'basico'
+    return
   }
-  if (editarForm.centro_educativo === '__nuevo__' && !editarCentroNuevo.value.trim()) {
-    editarErrors.centro_educativo = 'Escribe el nombre del nuevo centro'; ok = false
-  }
-  if (editarForm.centro_educativo === '__nuevo__' && editarCiclosSeleccionados.value.length === 0) {
-    editarErrors.ciclos_centro = 'Selecciona al menos un ciclo que imparte este centro'; ok = false
-  }
-  if (!ok) { tabEditar.value = 'basico'; return }
   editarLoading.value = true
   try {
     const { data } = await api.put(`/empresas/${props.empresaAEditar.id}`, {
@@ -247,10 +231,8 @@ async function guardarEdicion() {
       sector:          editarForm.sector           || null,
       tamano:          editarForm.tamano           || null,
       web:             editarForm.web              || null,
-      centroEducativo: editarForm.centro_educativo === '__nuevo__'
-        ? (editarCentroNuevo.value.trim() || null)
-        : (editarForm.centro_educativo || null),
-      ciclosIds: editarForm.centro_educativo === '__nuevo__' ? editarCiclosSeleccionados.value : [],
+      centroEducativo: editarForm.centro_educativo || null,
+      ciclosIds:       [],
       personaContacto: editarForm.persona_contacto || null,
       telefono:        editarForm.telefono         || null,
       emailGeneral:    editarForm.email_general    || null,
@@ -413,41 +395,16 @@ defineExpose({ abrirTrasLogin })
                   <select v-model="nuevaForm.centro_educativo" class="ime-input"
                     :class="{'ime-input-err': nuevaErrors.centro_educativo}">
                     <option value="">Selecciona un centro...</option>
-                    <option v-for="c in centrosDisponibles" :key="c" :value="c">{{ c }}</option>
-                    <option value="__nuevo__">+ Añadir nuevo centro...</option>
+                    <option v-for="c in centrosInternos" :key="c.id" :value="c.nombre">{{ c.nombre }}</option>
+                    <option value="__nuevo__">+ Crear nuevo centro educativo...</option>
                   </select>
-                  <p v-if="nuevaErrors.centro_educativo && nuevaForm.centro_educativo !== '__nuevo__'" class="ime-err">{{ nuevaErrors.centro_educativo }}</p>
-                  <input
-                    v-if="nuevaForm.centro_educativo === '__nuevo__'"
-                    v-model="nuevaCentroNuevo"
-                    class="ime-input mt-2"
-                    :class="{'ime-input-err': nuevaErrors.centro_educativo}"
-                    placeholder="Nombre del nuevo centro educativo"
-                  />
-                  <p v-if="nuevaErrors.centro_educativo && nuevaForm.centro_educativo === '__nuevo__'" class="ime-err">{{ nuevaErrors.centro_educativo }}</p>
-                  <!-- Ciclos que imparte el nuevo centro (obligatorio) -->
-                  <div v-if="nuevaForm.centro_educativo === '__nuevo__' && nuevaForm.familia" class="mt-3">
-                    <p class="ime-label mb-1">
-                      Ciclos que imparte este centro *
-                      <span class="font-normal text-gray-400 normal-case">(selecciona todos los que apliquen)</span>
-                    </p>
-                    <p v-if="nuevaErrors.ciclos_centro" class="ime-err mb-2">{{ nuevaErrors.ciclos_centro }}</p>
-                    <div v-if="nuevaCiclosDisponibles.length" class="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-                      <label v-for="c in nuevaCiclosDisponibles" :key="c.id"
-                        class="flex items-center gap-2 text-sm text-[#1F2937] cursor-pointer hover:text-[#00A859]">
-                        <input type="checkbox" :value="c.id" v-model="nuevaCiclosSeleccionados"
-                          class="accent-[#00A859] w-4 h-4 shrink-0"/>
-                        {{ c.nombre }}
-                      </label>
-                    </div>
-                    <p v-else class="text-xs text-gray-400 italic">Selecciona primero una familia profesional para ver sus ciclos.</p>
-                  </div>
+                  <p v-if="nuevaErrors.centro_educativo" class="ime-err">{{ nuevaErrors.centro_educativo }}</p>
                 </div>
                 <div>
                   <label class="ime-label">Familia Profesional *</label>
                   <select v-model="nuevaForm.familia" class="ime-input" :class="{'ime-input-err': nuevaErrors.familia}">
                     <option value="">Selecciona familia...</option>
-                    <option v-for="f in familiasProfesionales" :key="f" :value="f">{{ f }}</option>
+                    <option v-for="f in familiasProfesionales" :key="f.id ?? f" :value="f.nombre ?? f">{{ f.nombre ?? f }}</option>
                   </select>
                   <p v-if="nuevaErrors.familia" class="ime-err">{{ nuevaErrors.familia }}</p>
                 </div>
@@ -657,33 +614,10 @@ defineExpose({ abrirTrasLogin })
                   <label class="ime-label">Centro Educativo</label>
                   <select v-model="editarForm.centro_educativo" class="ime-input">
                     <option value="">Sin asignar...</option>
-                    <option v-for="c in centrosDisponibles" :key="c" :value="c">{{ c }}</option>
-                    <option value="__nuevo__">+ Añadir nuevo centro...</option>
+                    <option v-for="c in centrosInternos" :key="c.id" :value="c.nombre">{{ c.nombre }}</option>
+                    <option value="__nuevo__">+ Crear nuevo centro educativo...</option>
                   </select>
-                  <input
-                    v-if="editarForm.centro_educativo === '__nuevo__'"
-                    v-model="editarCentroNuevo"
-                    class="ime-input mt-2"
-                    :class="{'ime-input-err': editarErrors.centro_educativo}"
-                    placeholder="Nombre del nuevo centro educativo"
-                  />
                   <p v-if="editarErrors.centro_educativo" class="ime-err">{{ editarErrors.centro_educativo }}</p>
-                  <div v-if="editarForm.centro_educativo === '__nuevo__'" class="mt-3">
-                    <p class="ime-label mb-1">
-                      Ciclos que imparte este centro *
-                      <span class="font-normal text-gray-400 normal-case">(selecciona todos los que apliquen)</span>
-                    </p>
-                    <p v-if="editarErrors.ciclos_centro" class="ime-err mb-2">{{ editarErrors.ciclos_centro }}</p>
-                    <div v-if="editarCiclosDisponibles.length" class="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-                      <label v-for="c in editarCiclosDisponibles" :key="c.id"
-                        class="flex items-center gap-2 text-sm text-[#1F2937] cursor-pointer hover:text-[#00A859]">
-                        <input type="checkbox" :value="c.id" v-model="editarCiclosSeleccionados"
-                          class="accent-[#00A859] w-4 h-4 shrink-0"/>
-                        {{ c.nombre }}
-                      </label>
-                    </div>
-                    <p v-else class="text-xs text-gray-400 italic">Cargando ciclos...</p>
-                  </div>
                 </div>
                 <div>
                   <label class="ime-label">Actividad</label>
@@ -766,6 +700,13 @@ defineExpose({ abrirTrasLogin })
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Modal para crear nuevo centro educativo (compartido por nueva y editar empresa) -->
+  <CentroEducativoModal
+    :visible="mostrarModalCentro"
+    @centro-creado="onCentroCreado"
+    @cerrar="mostrarModalCentro = false"
+  />
 
 </template>
 
