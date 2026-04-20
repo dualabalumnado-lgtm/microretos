@@ -19,11 +19,12 @@ const authStore = useAuthStore();
 const { descargarPDF } = usePdfExport();
 
 // ── FILTROS ──────────────────────────────────────────────
-const filtroCentro = ref('');
-const filtroCiclo  = ref('');
-const filtroNivel  = ref('');   // '' | 'Bajo' | 'Medio' | 'Alto'
-const filtroCurso  = ref('');   // '' | '1' | '2'
-const busqueda     = ref('');
+const filtroCentro      = ref('');
+const filtroCiclo       = ref('');
+const filtroNivel       = ref('');        // '' | 'Bajo' | 'Medio' | 'Alto'
+const filtroCurso       = ref('');        // '' | '1' | '2'
+const filtroTipoEmpresa = ref('');        // '' | 'real' | 'simulada'
+const busqueda          = ref('');
 
 const centrosDisponibles = computed(() => {
   const c = microretos.value.map(m => m.centro_educativo || m.centro).filter(Boolean);
@@ -52,16 +53,35 @@ const conteoNiveles = computed(() => {
   return r;
 });
 
+// Conteo por tipo (real vs simulada) dentro de familia+centro
+const conteoTipos = computed(() => {
+  const r = { real: 0, simulada: 0, total: 0 };
+  if (!familiaSeleccionada.value) return r;
+  let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
+  if (filtroCentro.value) d = d.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  d.forEach(m => {
+    r.total++;
+    if (m.es_simulado) r.simulada++; else r.real++;
+  });
+  return r;
+});
+
 const microretosFiltrados = computed(() => {
   const q = busqueda.value.toLowerCase().trim();
   return microretos.value.filter(reto => {
     const centro = reto.centro_educativo || reto.centro;
+    const tipoOk = filtroTipoEmpresa.value === ''
+      ? true
+      : filtroTipoEmpresa.value === 'simulada'
+        ? reto.es_simulado === true
+        : reto.es_simulado !== true;
     return (
       reto.familia === familiaSeleccionada.value &&
       (filtroCentro.value === '' || centro === filtroCentro.value) &&
       (filtroCiclo.value  === '' || reto.ciclo === filtroCiclo.value) &&
       (filtroNivel.value  === '' || reto.nivel_grupo === filtroNivel.value) &&
       (filtroCurso.value  === '' || String(reto.curso) === filtroCurso.value) &&
+      tipoOk &&
       (!q || [reto.titulo, reto.pregunta_reto, reto.empresa_nombre, reto.ciclo]
         .some(f => f && f.toLowerCase().includes(q)))
     );
@@ -69,7 +89,7 @@ const microretosFiltrados = computed(() => {
 });
 
 const hayFiltrosActivos = computed(() =>
-  !!(filtroCiclo.value || filtroNivel.value || filtroCurso.value || busqueda.value)
+  !!(filtroCiclo.value || filtroNivel.value || filtroCurso.value || filtroTipoEmpresa.value || busqueda.value)
 );
 
 const conteoPorFamilia = computed(() => {
@@ -93,8 +113,8 @@ const nivelClase = (nivel) => ({
 }[nivel] || 'bg-gray-100 border-gray-200 text-gray-500');
 
 // ── CICLO DE VIDA ─────────────────────────────────────────
-onMounted(async () => {
-  setTimeout(() => { isLoaded.value = true; }, 100);
+const cargarDatos = async () => {
+  cargando.value = true;
   try {
     const [resMicroretos, resFamilias] = await Promise.all([
       api.get('/microretos'),
@@ -114,6 +134,17 @@ onMounted(async () => {
   } finally {
     cargando.value = false;
   }
+};
+
+onMounted(async () => {
+  setTimeout(() => { isLoaded.value = true; }, 100);
+  if (!authStore.isAuthenticated) {
+    accionPendiente.value = { tipo: 'cargar' };
+    showLogin.value = true;
+    cargando.value = false;
+    return;
+  }
+  await cargarDatos();
 });
 
 // ── ACCIONES ──────────────────────────────────────────────
@@ -121,6 +152,7 @@ const resetFiltrosDetalle = () => {
   filtroCiclo.value = '';
   filtroNivel.value = '';
   filtroCurso.value = '';
+  filtroTipoEmpresa.value = '';
   busqueda.value = '';
 };
 
@@ -153,11 +185,12 @@ const irADetalle = (reto) => {
   router.push({ name: 'detalle-microreto', params: { id: reto.uuid || reto.id } });
 };
 
-const onLoginSuccess = () => {
+const onLoginSuccess = async () => {
   if (!accionPendiente.value) return;
   const { tipo, payload } = accionPendiente.value;
   accionPendiente.value = null;
-  if (tipo === 'eliminar') { retoAEliminar.value = payload; modalVisible.value = true; }
+  if (tipo === 'cargar') { await cargarDatos(); }
+  else if (tipo === 'eliminar') { retoAEliminar.value = payload; modalVisible.value = true; }
   else if (tipo === 'ver') router.push({ name: 'detalle-microreto', params: { id: payload.uuid || payload.id } });
 };
 
@@ -470,6 +503,62 @@ const confirmarEliminar = async () => {
 
             </div>
 
+            <!-- ── CARDS TIPO EMPRESA ─────────────────────────────── -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+
+              <!-- TODAS -->
+              <button
+                @click="filtroTipoEmpresa = ''"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
+                :class="filtroTipoEmpresa === ''
+                  ? 'bg-[#1F2937] border-[#1F2937] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-2">
+                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                  </svg>
+                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-400'">{{ conteoTipos.total }}</span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-600'">Todas</p>
+                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === '' ? 'text-white/60' : 'text-gray-400'">sin filtrar</p>
+              </button>
+
+              <!-- EMPRESA REAL -->
+              <button
+                @click="filtroTipoEmpresa = filtroTipoEmpresa === 'real' ? '' : 'real'"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
+                :class="filtroTipoEmpresa === 'real'
+                  ? 'bg-[#00A859] border-[#00A859] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#00A859]/50 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-2">
+                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-[#00A859]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"/>
+                  </svg>
+                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-[#00A859]'">{{ conteoTipos.real }}</span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-gray-600'">Empresa Real</p>
+                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white/60' : 'text-gray-400'">contacto real</p>
+              </button>
+
+              <!-- INFO SIMULADA -->
+              <button
+                @click="filtroTipoEmpresa = filtroTipoEmpresa === 'simulada' ? '' : 'simulada'"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
+                :class="filtroTipoEmpresa === 'simulada'
+                  ? 'bg-[#6366F1] border-[#6366F1] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#6366F1]/50 hover:shadow-md'">
+                <div class="flex items-end justify-between mb-2">
+                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-[#6366F1]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-[#6366F1]'">{{ conteoTipos.simulada }}</span>
+                </div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-gray-600'">Info Simulada</p>
+                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white/60' : 'text-gray-400'">datos de IA</p>
+              </button>
+
+            </div>
+
             <!-- ── BARRA DE FILTROS ──────────────────────────────── -->
             <section class="bg-white/90 backdrop-blur-md rounded-[2rem] p-5 border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.04)] mb-8">
 
@@ -548,6 +637,17 @@ const confirmarEliminar = async () => {
                 <div v-if="hayFiltrosActivos" class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
                   <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Activos:</span>
 
+                  <span v-if="filtroTipoEmpresa"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
+                    :class="filtroTipoEmpresa === 'simulada' ? 'bg-[#6366F1]/10 text-[#6366F1]' : 'bg-[#00A859]/10 text-[#00A859]'">
+                    {{ filtroTipoEmpresa === 'simulada' ? 'Info Simulada' : 'Empresa Real' }}
+                    <button @click="filtroTipoEmpresa = ''" class="ml-0.5 hover:opacity-70 transition-opacity">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
                   <span v-if="filtroNivel"
                     class="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
                     Nivel {{ filtroNivel }}
@@ -606,56 +706,65 @@ const confirmarEliminar = async () => {
             <!-- ── GRID DE MICRORETOS ───────────────────────────── -->
             <div v-if="microretosFiltrados.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div v-for="reto in microretosFiltrados" :key="reto.id"
-                class="bg-white rounded-[1.5rem] border border-gray-100 hover:border-[#00A859]/40 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] shadow-sm transition-all duration-300 flex flex-col group relative overflow-hidden transform hover:-translate-y-1">
+                class="bg-white rounded-[1.5rem] border border-gray-100 hover:border-[#00A859]/40 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] shadow-sm transition-all duration-300 flex flex-col group overflow-hidden transform hover:-translate-y-1">
 
-                <!-- Badge nivel color-coded -->
-                <div class="absolute top-4 right-4 border px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full z-10"
-                  :class="nivelClase(reto.nivel_grupo)">
-                  Nivel microreto: {{ reto.nivel_grupo || 'N/D' }}
+                <div class="p-5 pb-0 flex items-start justify-between gap-2">
+                  <!-- Papelera -->
+                  <button @click.prevent="abrirModalEliminar(reto)"
+                    class="shrink-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm transition-all duration-300 hover:bg-red-50 hover:border-red-300 active:scale-95"
+                    title="Eliminar microreto">
+                    <svg class="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+
+                  <!-- Badges derecha -->
+                  <div class="flex flex-wrap justify-end gap-1.5 min-w-0">
+                    <span class="border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full whitespace-nowrap"
+                      :class="nivelClase(reto.nivel_grupo)">
+                      Nivel: {{ reto.nivel_grupo || 'N/D' }}
+                    </span>
+                    <span v-if="reto.es_simulado"
+                      class="bg-[#6366F1]/10 border border-[#6366F1]/20 text-[#6366F1] px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full whitespace-nowrap">
+                      IA ficticia
+                    </span>
+                  </div>
                 </div>
 
-                <div class="p-7 flex-1 flex flex-col pt-10">
+                <div class="px-7 pb-7 pt-4 flex-1 flex flex-col">
                   <h3 class="text-[#1F2937] font-black text-xl leading-tight mb-4 group-hover:text-[#00A859] transition-colors line-clamp-2" :title="reto.titulo">
                     {{ reto.titulo }}
                   </h3>
                   <div class="flex flex-col gap-2 mb-5 border-l-2 border-gray-100 group-hover:border-[#00A859]/30 pl-3 transition-colors">
                     <p class="text-[#1F2937] text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                      <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      {{ reto.empresa_nombre }}
+                      <span class="truncate">{{ reto.empresa_nombre }}</span>
                     </p>
                     <p class="text-gray-500 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2">
-                      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                       </svg>
-                      {{ reto.centro_educativo || 'Centro ND' }}
+                      <span class="truncate">{{ reto.centro_educativo || 'Centro ND' }}</span>
                     </p>
                   </div>
                   <p class="text-gray-600 text-sm leading-relaxed line-clamp-3 mb-6 flex-1">
                     {{ reto.pregunta_reto }}
                   </p>
                   <div class="mt-auto flex flex-wrap items-center gap-2">
-                    <span class="inline-block bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium truncate shadow-sm" :title="reto.ciclo">
+                    <span class="inline-block bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium truncate max-w-full shadow-sm" :title="reto.ciclo">
                       {{ reto.ciclo }}
                     </span>
-                    <span v-if="reto.curso" class="inline-block bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+                    <span v-if="reto.curso" class="inline-block bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm shrink-0">
                       {{ reto.curso }}º curso
                     </span>
                   </div>
                 </div>
-
-                <button @click.prevent="abrirModalEliminar(reto)"
-                  class="absolute top-4 left-4 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm transition-all duration-300 hover:bg-red-50 hover:border-red-300 active:scale-95 z-10"
-                  title="Eliminar microreto">
-                  <svg class="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
 
                 <div class="flex border-t border-gray-100 group-hover:border-[#00A859] transition-colors duration-300">
                   <button @click.stop="descargarPDF(reto)"

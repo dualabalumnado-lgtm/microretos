@@ -277,6 +277,30 @@ const centrosOrdenados = computed(() => Object.keys(datosPorCentro.value).sort()
 
 const totalFiltradas = computed(() => empresasFiltradas.value.length)
 
+// ─── Colores de estado de contacto ──────────────────────
+const ESTADO_BADGE = {
+  'Pendiente de llamar':            { bg: 'bg-amber-100',       text: 'text-amber-700',   border: 'border-amber-300',   dot: 'bg-amber-400',   pulse: true  },
+  'Llamado - Información obtenida': { bg: 'bg-[#00A859]/10',    text: 'text-[#00A859]',   border: 'border-[#00A859]/30',dot: 'bg-[#00A859]',   pulse: false },
+  'Llamado - Negativa':             { bg: 'bg-red-50',          text: 'text-red-600',     border: 'border-red-200',     dot: 'bg-red-400',     pulse: false },
+  'Llamado - Llamar más tarde':     { bg: 'bg-blue-50',         text: 'text-blue-600',    border: 'border-blue-200',    dot: 'bg-blue-400',    pulse: false },
+  'En colaboración activa':         { bg: 'bg-[#1F2937]/8',     text: 'text-[#1F2937]',   border: 'border-gray-300',    dot: 'bg-[#1F2937]',   pulse: false },
+  'Descartada':                     { bg: 'bg-gray-100',        text: 'text-gray-500',    border: 'border-gray-200',    dot: 'bg-gray-400',    pulse: false },
+  // valores legacy en BD
+  'Pendiente':                      { bg: 'bg-amber-100',       text: 'text-amber-700',   border: 'border-amber-300',   dot: 'bg-amber-400',   pulse: true  },
+  'Pendiente ':                     { bg: 'bg-amber-100',       text: 'text-amber-700',   border: 'border-amber-300',   dot: 'bg-amber-400',   pulse: true  },
+  'Email enviado sin respuesta':    { bg: 'bg-red-50',          text: 'text-red-500',     border: 'border-red-200',     dot: 'bg-red-300',     pulse: false },
+  'Email enviado pendiente respuesta': { bg: 'bg-blue-50',      text: 'text-blue-500',    border: 'border-blue-200',    dot: 'bg-blue-300',    pulse: false },
+  'Email enviado pendiente de respuesta': { bg: 'bg-blue-50',   text: 'text-blue-500',    border: 'border-blue-200',    dot: 'bg-blue-300',    pulse: false },
+  'Contactado':                     { bg: 'bg-[#00A859]/10',    text: 'text-[#00A859]',   border: 'border-[#00A859]/30',dot: 'bg-[#00A859]',   pulse: false },
+  'Contactado ':                    { bg: 'bg-[#00A859]/10',    text: 'text-[#00A859]',   border: 'border-[#00A859]/30',dot: 'bg-[#00A859]',   pulse: false },
+  'Volver a llamar':                { bg: 'bg-blue-50',         text: 'text-blue-600',    border: 'border-blue-200',    dot: 'bg-blue-400',    pulse: false },
+  'Email enviado pendiente respuesta ': { bg: 'bg-blue-50',     text: 'text-blue-500',    border: 'border-blue-200',    dot: 'bg-blue-300',    pulse: false },
+}
+
+function estadoBadge(estado) {
+  return ESTADO_BADGE[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-300', pulse: false }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  ACORDEÓN
 // ═══════════════════════════════════════════════════════════
@@ -752,6 +776,13 @@ function onEmpresaEliminada(data) {
                                        bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full shrink-0">
                             {{ empresa.tamano }}
                           </span>
+                          <span v-if="empresa.estado_contacto"
+                            :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shrink-0">
+                            <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                              class="w-1.5 h-1.5 rounded-full"></span>
+                            {{ empresa.estado_contacto }}
+                          </span>
                         </div>
                         <p class="text-xs text-gray-400 mt-0.5 truncate">
                           <span v-if="empresa.municipio">{{ empresa.municipio }}</span>
@@ -892,9 +923,16 @@ function onEmpresaEliminada(data) {
                               <dt class="text-gray-400 shrink-0 w-24">Horario</dt>
                               <dd class="font-medium text-gray-700">{{ empresa.horario_atencion }}</dd>
                             </div>
-                            <div v-if="empresa.estado_contacto" class="flex gap-2">
-                              <dt class="text-gray-400 shrink-0 w-24">Estado</dt>
-                              <dd class="font-medium text-gray-700">{{ empresa.estado_contacto }}</dd>
+                            <div v-if="empresa.estado_contacto" class="flex gap-2 items-start">
+                              <dt class="text-gray-400 shrink-0 w-24 pt-0.5">Estado</dt>
+                              <dd>
+                                <span :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
+                                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border">
+                                  <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                                    class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                                  {{ empresa.estado_contacto }}
+                                </span>
+                              </dd>
                             </div>
                             <div v-if="empresa.fecha_cita" class="flex gap-2">
                               <dt class="text-gray-400 shrink-0 w-24">Cita</dt>
@@ -1045,6 +1083,13 @@ function onEmpresaEliminada(data) {
                             class="text-[10px] font-bold uppercase tracking-wider
                                    bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full shrink-0">
                         {{ empresa.sector }}
+                      </span>
+                      <span v-if="empresa.estado_contacto"
+                        :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shrink-0">
+                        <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                          class="w-1.5 h-1.5 rounded-full"></span>
+                        {{ empresa.estado_contacto }}
                       </span>
                     </div>
                     <p class="text-xs text-amber-500 mt-0.5 truncate">

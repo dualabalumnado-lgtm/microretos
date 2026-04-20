@@ -32,12 +32,8 @@ const closeOnMobile = () => {
 const isActive = (path) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
 
-const sincronizarConRuta = (path) => {
-  isOpen.value = path !== '/'
-}
-
-onMounted(() => sincronizarConRuta(route.path))
-watch(() => route.path, (path) => sincronizarConRuta(path))
+onMounted(() => { isOpen.value = route.path !== '/' })
+watch(() => route.path, () => closeOnMobile())
 
 watch(
   () => route.query.redirect,
