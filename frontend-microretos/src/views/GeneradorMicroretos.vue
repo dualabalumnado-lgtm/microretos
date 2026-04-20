@@ -663,6 +663,18 @@ const tieneContextoEmpresa = computed(() => {
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
+// ── ESTADO DE CONTACTO (solo lectura, badge) ──────────
+const ESTADO_BADGE_GEN = {
+  'Pendiente de llamar':            { bg: 'bg-amber-100',    text: 'text-amber-700',  border: 'border-amber-300',    dot: 'bg-amber-400 animate-pulse' },
+  'Llamado - Información obtenida': { bg: 'bg-[#00A859]/10', text: 'text-[#00A859]',  border: 'border-[#00A859]/30', dot: 'bg-[#00A859]' },
+  'Llamado - Negativa':             { bg: 'bg-red-50',       text: 'text-red-600',    border: 'border-red-200',      dot: 'bg-red-400' },
+  'Llamado - Llamar más tarde':     { bg: 'bg-blue-50',      text: 'text-blue-600',   border: 'border-blue-200',     dot: 'bg-blue-400' },
+  'En colaboración activa':         { bg: 'bg-gray-100',     text: 'text-gray-700',   border: 'border-gray-300',     dot: 'bg-gray-600' },
+  'Descartada':                     { bg: 'bg-gray-50',      text: 'text-gray-400',   border: 'border-gray-200',     dot: 'bg-gray-300' },
+}
+const estadoBadgeGen = (estado) =>
+  ESTADO_BADGE_GEN[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-300' }
+
 </script>
 
 <template>
@@ -906,22 +918,63 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
               </div>
 
             <div v-if="empresaDetalle" class="bg-white rounded-3xl p-8 border border-gray-100 mb-8 animate-in fade-in duration-500">
-  
+
+            <!-- Cabecera empresa -->
             <div class="mb-8">
               <div class="flex items-center gap-3 mb-4">
-                <div class="w-2 h-6 bg-[#00A859] rounded-full"></div>
-                <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Ficha de Contacto</h3>
+                <div class="w-2 h-6 bg-[#00A859] rounded-full shrink-0"></div>
+                <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Ficha de Empresa</h3>
               </div>
-              
-              <div v-if="empresaDetalle.razon_social" class="flex items-start gap-3 ml-1">
-                <svg class="w-5 h-5 mt-0.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"></path></svg>
-                <div>
-                  <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Razón Social</p>
-                  <p class="font-bold text-[#1F2937] text-lg leading-tight">{{ empresaDetalle.razon_social }}</p>
-                </div>
+
+              <!-- Nombre + razón social -->
+              <p class="font-black text-[#1F2937] text-xl leading-tight ml-5">{{ empresaDetalle.nombre_comercial }}</p>
+              <p v-if="empresaDetalle.razon_social && empresaDetalle.razon_social !== empresaDetalle.nombre_comercial"
+                class="text-sm text-gray-400 ml-5 mt-0.5">{{ empresaDetalle.razon_social }}</p>
+
+              <!-- Chips: sector, tamaño, CIF -->
+              <div class="flex flex-wrap gap-2 ml-5 mt-3">
+                <span v-if="empresaDetalle.sector"
+                  class="text-[10px] font-black uppercase tracking-widest bg-[#00A859]/10 text-[#00A859] px-2.5 py-1 rounded-full">
+                  {{ empresaDetalle.sector }}
+                </span>
+                <span v-if="empresaDetalle.tamano"
+                  class="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-500 px-2.5 py-1 rounded-full">
+                  {{ empresaDetalle.tamano }}
+                </span>
+                <span v-if="empresaDetalle.cif"
+                  class="text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">
+                  CIF: {{ empresaDetalle.cif }}
+                </span>
               </div>
             </div>
               
+              <!-- Estado de contacto (solo lectura) -->
+              <div v-if="!esModoDemo" class="mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                  <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Estado de Contacto</h3>
+                  <span v-if="empresaDetalle.estado_contacto"
+                    :class="[estadoBadgeGen(empresaDetalle.estado_contacto).bg, estadoBadgeGen(empresaDetalle.estado_contacto).text, estadoBadgeGen(empresaDetalle.estado_contacto).border]"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border">
+                    <span :class="estadoBadgeGen(empresaDetalle.estado_contacto).dot" class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                    {{ empresaDetalle.estado_contacto }}
+                  </span>
+                  <span v-else class="text-[10px] text-gray-400 italic">Sin estado asignado</span>
+                </div>
+
+                <!-- Banner para pendiente de llamar -->
+                <Transition name="fade">
+                  <div v-if="empresaDetalle.estado_contacto === 'Pendiente de llamar'"
+                    class="flex items-center gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3">
+                    <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                    <p class="text-xs font-bold text-amber-700">
+                      Empresa <span class="uppercase tracking-wider">pendiente de llamar</span> — contacta con ella antes de generar microretos con su información.
+                    </p>
+                  </div>
+                </Transition>
+              </div>
+
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-gray-200/60">
                 <div v-if="empresaDetalle.persona_contacto || empresaDetalle.telefono || empresaDetalle.email_general">
                   <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Contacto Directo</p>

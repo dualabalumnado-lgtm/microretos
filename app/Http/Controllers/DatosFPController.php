@@ -286,6 +286,8 @@ class DatosFPController extends Controller
 
     public function guardarEmpresa(Request $request)
     {
+        $estadosPermitidos = ['Pendiente de llamar', 'Llamado - Información obtenida', 'Llamado - Negativa', 'Llamado - Llamar más tarde', 'En colaboración activa', 'Descartada'];
+
         $request->validate([
             'nombreComercial'  => 'required|string|max:255',
             'diaANormal'       => 'nullable|string|max:1000',
@@ -294,6 +296,8 @@ class DatosFPController extends Controller
             'restricciones'    => 'nullable|string|max:600',
             'loQueNoQuieren'   => 'nullable|string|max:500',
             'consecuencias'    => 'nullable',
+            'esSimulada'       => 'nullable|boolean',
+            'estadoContacto'   => 'nullable|string|in:' . implode(',', $estadosPermitidos),
         ]);
 
         $consecuenciasTexto = is_array($request->consecuencias)
@@ -320,6 +324,8 @@ class DatosFPController extends Controller
             'consecuencias'     => $consecuenciasTexto,
             'restricciones'     => $request->restricciones,
             'lo_que_no_quieren' => $request->loQueNoQuieren,
+            'es_simulada'       => $request->boolean('esSimulada', false),
+            'estado_contacto'   => $request->estadoContacto,
         ]);
 
         // Guardamos la familia usando FK si existe, además del string legacy
@@ -393,6 +399,8 @@ class DatosFPController extends Controller
             return response()->json(['error' => 'Empresa no encontrada'], 404);
         }
 
+        $estadosPermitidos = ['Pendiente de llamar', 'Llamado - Información obtenida', 'Llamado - Negativa', 'Llamado - Llamar más tarde', 'En colaboración activa', 'Descartada'];
+
         $request->validate([
             'diaANormal'       => 'nullable|string|max:1000',
             'friccionArea'     => 'nullable|string|max:400',
@@ -400,6 +408,8 @@ class DatosFPController extends Controller
             'restricciones'    => 'nullable|string|max:600',
             'loQueNoQuieren'   => 'nullable|string|max:500',
             'consecuencias'    => 'nullable',
+            'esSimulada'       => 'nullable|boolean',
+            'estadoContacto'   => 'nullable|string|in:' . implode(',', $estadosPermitidos),
         ]);
 
         $consecuenciasTexto = is_array($request->consecuencias)
@@ -413,7 +423,7 @@ class DatosFPController extends Controller
             $centroId = $centro->id;
         }
 
-        $empresa->update([
+        $updateData = [
             'centro_educativo'  => $request->centroEducativo, // legacy
             'centro_id'         => $centroId,
             'sector'            => $request->sector,
@@ -425,7 +435,16 @@ class DatosFPController extends Controller
             'consecuencias'     => $consecuenciasTexto,
             'restricciones'     => $request->restricciones,
             'lo_que_no_quieren' => $request->loQueNoQuieren,
-        ]);
+        ];
+
+        if ($request->has('esSimulada')) {
+            $updateData['es_simulada'] = $request->boolean('esSimulada');
+        }
+        if ($request->has('estadoContacto')) {
+            $updateData['estado_contacto'] = $request->estadoContacto;
+        }
+
+        $empresa->update($updateData);
 
         if ($request->filled('familia')) {
             $familiaModel = Familia::where('nombre', $request->familia)->first();
@@ -453,5 +472,23 @@ class DatosFPController extends Controller
             'message' => 'Empresa actualizada correctamente',
             'empresa' => $empresa,
         ]);
+    }
+
+    public function actualizarEstadoEmpresa(Request $request, $id)
+    {
+        $empresa = Empresa::find($id);
+        if (!$empresa) {
+            return response()->json(['error' => 'Empresa no encontrada'], 404);
+        }
+
+        $estadosPermitidos = ['Pendiente de llamar', 'Llamado - Información obtenida', 'Llamado - Negativa', 'Llamado - Llamar más tarde', 'En colaboración activa', 'Descartada'];
+
+        $request->validate([
+            'estadoContacto' => 'nullable|string|in:' . implode(',', $estadosPermitidos),
+        ]);
+
+        $empresa->update(['estado_contacto' => $request->estadoContacto ?: null]);
+
+        return response()->json(['message' => 'Estado actualizado', 'empresa' => $empresa]);
     }
 }
