@@ -40,6 +40,11 @@ class Empresa extends Model
         'consecuencias',
         'restricciones',
         'lo_que_no_quieren',
+        'es_simulada',
+    ];
+
+    protected $casts = [
+        'es_simulada' => 'boolean',
     ];
 
     public function centroEducativo()

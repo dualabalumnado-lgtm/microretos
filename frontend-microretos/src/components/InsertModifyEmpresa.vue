@@ -79,6 +79,7 @@ const nuevaForm               = reactive({
   web: '', centro_educativo: '', familia: '', persona_contacto: '',
   telefono: '', email_general: '', direccion: '', municipio: '',
   provincia: '', codigo_postal: '', actividad: '',
+  es_simulada: false, estado_contacto: '',
 })
 
 watch(() => props.mostrarNuevaEmpresa, (v) => {
@@ -86,6 +87,7 @@ watch(() => props.mostrarNuevaEmpresa, (v) => {
     Object.keys(nuevaErrors).forEach(k => delete nuevaErrors[k])
     Object.keys(nuevaForm).forEach(k => (nuevaForm[k] = ''))
     nuevaForm.nombre_comercial = props.nombreBuscado || ''
+    nuevaForm.es_simulada = false
     nuevaConfirmando.value = false
     tabNueva.value = 'basico'
   }
@@ -155,6 +157,8 @@ async function guardarNueva() {
       provincia:       nuevaForm.provincia        || null,
       codigoPostal:    nuevaForm.codigo_postal    || null,
       actividad:       nuevaForm.actividad        || null,
+      esSimulada:      nuevaForm.es_simulada,
+      estadoContacto:  nuevaForm.estado_contacto || null,
     })
     emit('empresa-creada', data.empresa)
     emit('update:mostrarNuevaEmpresa', false)
@@ -177,11 +181,20 @@ async function guardarNueva() {
 const tabEditar     = ref('basico')
 const editarLoading = ref(false)
 const editarErrors  = reactive({})
+const ESTADOS_CONTACTO = [
+  { value: 'Pendiente de llamar',            label: 'Pendiente de llamar',      activeClass: 'bg-amber-500 text-white border-amber-500 shadow-md',         inactiveClass: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100',       dotClass: 'bg-amber-400' },
+  { value: 'Llamado - Información obtenida', label: 'Llamado — Info obtenida ✓', activeClass: 'bg-[#00A859] text-white border-[#00A859] shadow-md',           inactiveClass: 'bg-[#00A859]/5 text-[#00A859] border-[#00A859]/20 hover:bg-[#00A859]/10', dotClass: 'bg-[#00A859]' },
+  { value: 'Llamado - Negativa',             label: 'Llamado — Negativa ✗',     activeClass: 'bg-red-500 text-white border-red-500 shadow-md',               inactiveClass: 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100',               dotClass: 'bg-red-400' },
+  { value: 'Llamado - Llamar más tarde',     label: 'Llamado — Llamar más tarde', activeClass: 'bg-blue-500 text-white border-blue-500 shadow-md',            inactiveClass: 'bg-blue-50 text-blue-500 border-blue-200 hover:bg-blue-100',           dotClass: 'bg-blue-400' },
+  { value: 'En colaboración activa',         label: 'En colaboración activa ★',  activeClass: 'bg-[#1F2937] text-white border-[#1F2937] shadow-md',           inactiveClass: 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200',         dotClass: 'bg-gray-500' },
+  { value: 'Descartada',                     label: 'Descartada',               activeClass: 'bg-gray-500 text-white border-gray-500 shadow-md',             inactiveClass: 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100',           dotClass: 'bg-gray-300' },
+]
+
 const editarForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
   web: '', centro_educativo: '', persona_contacto: '', telefono: '',
   email_general: '', direccion: '', municipio: '', provincia: '',
-  codigo_postal: '', actividad: '',
+  codigo_postal: '', actividad: '', estado_contacto: '', es_simulada: false,
 })
 
 watch(() => props.mostrarEditarEmpresa, (v) => {
@@ -203,6 +216,8 @@ watch(() => props.mostrarEditarEmpresa, (v) => {
     editarForm.provincia        = e.provincia        || ''
     editarForm.codigo_postal    = e.codigo_postal    || ''
     editarForm.actividad        = e.actividad        || ''
+    editarForm.estado_contacto  = e.estado_contacto  || ''
+    editarForm.es_simulada      = !!e.es_simulada
     tabEditar.value = 'basico'
   }
 })
@@ -241,6 +256,8 @@ async function guardarEdicion() {
       provincia:       editarForm.provincia        || null,
       codigoPostal:    editarForm.codigo_postal    || null,
       actividad:       editarForm.actividad        || null,
+      esSimulada:      editarForm.es_simulada,
+      estadoContacto:  editarForm.estado_contacto  || null,
     })
     // El backend devuelve la empresa completa con el JOIN de familia
     emit('empresa-actualizada', data.empresa)
@@ -301,6 +318,38 @@ defineExpose({ abrirTrasLogin })
               </div>
             </div>
 
+            <!-- Selector: ¿Empresa real o ficticia? -->
+            <div class="mt-5 p-4 rounded-2xl border-2 transition-colors"
+              :class="nuevaForm.es_simulada ? 'border-[#1F2937]/20 bg-[#1F2937]/5' : 'border-[#00A859]/20 bg-[#00A859]/5'">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3">¿Qué tipo de empresa es?</p>
+              <div class="flex gap-3">
+                <button
+                  type="button"
+                  @click="nuevaForm.es_simulada = false"
+                  :class="!nuevaForm.es_simulada ? 'bg-[#00A859] text-white border-[#00A859] shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859]/50'"
+                  class="flex-1 py-3 rounded-xl border-2 font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"/>
+                  </svg>
+                  Empresa Real
+                </button>
+                <button
+                  type="button"
+                  @click="nuevaForm.es_simulada = true"
+                  :class="nuevaForm.es_simulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'"
+                  class="flex-1 py-3 rounded-xl border-2 font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  Empresa Ficticia
+                </button>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-2 ml-1 leading-relaxed">
+                <template v-if="!nuevaForm.es_simulada">Contacto real: la empresa ha sido o será contactada para recabar información.</template>
+                <template v-else>Empresa con datos inventados o generados por IA. No ha habido contacto real.</template>
+              </p>
+            </div>
+
             <div class="ime-tabs mt-7">
               <button v-for="tab in tabs" :key="tab.id"
                 @click="tabNueva = tab.id" class="ime-tab"
@@ -346,6 +395,26 @@ defineExpose({ abrirTrasLogin })
 
             <!-- Tab Básico -->
             <div v-show="tabNueva === 'basico'" class="space-y-5 mt-6">
+              <!-- Estado de contacto -->
+              <div>
+                <label class="ime-label">Estado de Contacto</label>
+                <div class="flex flex-wrap gap-2 mt-1">
+                  <button
+                    v-for="est in ESTADOS_CONTACTO"
+                    :key="est.value"
+                    type="button"
+                    @click="nuevaForm.estado_contacto = nuevaForm.estado_contacto === est.value ? '' : est.value"
+                    :class="[nuevaForm.estado_contacto === est.value ? est.activeClass : est.inactiveClass]"
+                    class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer">
+                    {{ est.label }}
+                  </button>
+                  <button v-if="nuevaForm.estado_contacto" type="button"
+                    @click="nuevaForm.estado_contacto = ''"
+                    class="px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest transition-all border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 cursor-pointer">
+                    ✕ Sin estado
+                  </button>
+                </div>
+              </div>
               <div class="ime-g2">
                 <div>
                   <label class="ime-label">Nombre Comercial *</label>
@@ -555,6 +624,47 @@ defineExpose({ abrirTrasLogin })
               </div>
             </div>
 
+            <!-- Banner pendiente de llamar -->
+            <Transition name="ime-fade">
+              <div v-if="editarForm.estado_contacto === 'Pendiente de llamar'"
+                class="mt-5 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3">
+                <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <p class="text-xs font-bold text-amber-700">
+                  Esta empresa está <span class="uppercase tracking-wider">pendiente de llamar</span>. Los datos de diagnóstico pueden estar incompletos hasta establecer contacto.
+                </p>
+              </div>
+            </Transition>
+
+            <!-- Tipo de empresa (es_simulada) -->
+            <div class="mt-5 p-4 rounded-2xl border-2 transition-colors"
+              :class="editarForm.es_simulada ? 'border-[#1F2937]/20 bg-[#1F2937]/5' : 'border-[#00A859]/20 bg-[#00A859]/5'">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Tipo de empresa</p>
+              <div class="flex gap-3">
+                <button
+                  type="button"
+                  @click="editarForm.es_simulada = false"
+                  :class="!editarForm.es_simulada ? 'bg-[#00A859] text-white border-[#00A859] shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859]/50'"
+                  class="flex-1 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7z"/>
+                  </svg>
+                  Empresa Real
+                </button>
+                <button
+                  type="button"
+                  @click="editarForm.es_simulada = true"
+                  :class="editarForm.es_simulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'"
+                  class="flex-1 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  Empresa Ficticia
+                </button>
+              </div>
+            </div>
+
             <div class="ime-tabs mt-7">
               <button v-for="tab in tabs" :key="tab.id"
                 @click="tabEditar = tab.id" class="ime-tab"
@@ -570,6 +680,26 @@ defineExpose({ abrirTrasLogin })
 
             <!-- Tab Básico -->
             <div v-show="tabEditar === 'basico'" class="space-y-5 mt-6">
+              <!-- Estado de contacto -->
+              <div>
+                <label class="ime-label">Estado de Contacto</label>
+                <div class="flex flex-wrap gap-2 mt-1">
+                  <button
+                    v-for="est in ESTADOS_CONTACTO"
+                    :key="est.value"
+                    type="button"
+                    @click="editarForm.estado_contacto = editarForm.estado_contacto === est.value ? '' : est.value"
+                    :class="[editarForm.estado_contacto === est.value ? est.activeClass : est.inactiveClass]"
+                    class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer">
+                    {{ est.label }}
+                  </button>
+                  <button v-if="editarForm.estado_contacto" type="button"
+                    @click="editarForm.estado_contacto = ''"
+                    class="px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest transition-all border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 cursor-pointer">
+                    ✕ Sin estado
+                  </button>
+                </div>
+              </div>
               <div class="ime-g2">
                 <div>
                   <label class="ime-label">Nombre Comercial *</label>
@@ -585,8 +715,10 @@ defineExpose({ abrirTrasLogin })
               </div>
               <div class="ime-g2">
                 <div>
-                  <label class="ime-label">CIF</label>
-                  <input v-model="editarForm.cif" class="ime-input" placeholder="Ej: B12345678"/>
+                  <label class="ime-label">CIF{{ editarForm.cif ? ' — asignado, no editable' : '' }}</label>
+                  <input v-model="editarForm.cif" :disabled="!!props.empresaAEditar?.cif" class="ime-input"
+                    :class="props.empresaAEditar?.cif ? 'opacity-60 cursor-not-allowed bg-gray-100' : ''"
+                    placeholder="Ej: B12345678"/>
                 </div>
                 <div>
                   <label class="ime-label">Sector de Actividad</label>
