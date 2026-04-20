@@ -65,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/empresas/{id}/familias',  [DatosFPController::class, 'getFamiliasPorEmpresa']);
     Route::post('/empresas',               [DatosFPController::class, 'guardarEmpresa']);
     Route::put('/empresas/{id}',           [DatosFPController::class, 'actualizarEmpresa']);
+    Route::patch('/empresas/{id}/estado',  [DatosFPController::class, 'actualizarEstadoEmpresa']);
     Route::delete('/empresas/{id}',        [DatosFPController::class, 'eliminarEmpresa']);
 
     // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
