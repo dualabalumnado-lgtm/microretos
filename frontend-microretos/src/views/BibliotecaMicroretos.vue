@@ -130,7 +130,12 @@ const cargarDatos = async () => {
     await nextTick();
     if (centrosDisponibles.value.length > 0) filtroCentro.value = centrosDisponibles.value[0];
   } catch (error) {
-    console.error('Error al cargar la biblioteca:', error);
+    if (error.response?.status === 401) {
+      accionPendiente.value = { tipo: 'cargar' };
+      showLogin.value = true;
+    } else {
+      console.error('Error al cargar la biblioteca:', error);
+    }
   } finally {
     cargando.value = false;
   }

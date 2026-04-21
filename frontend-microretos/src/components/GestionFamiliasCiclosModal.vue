@@ -56,10 +56,12 @@ const nuevoCicloErr          = ref('')
 const nuevoCicloLoad         = ref(false)
 
 // ─── Confirmación de eliminación ─────────────────────────────
-const confirmElimFamilia = ref(null)   // { id, nombre, numCiclos, numEmpresas }
-const confirmElimCiclo   = ref(null)   // { id, nombre, familiaId, numCentros }
-const elimLoading        = ref(false)
-const elimError          = ref('')
+const confirmElimFamilia   = ref(null)   // { id, nombre, numCiclos }
+const confirmElimCiclo     = ref(null)   // { id, nombre, familiaId }
+const confirmNombreFamilia = ref('')
+const confirmNombreCiclo   = ref('')
+const elimLoading          = ref(false)
+const elimError            = ref('')
 
 const GRADOS = [
   { value: 'Ciclo Formativo de Grado Básico',    siglas: 'FPB' },
@@ -115,14 +117,16 @@ watch(() => props.visible, async (v) => {
 })
 
 function resetAll() {
-  familiaExpandida.value     = null
-  editFamiliaId.value        = null
-  mostrarNuevaFamilia.value  = false
-  editCicloId.value          = null
+  familiaExpandida.value       = null
+  editFamiliaId.value          = null
+  mostrarNuevaFamilia.value    = false
+  editCicloId.value            = null
   nuevoCicloPorFamiliaId.value = null
-  confirmElimFamilia.value   = null
-  confirmElimCiclo.value     = null
-  elimError.value            = ''
+  confirmElimFamilia.value     = null
+  confirmElimCiclo.value       = null
+  confirmNombreFamilia.value   = ''
+  confirmNombreCiclo.value     = ''
+  elimError.value              = ''
 }
 
 // ════════════════════════════════════════════════════════════
@@ -167,11 +171,12 @@ async function guardarFamilia() {
 }
 
 function pedirEliminarFamilia(f) {
-  elimError.value = ''
-  confirmElimFamilia.value = {
-    id:          f.id,
-    nombre:      f.nombre,
-    numCiclos:   f.ciclos?.length ?? 0,
+  elimError.value            = ''
+  confirmNombreFamilia.value = ''
+  confirmElimFamilia.value   = {
+    id:        f.id,
+    nombre:    f.nombre,
+    numCiclos: f.ciclos?.length ?? 0,
   }
 }
 
@@ -255,8 +260,9 @@ async function guardarCiclo() {
 }
 
 function pedirEliminarCiclo(ciclo, familiaId) {
-  elimError.value        = ''
-  confirmElimCiclo.value = { id: ciclo.id, nombre: ciclo.nombre, familiaId }
+  elimError.value           = ''
+  confirmNombreCiclo.value  = ''
+  confirmElimCiclo.value    = { id: ciclo.id, nombre: ciclo.nombre, familiaId }
 }
 
 async function confirmarEliminarCiclo() {
@@ -649,8 +655,10 @@ async function guardarNuevoCiclo(familiaId) {
             <!-- ══ Modal confirmación eliminar FAMILIA ══ -->
             <Transition name="gfcm-fade">
               <div v-if="confirmElimFamilia"
-                class="fixed inset-0 z-10010 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                <div class="bg-white rounded-4xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+                class="fixed inset-0 z-10010 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div class="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+
+                  <!-- Cabecera -->
                   <div class="flex items-center gap-3 mb-4">
                     <div class="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
                       <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -663,25 +671,47 @@ async function guardarNuevoCiclo(familiaId) {
                       <p class="text-xs text-gray-400">Esta acción no se puede deshacer</p>
                     </div>
                   </div>
+
+                  <!-- Nombre + estado -->
                   <div class="bg-red-50 border border-red-200 rounded-2xl p-3 mb-4">
                     <p class="text-sm font-black text-red-800">"{{ confirmElimFamilia.nombre }}"</p>
                     <p class="text-xs text-red-600 mt-1">
                       {{ confirmElimFamilia.numCiclos > 0
-                        ? `Tiene ${confirmElimFamilia.numCiclos} ciclo(s) asociado(s). Elimina primero los ciclos.`
-                        : 'Esta familia no tiene ciclos. Se eliminará de forma permanente.' }}
+                        ? `Tiene ${confirmElimFamilia.numCiclos} ciclo(s) asociado(s). Elimina primero todos sus ciclos.`
+                        : 'Afecta a todos los microretos y empresas vinculadas a esta familia.' }}
                     </p>
                   </div>
+
+                  <!-- Confirmación por nombre (solo si se puede borrar) -->
+                  <template v-if="confirmElimFamilia.numCiclos === 0">
+                    <p class="text-xs text-gray-500 mb-1.5">
+                      Escribe <span class="font-black text-gray-700">{{ confirmElimFamilia.nombre }}</span> para confirmar:
+                    </p>
+                    <input
+                      v-model="confirmNombreFamilia"
+                      :placeholder="confirmElimFamilia.nombre"
+                      class="w-full px-3 py-2 rounded-xl border text-sm mb-3 focus:outline-none focus:ring-2 transition-all"
+                      :class="confirmNombreFamilia === confirmElimFamilia.nombre
+                        ? 'border-green-300 focus:ring-green-200 bg-green-50'
+                        : 'border-gray-200 focus:ring-red-200'"
+                      @keyup.enter="confirmNombreFamilia === confirmElimFamilia.nombre && confirmarEliminarFamilia()"
+                    />
+                  </template>
+
                   <p v-if="elimError" class="text-xs text-red-600 font-bold mb-3">{{ elimError }}</p>
+
                   <div class="flex gap-2">
-                    <button @click="confirmElimFamilia = null; elimError = ''" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+                    <button
+                      @click="confirmElimFamilia = null; confirmNombreFamilia = ''; elimError = ''"
+                      class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
                       Cancelar
                     </button>
                     <button
                       @click="confirmarEliminarFamilia"
-                      :disabled="elimLoading || confirmElimFamilia.numCiclos > 0"
+                      :disabled="elimLoading || confirmElimFamilia.numCiclos > 0 || confirmNombreFamilia !== confirmElimFamilia.nombre"
                       class="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
-                      {{ elimLoading ? 'Eliminando...' : 'Eliminar' }}
+                      {{ elimLoading ? 'Eliminando...' : 'Eliminar definitivamente' }}
                     </button>
                   </div>
                 </div>
@@ -691,8 +721,10 @@ async function guardarNuevoCiclo(familiaId) {
             <!-- ══ Modal confirmación eliminar CICLO ══ -->
             <Transition name="gfcm-fade">
               <div v-if="confirmElimCiclo"
-                class="fixed inset-0 z-10010 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                <div class="bg-white rounded-4xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+                class="fixed inset-0 z-10010 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div class="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+
+                  <!-- Cabecera -->
                   <div class="flex items-center gap-3 mb-4">
                     <div class="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
                       <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,25 +733,45 @@ async function guardarNuevoCiclo(familiaId) {
                       </svg>
                     </div>
                     <div>
-                      <h3 class="font-black text-base text-[#1F2937]">Eliminar ciclo</h3>
+                      <h3 class="font-black text-base text-[#1F2937]">Eliminar ciclo formativo</h3>
                       <p class="text-xs text-gray-400">Esta acción no se puede deshacer</p>
                     </div>
                   </div>
+
+                  <!-- Nombre -->
                   <div class="bg-red-50 border border-red-200 rounded-2xl p-3 mb-4">
                     <p class="text-sm font-black text-red-800">"{{ confirmElimCiclo.nombre }}"</p>
-                    <p class="text-xs text-red-600 mt-1">Se eliminará permanentemente del catálogo.</p>
+                    <p class="text-xs text-red-600 mt-1">Se eliminará permanentemente del catálogo y afectará a todas las relaciones del sistema.</p>
                   </div>
+
+                  <!-- Confirmación por nombre -->
+                  <p class="text-xs text-gray-500 mb-1.5">
+                    Escribe <span class="font-black text-gray-700">{{ confirmElimCiclo.nombre }}</span> para confirmar:
+                  </p>
+                  <input
+                    v-model="confirmNombreCiclo"
+                    :placeholder="confirmElimCiclo.nombre"
+                    class="w-full px-3 py-2 rounded-xl border text-sm mb-3 focus:outline-none focus:ring-2 transition-all"
+                    :class="confirmNombreCiclo === confirmElimCiclo.nombre
+                      ? 'border-green-300 focus:ring-green-200 bg-green-50'
+                      : 'border-gray-200 focus:ring-red-200'"
+                    @keyup.enter="confirmNombreCiclo === confirmElimCiclo.nombre && confirmarEliminarCiclo()"
+                  />
+
                   <p v-if="elimError" class="text-xs text-red-600 font-bold mb-3">{{ elimError }}</p>
+
                   <div class="flex gap-2">
-                    <button @click="confirmElimCiclo = null; elimError = ''" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+                    <button
+                      @click="confirmElimCiclo = null; confirmNombreCiclo = ''; elimError = ''"
+                      class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
                       Cancelar
                     </button>
                     <button
                       @click="confirmarEliminarCiclo"
-                      :disabled="elimLoading"
-                      class="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 disabled:opacity-50 transition-all"
+                      :disabled="elimLoading || confirmNombreCiclo !== confirmElimCiclo.nombre"
+                      class="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
-                      {{ elimLoading ? 'Eliminando...' : 'Eliminar' }}
+                      {{ elimLoading ? 'Eliminando...' : 'Eliminar definitivamente' }}
                     </button>
                   </div>
                 </div>

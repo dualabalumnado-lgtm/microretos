@@ -50,7 +50,8 @@ const filtroCentro  = ref('')
 const filtroFamilia = ref('')
 const filtroCiclo   = ref('')
 const filtroCurso   = ref('')
-const busqueda      = ref('')
+const busqueda       = ref('')
+const filtroSimulado = ref('') // '' | 'si' | 'no'
 
 // ── Derivados para los selects ────────────────────────────────────────────────
 
@@ -127,6 +128,8 @@ const resultadosFiltrados = computed(() => {
       (m.curso != null && String(m.curso).includes(q))
     )
   }
+  if (filtroSimulado.value === 'si') base = base.filter(m => !!m.es_simulado)
+  if (filtroSimulado.value === 'no') base = base.filter(m => !m.es_simulado)
 
   return base.slice(0, 60)
 })
@@ -214,6 +217,35 @@ function eliminarSesion(id) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
   sesiones.value = lista
 }
+
+// ─── Filtros y paginación del panel de sesiones ───────────────────────────────
+const filtroSes      = ref({ fecha: '', titulo: '', curso: '', grupo: '' })
+const paginaSesiones = ref(1)
+const SESIONES_POR_PAGINA = 5
+
+const sesionesFiltradas = computed(() => {
+  let lista = [...sesiones.value].reverse()
+  if (filtroSes.value.fecha)
+    lista = lista.filter(s => s.fecha === filtroSes.value.fecha)
+  if (filtroSes.value.titulo.trim()) {
+    const q = filtroSes.value.titulo.trim().toLowerCase()
+    lista = lista.filter(s => (s.microreto_titulo || '').toLowerCase().includes(q))
+  }
+  if (filtroSes.value.curso) lista = lista.filter(s => s.curso === filtroSes.value.curso)
+  if (filtroSes.value.grupo) lista = lista.filter(s => s.grupo === filtroSes.value.grupo)
+  return lista
+})
+
+const sesionesVisibles = computed(() => {
+  const start = (paginaSesiones.value - 1) * SESIONES_POR_PAGINA
+  return sesionesFiltradas.value.slice(start, start + SESIONES_POR_PAGINA)
+})
+
+const totalPaginasSes = computed(() =>
+  Math.ceil(sesionesFiltradas.value.length / SESIONES_POR_PAGINA)
+)
+
+watch(filtroSes, () => { paginaSesiones.value = 1 }, { deep: true })
 
 // ─── Limpiar selección de microreto ──────────────────────────────────────────
 function limpiarFormulario() {
@@ -389,6 +421,22 @@ function formatFecha(isoDate) {
                   <span :class="filtroCurso ? 'text-[#00A859]' : filtroCiclo ? 'text-gray-400' : 'text-gray-200'">④ Curso</span>
                 </div>
 
+                <!-- Filtro: tipo de microreto (simulado / real) -->
+                <div v-if="!cargandoCatalogo" class="flex items-center gap-2.5">
+                  <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 flex-shrink-0">Tipo:</p>
+                  <div class="flex gap-1.5 flex-1">
+                    <button v-for="op in [{ val: '', label: 'Todos' }, { val: 'si', label: 'Simulados' }, { val: 'no', label: 'Reales' }]"
+                            :key="op.val"
+                            @click="filtroSimulado = op.val"
+                            class="flex-1 py-1 px-2 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all text-center"
+                            :class="filtroSimulado === op.val
+                              ? (op.val === 'si' ? 'bg-amber-400 border-amber-400 text-white' : 'bg-[#00A859] border-[#00A859] text-white')
+                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-600'">
+                      {{ op.label }}
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Filtros en cascada -->
                 <div class="grid grid-cols-2 gap-3">
 
@@ -459,8 +507,8 @@ function formatFecha(isoDate) {
 
                 </div>
 
-                <!-- Barra de búsqueda por texto — solo cuando hay ciclo seleccionado -->
-                <div v-if="filtroCiclo" class="relative">
+                <!-- Barra de búsqueda por texto — cuando hay ciclo o filtro simulado activo -->
+                <div v-if="filtroCiclo || filtroSimulado" class="relative">
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300
                                pointer-events-none"
                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -476,7 +524,7 @@ function formatFecha(isoDate) {
                 <div class="flex items-center justify-between">
                   <p class="text-[10px] text-gray-400 font-medium">
                     <span v-if="cargandoCatalogo">Cargando catálogo...</span>
-                    <span v-else-if="filtroCiclo">
+                    <span v-else-if="filtroCiclo || filtroSimulado">
                       {{ resultadosFiltrados.length }}
                       {{ resultadosFiltrados.length === 1 ? 'microreto' : 'microretos' }}
                       encontrados
@@ -484,8 +532,8 @@ function formatFecha(isoDate) {
                     <span v-else class="text-gray-300">Completa los filtros para ver resultados</span>
                   </p>
                   <div class="flex gap-2">
-                    <button v-if="filtroCentro || filtroFamilia || filtroCiclo || filtroCurso || busqueda"
-                            @click="filtroCentro=''; filtroFamilia=''; filtroCiclo=''; filtroCurso=''; busqueda=''"
+                    <button v-if="filtroCentro || filtroFamilia || filtroCiclo || filtroCurso || busqueda || filtroSimulado"
+                            @click="filtroCentro=''; filtroFamilia=''; filtroCiclo=''; filtroCurso=''; busqueda=''; filtroSimulado=''"
                             class="text-[10px] font-black uppercase tracking-widest text-gray-400
                                    hover:text-red-400 transition-colors">
                       Limpiar filtros
@@ -506,8 +554,8 @@ function formatFecha(isoDate) {
                   </svg>
                 </div>
 
-                <!-- Lista de resultados — solo cuando hay ciclo elegido -->
-                <ul v-else-if="filtroCiclo && resultadosFiltrados.length"
+                <!-- Lista de resultados — cuando hay ciclo elegido o filtro simulado activo -->
+                <ul v-else-if="(filtroCiclo || filtroSimulado) && resultadosFiltrados.length"
                     class="space-y-2 max-h-72 overflow-y-auto pr-1 -mr-1">
                   <li v-for="m in resultadosFiltrados" :key="m.uuid || m.id">
                     <button @click="seleccionarMicroreto(m)"
@@ -522,6 +570,7 @@ function formatFecha(isoDate) {
                         <span v-if="m.familia" class="tag tag-gray">{{ m.familia }}</span>
                         <span v-if="m.ciclo"   class="tag tag-gray truncate max-w-[180px]">{{ m.ciclo }}</span>
                         <span v-if="m.curso"   class="tag tag-green">{{ normalizarCurso(m.curso) }}</span>
+                        <span v-if="m.es_simulado" class="tag tag-amber">Simulado</span>
                         <span v-if="m.centro_educativo || m.centro"
                               class="tag tag-gray">
                           {{ m.centro_educativo || m.centro }}
@@ -531,8 +580,8 @@ function formatFecha(isoDate) {
                   </li>
                 </ul>
 
-                <!-- Sin resultados (con ciclo seleccionado pero sin matches) -->
-                <div v-else-if="filtroCiclo"
+                <!-- Sin resultados (con ciclo o filtro simulado activo pero sin matches) -->
+                <div v-else-if="filtroCiclo || filtroSimulado"
                      class="text-center py-8 text-gray-400">
                   <svg class="w-8 h-8 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -541,7 +590,7 @@ function formatFecha(isoDate) {
                 </div>
 
                 <!-- Indicador visual cuando el buscador está bloqueado esperando filtros -->
-                <div v-else-if="!filtroCiclo && !cargandoCatalogo"
+                <div v-else-if="!filtroCiclo && !filtroSimulado && !cargandoCatalogo"
                      class="rounded-xl border border-dashed border-gray-200 py-8 text-center">
                   <div class="flex items-center justify-center gap-1.5 text-gray-300 mb-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -551,7 +600,7 @@ function formatFecha(isoDate) {
                   </div>
                   <p class="text-xs text-gray-400 font-medium">
                     Selecciona centro → familia → ciclo<br>
-                    <span class="text-gray-300">para desbloquear los resultados</span>
+                    <span class="text-gray-300">para desbloquear los resultados,<br>o filtra por tipo arriba</span>
                   </p>
                 </div>
 
@@ -721,16 +770,94 @@ function formatFecha(isoDate) {
         <!-- ─── COLUMNA DERECHA: Historial ──────────────────────────────── -->
         <div class="lg:col-span-2">
           <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6">
-            <div class="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                Sesiones registradas
-              </p>
-              <span class="text-[10px] font-black bg-[#00A859]/10 text-[#00A859]
-                           px-2 py-0.5 rounded-full uppercase tracking-widest">
-                {{ sesiones.length }}
-              </span>
+
+            <!-- Cabecera -->
+            <div class="px-5 py-4 border-b border-gray-50">
+              <div class="flex items-center justify-between mb-3">
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                  Sesiones registradas
+                </p>
+                <span class="text-[10px] font-black bg-[#00A859]/10 text-[#00A859]
+                             px-2 py-0.5 rounded-full uppercase tracking-widest">
+                  {{ sesiones.length }}
+                </span>
+              </div>
+              <!-- Botón ver todas -->
+              <button v-if="sesiones.length > 0"
+                      @click="router.push('/dashboard/sesiones')"
+                      class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                             bg-[#00A859]/8 border border-[#00A859]/20 text-[#00A859]
+                             text-[9px] font-black uppercase tracking-widest
+                             hover:bg-[#00A859]/15 transition-all">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                Ver todas las sesiones
+                <svg class="w-3 h-3 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </button>
             </div>
 
+            <!-- Filtros compactos -->
+            <div v-if="sesiones.length > 0" class="px-4 py-3 border-b border-gray-50 space-y-2">
+              <!-- Búsqueda por título -->
+              <div class="relative">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-300 pointer-events-none"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input v-model="filtroSes.titulo" type="text" placeholder="Buscar sesión..."
+                       class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 py-1.5
+                              text-xs font-medium text-gray-700 placeholder-gray-300
+                              focus:outline-none focus:border-[#00A859]/50 focus:ring-1 focus:ring-[#00A859]/20" />
+              </div>
+              <!-- Fecha -->
+              <input v-model="filtroSes.fecha" type="date"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5
+                            text-xs font-medium text-gray-600
+                            focus:outline-none focus:border-[#00A859]/50 focus:ring-1 focus:ring-[#00A859]/20" />
+              <!-- Curso + Grupo -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <p class="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">Curso</p>
+                  <div class="flex gap-1">
+                    <button v-for="c in ['', '1º', '2º']" :key="'fc'+c"
+                            @click="filtroSes.curso = c"
+                            class="flex-1 py-1 rounded-lg text-[8px] font-black uppercase border transition-all"
+                            :class="filtroSes.curso === c
+                              ? 'bg-[#00A859] border-[#00A859] text-white'
+                              : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#00A859]/40'">
+                      {{ c === '' ? '·' : c }}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">Grupo</p>
+                  <div class="flex gap-0.5">
+                    <button v-for="g in ['', 'A', 'B', 'C', 'D']" :key="'fg'+g"
+                            @click="filtroSes.grupo = g"
+                            class="flex-1 py-1 rounded-md text-[7px] font-black uppercase border transition-all"
+                            :class="filtroSes.grupo === g
+                              ? 'bg-[#99CC33] border-[#99CC33] text-white'
+                              : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#99CC33]/40'">
+                      {{ g === '' ? '·' : g }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <!-- Limpiar filtros -->
+              <div v-if="filtroSes.titulo || filtroSes.fecha || filtroSes.curso || filtroSes.grupo"
+                   class="flex justify-end">
+                <button @click="filtroSes = { fecha: '', titulo: '', curso: '', grupo: '' }"
+                        class="text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+
+            <!-- Estado vacío -->
             <div v-if="sesiones.length === 0" class="px-5 py-10 text-center">
               <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100
                           flex items-center justify-center mx-auto mb-3">
@@ -744,11 +871,18 @@ function formatFecha(isoDate) {
               </p>
             </div>
 
-            <ul v-else class="divide-y divide-gray-50 max-h-[calc(100vh-16rem)] overflow-y-auto">
-              <li v-for="s in [...sesiones].reverse()" :key="s.id"
-                  class="px-5 py-4 hover:bg-gray-50/60 transition-colors group">
+            <!-- Sin resultados tras filtrar -->
+            <div v-else-if="sesionesFiltradas.length === 0" class="px-5 py-8 text-center">
+              <p class="text-xs text-gray-400 font-medium">Sin resultados para esos filtros.</p>
+            </div>
+
+            <!-- Lista de sesiones (miniaturas) -->
+            <ul v-else class="divide-y divide-gray-50">
+              <li v-for="s in sesionesVisibles" :key="s.id"
+                  class="px-4 py-3 hover:bg-gray-50/60 transition-colors group cursor-pointer"
+                  @click="verSesion(s)">
                 <div class="flex items-start justify-between gap-2">
-                  <div class="flex-1 min-w-0 cursor-pointer" @click="verSesion(s)">
+                  <div class="flex-1 min-w-0">
                     <p class="text-xs font-black text-[#1F2937] leading-snug truncate
                               group-hover:text-[#00A859] transition-colors">
                       {{ s.microreto_titulo || '(sin título)' }}
@@ -756,58 +890,63 @@ function formatFecha(isoDate) {
                     <p class="text-[10px] text-[#00A859] font-bold mt-0.5">
                       {{ formatFecha(s.fecha) }}
                     </p>
-                    <div class="flex flex-wrap gap-1 mt-1.5">
-                      <span v-if="s.centro_educativo" class="tag tag-gray">{{ s.centro_educativo }}</span>
-                      <span v-if="s.ciclo_formativo"  class="tag tag-gray truncate max-w-[120px]">{{ s.ciclo_formativo }}</span>
-                      <span v-if="s.curso"            class="tag tag-green">{{ s.curso }}</span>
-                      <span v-if="s.grupo"            class="tag tag-lime">Grupo {{ s.grupo }}</span>
-                      <span v-if="s.num_alumnos"      class="tag tag-gray">{{ s.num_alumnos }} alumnos</span>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                      <span v-if="s.curso"       class="tag tag-green">{{ s.curso }}</span>
+                      <span v-if="s.grupo"       class="tag tag-lime">Gr. {{ s.grupo }}</span>
+                      <span v-if="s.num_alumnos" class="tag tag-gray">{{ s.num_alumnos }} al.</span>
                     </div>
-                    <p v-if="s.notas" class="text-[10px] text-gray-400 mt-1.5 leading-relaxed line-clamp-2">
-                      {{ s.notas }}
-                    </p>
                   </div>
-                  <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                    <!-- Botón Ver ficha del microreto (directo al modal) -->
+                  <div class="flex flex-col items-end gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
                     <button v-if="s.microreto_id"
-                            @click="abrirMicroretoModal(s.microreto_id)"
-                            class="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1
-                                   rounded-lg bg-[#00A859]/10 text-[#00A859] text-[9px] font-black
-                                   uppercase tracking-widest hover:bg-[#00A859]/20 transition-all"
+                            @click.stop="abrirMicroretoModal(s.microreto_id)"
+                            class="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[#00A859]/10 text-[#00A859]
+                                   text-[8px] font-black uppercase tracking-widest hover:bg-[#00A859]/20 transition-all"
                             title="Ver ficha del microreto">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
                                  a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                       </svg>
-                      Ver ficha
+                      Ficha
                     </button>
-                    <div class="flex items-center gap-1">
-                      <!-- Botón abrir detalles de sesión -->
-                      <button @click="verSesion(s)"
-                              class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg
-                                     hover:bg-gray-100 text-gray-300 hover:text-gray-500 transition-all"
-                              title="Ver detalles de sesión">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                      </button>
-                      <!-- Botón eliminar -->
-                      <button @click="eliminarSesion(s.id)"
-                              class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg
-                                     hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
-                              title="Eliminar">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                      </button>
-                    </div>
+                    <button @click.stop="eliminarSesion(s.id)"
+                            class="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+                            title="Eliminar">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                              d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </li>
             </ul>
+
+            <!-- Paginación -->
+            <div v-if="totalPaginasSes > 1"
+                 class="px-4 py-3 border-t border-gray-50 flex items-center justify-between gap-2">
+              <button @click="paginaSesiones--"
+                      :disabled="paginaSesiones === 1"
+                      class="p-1.5 rounded-lg border border-gray-200 text-gray-400
+                             hover:border-[#00A859] hover:text-[#00A859]
+                             disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {{ paginaSesiones }} / {{ totalPaginasSes }}
+              </span>
+              <button @click="paginaSesiones++"
+                      :disabled="paginaSesiones === totalPaginasSes"
+                      class="p-1.5 rounded-lg border border-gray-200 text-gray-400
+                             hover:border-[#00A859] hover:text-[#00A859]
+                             disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </button>
+            </div>
 
           </div>
         </div>
@@ -977,6 +1116,7 @@ select.field-input { cursor: pointer; }
 .tag-gray  { background: #F3F4F6; color: #6B7280; }
 .tag-green { background: rgba(0,168,89,0.1); color: #00A859; }
 .tag-lime  { background: rgba(153,204,51,0.12); color: #5a7a00; }
+.tag-amber { background: rgba(251,191,36,0.12); color: #92400e; }
 
 /* Modal animation */
 .modal-fade-enter-active,

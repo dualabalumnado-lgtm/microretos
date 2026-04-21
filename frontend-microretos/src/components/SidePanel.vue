@@ -335,6 +335,38 @@ defineExpose({ isOpen, toggle, close })
               <p class="text-xs font-bold text-white truncate">Administrador</p>
             </div>
           </div>
+
+          <!-- Aviso de expiración inminente -->
+          <Transition name="sp-fade">
+            <div v-if="authStore.minutosRestantes >= 0 && authStore.minutosRestantes <= 30"
+              class="rounded-xl px-3 py-2 text-[10px] font-bold space-y-2"
+              :class="authStore.minutosRestantes <= 5
+                ? 'bg-red-500/15 border border-red-500/30 text-red-300'
+                : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>
+                  {{ authStore.minutosRestantes <= 0
+                    ? 'Sesión a punto de expirar'
+                    : `Sesión expira en ${authStore.minutosRestantes} min` }}
+                </span>
+              </div>
+              <button
+                @click="authStore.refresh()"
+                :disabled="authStore.refreshing"
+                class="w-full py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest
+                       transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="authStore.minutosRestantes <= 5
+                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200'
+                  : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'">
+                {{ authStore.refreshing ? 'Renovando...' : 'Renovar sesión' }}
+              </button>
+            </div>
+          </Transition>
+
           <button
             @click="cerrarSesion"
             :disabled="cargandoOut"

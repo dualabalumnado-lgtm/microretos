@@ -50,16 +50,43 @@ const familiasExpandidas  = ref(new Set())
 // ─── Empresa expandida (panel de detalle inline) ─────────
 const empresaExpandida = ref(null)
 
+// ─── Zona de peligro (desplegable) ───────────────────────
+const zonaPeligroAbierta      = ref(false)
+
 // ─── Modal CATÁLOGO FP (familias y ciclos) ────────────────
-const mostrarConfirmCatalogo = ref(false)
-const mostrarCatalogo        = ref(false)
+const mostrarConfirmCatalogo  = ref(false)
+const mostrarCatalogo         = ref(false)
+const passwordCatalogo        = ref('')
+const passwordCatalogoErr     = ref('')
+const passwordCatalogoLoad    = ref(false)
+const mostrarPasswordCatalogo = ref(false)
 
 function pedirAbrirCatalogo() {
-  mostrarConfirmCatalogo.value = true
+  passwordCatalogo.value     = ''
+  passwordCatalogoErr.value  = ''
+  mostrarPasswordCatalogo.value = false
+  mostrarConfirmCatalogo.value  = true
 }
-function confirmarAbrirCatalogo() {
-  mostrarConfirmCatalogo.value = false
-  mostrarCatalogo.value        = true
+
+async function verificarPasswordCatalogo() {
+  if (!passwordCatalogo.value.trim()) {
+    passwordCatalogoErr.value = 'Introduce tu contraseña de administrador.'
+    return
+  }
+  passwordCatalogoLoad.value = true
+  passwordCatalogoErr.value  = ''
+  try {
+    await api.post('/admin/verify-password', { password: passwordCatalogo.value })
+    mostrarConfirmCatalogo.value = false
+    passwordCatalogo.value       = ''
+    mostrarCatalogo.value        = true
+  } catch (e) {
+    passwordCatalogoErr.value = e.response?.status === 401
+      ? 'Contraseña incorrecta. Inténtalo de nuevo.'
+      : 'Error al verificar. Inténtalo de nuevo.'
+  } finally {
+    passwordCatalogoLoad.value = false
+  }
 }
 
 // ─── Modal CREAR / EDITAR CENTRO EDUCATIVO ───────────────
@@ -425,32 +452,64 @@ function onEmpresaEliminada(data) {
 
           <!-- Acciones de cabecera -->
           <div class="flex flex-wrap items-center gap-2">
-            <!-- Botón catálogo FP — low-visibility -->
-            <div class="relative group/cat-tip">
+
+            <!-- ── Zona de peligro — desplegable ── -->
+            <div class="relative">
               <button
-                @click="pedirAbrirCatalogo"
+                @click="zonaPeligroAbierta = !zonaPeligroAbierta"
                 :disabled="cargando"
-                class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs
-                       bg-white text-gray-400 border border-gray-200
-                       hover:text-[#1F2937] hover:border-gray-300 hover:bg-gray-50
+                class="flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs
+                       border border-red-200 bg-red-50 text-red-500
+                       hover:bg-red-100 hover:border-red-300
                        transition-all duration-200
                        disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                 </svg>
-                <span class="hidden sm:inline">Catálogo FP</span>
+                <span class="hidden sm:inline uppercase tracking-widest">Zona de peligro</span>
+                <svg class="w-3 h-3 transition-transform duration-200"
+                  :class="zonaPeligroAbierta ? 'rotate-180' : ''"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                </svg>
               </button>
-              <div class="pointer-events-none absolute right-0 top-full mt-2 z-20
-                          w-max max-w-[200px] px-3 py-2 rounded-xl
-                          bg-[#1F2937] text-white text-[11px] font-semibold leading-snug
-                          shadow-lg opacity-0 group-hover/cat-tip:opacity-100
-                          translate-y-1 group-hover/cat-tip:translate-y-0
-                          transition-all duration-150">
-                Gestionar familias y ciclos del catálogo
-                <div class="absolute -top-1 right-3 w-2 h-2 bg-[#1F2937] rotate-45"></div>
-              </div>
+
+              <!-- Desplegable -->
+              <Transition name="dropdown-fade">
+                <div v-if="zonaPeligroAbierta"
+                  class="absolute right-0 top-full mt-2 z-30
+                         bg-white border border-red-100 rounded-2xl shadow-xl
+                         w-56 overflow-hidden">
+                  <div class="px-4 pt-3 pb-2 border-b border-red-50">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-red-400">Acciones críticas</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Afectan a toda la base de datos</p>
+                  </div>
+                  <div class="p-2">
+                    <button
+                      @click="zonaPeligroAbierta = false; pedirAbrirCatalogo()"
+                      class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left
+                             text-sm font-bold text-gray-700
+                             hover:bg-red-50 hover:text-red-600
+                             transition-all duration-150"
+                    >
+                      <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                      </svg>
+                      Mostrar catálogo FP
+                    </button>
+                  </div>
+                </div>
+              </Transition>
+
+              <!-- Overlay para cerrar al hacer clic fuera -->
+              <div
+                v-if="zonaPeligroAbierta"
+                class="fixed inset-0 z-20"
+                @click="zonaPeligroAbierta = false"
+              />
             </div>
 
             <!-- Botón nuevo centro educativo -->
@@ -1293,47 +1352,97 @@ function onEmpresaEliminada(data) {
       </div>
     </Transition>
 
-    <!-- ════════════ MODAL: CONFIRMAR APERTURA CATÁLOGO FP ═══ -->
+    <!-- ════════════ MODAL: ACCESO PROTEGIDO CATÁLOGO FP ════ -->
     <Transition name="modal-fade">
       <div v-if="mostrarConfirmCatalogo"
-           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+           @click.self="mostrarConfirmCatalogo = false; passwordCatalogo = ''; passwordCatalogoErr = ''">
         <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-[#1F2937]/8 flex items-center justify-center shrink-0">
-              <svg class="w-5 h-5 text-[#1F2937]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+          <!-- Cabecera -->
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
               </svg>
             </div>
             <div>
-              <h3 class="font-black text-lg text-[#1F2937]">Editar catálogo de FP</h3>
-              <p class="text-xs text-gray-400">Familias profesionales y ciclos formativos</p>
+              <h3 class="font-black text-lg text-[#1F2937]">Acceso restringido</h3>
+              <p class="text-xs text-gray-400">Catálogo de familias y ciclos formativos</p>
             </div>
           </div>
+
+          <!-- Aviso de impacto -->
           <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
             <p class="text-xs text-amber-700 font-semibold leading-relaxed">
-              Estás accediendo a la edición del catálogo académico. Los cambios en familias y ciclos
-              afectan a <span class="font-black">todo el sistema</span>: centros, empresas y generación de microretos.
-              Procede solo si estás seguro.
+              Esta sección modifica el <span class="font-black">catálogo académico global</span>.
+              Los cambios afectan a centros, empresas, generación de microretos y todas las relaciones de la base de datos.
+              Solo procede si eres administrador del sistema.
             </p>
           </div>
+
+          <!-- Campo contraseña -->
+          <div class="mb-4">
+            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+              Confirma tu contraseña de administrador
+            </label>
+            <div class="relative">
+              <input
+                v-model="passwordCatalogo"
+                :type="mostrarPasswordCatalogo ? 'text' : 'password'"
+                placeholder="Contraseña"
+                class="w-full px-4 py-3 rounded-xl border text-sm font-medium
+                       focus:outline-none focus:ring-2 transition-all"
+                :class="passwordCatalogoErr
+                  ? 'border-red-300 focus:ring-red-200 bg-red-50'
+                  : 'border-gray-200 focus:ring-[#1F2937]/20 bg-white'"
+                @keyup.enter="verificarPasswordCatalogo"
+                @keyup.escape="mostrarConfirmCatalogo = false; passwordCatalogo = ''; passwordCatalogoErr = ''"
+                autocomplete="current-password"
+              />
+              <button
+                type="button"
+                @click="mostrarPasswordCatalogo = !mostrarPasswordCatalogo"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg v-if="!mostrarPasswordCatalogo" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                </svg>
+              </button>
+            </div>
+            <p v-if="passwordCatalogoErr" class="text-xs text-red-600 font-bold mt-2 ml-1">
+              {{ passwordCatalogoErr }}
+            </p>
+          </div>
+
+          <!-- Botones -->
           <div class="flex gap-3">
             <button
-              @click="mostrarConfirmCatalogo = false"
+              @click="mostrarConfirmCatalogo = false; passwordCatalogo = ''; passwordCatalogoErr = ''"
               class="flex-1 py-2.5 rounded-xl border border-gray-200
                      text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
             >
               Cancelar
             </button>
             <button
-              @click="confirmarAbrirCatalogo"
-              class="flex-1 py-2.5 rounded-xl
-                     bg-[#1F2937] text-white text-sm font-black
-                     hover:bg-[#374151] transition-all shadow-sm"
+              @click="verificarPasswordCatalogo"
+              :disabled="passwordCatalogoLoad || !passwordCatalogo.trim()"
+              class="flex-1 py-2.5 rounded-xl bg-[#1F2937] text-white text-sm font-black
+                     hover:bg-[#374151] transition-all shadow-sm
+                     disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Abrir catálogo
+              <svg v-if="passwordCatalogoLoad" class="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+              </svg>
+              <span>{{ passwordCatalogoLoad ? 'Verificando...' : 'Acceder' }}</span>
             </button>
           </div>
+
         </div>
       </div>
     </Transition>
@@ -1428,6 +1537,12 @@ function onEmpresaEliminada(data) {
 .modal-fade-leave-to    { opacity: 0; }
 .modal-fade-enter-from > div,
 .modal-fade-leave-to > div { transform: scale(0.95) translateY(8px); }
+
+/* Desplegable zona de peligro */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active { transition: all 0.15s ease; }
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to     { opacity: 0; transform: translateY(-4px) scale(0.97); }
 
 /* Snackbar */
 .snack-enter-active,

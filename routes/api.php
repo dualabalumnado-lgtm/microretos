@@ -45,7 +45,9 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
-    Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
+    Route::post('/admin/logout',          [AdminAuthController::class, 'logout']);
+    Route::post('/admin/refresh',         [AdminAuthController::class, 'refresh']);
+    Route::post('/admin/verify-password', [AdminAuthController::class, 'verifyPassword']);
 
     // Biblioteca de microretos (requiere login — protege contra enumeración IDOR)
     // Los IDs en URL son UUIDs, no secuenciales
