@@ -6,6 +6,7 @@ import DetalleMicroreto from '../views/DetalleMicroreto.vue'
 import BaseDatosDashboard from '../views/BaseDatosDashboard.vue'
 import PublicMicroreto from '../views/PublicMicroreto.vue'
 import DashboardDocente from '../views/DashboardDocente.vue'
+import SesionesRegistradas from '../views/SesionesRegistradas.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,6 +44,12 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard-docente',
       component: DashboardDocente,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/sesiones',
+      name: 'sesiones-registradas',
+      component: SesionesRegistradas,
       meta: { requiresAuth: true }
     },
     {
