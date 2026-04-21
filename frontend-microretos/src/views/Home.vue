@@ -1,24 +1,32 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth'; 
-import LoginModal from '../components/LoginModal.vue'; 
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
+import LoginModal from '../components/LoginModal.vue';
 
 const router = useRouter();
+const route  = useRoute();
 const authStore = useAuthStore();
 const isLoaded = ref(false);
 const showLogin = ref(false); // 👈 controla el modal
 
+// Ruta a la que volver tras el login (puede venir de ?redirect=... al expirar el token)
+const redirectTrasLogin = ref(null)
+
 onMounted(() => {
-  setTimeout(() => {
-    isLoaded.value = true;
-  }, 100);
+  setTimeout(() => { isLoaded.value = true; }, 100);
+  // Si llegamos aquí por expiración de sesión, abrir el modal automáticamente
+  if (route.query.redirect) {
+    redirectTrasLogin.value = route.query.redirect
+    showLogin.value = true;
+  }
 });
 
 const irAGenerador = () => {
   if (authStore.isAuthenticated) {
     router.push({ name: 'microretos' });
   } else {
+    redirectTrasLogin.value = null
     destinoTrasLogin.value = 'microretos'
     showLogin.value = true;
   }
@@ -28,13 +36,18 @@ const irAGenerador = () => {
 const destinoTrasLogin = ref('microretos')
 
 const onLoginSuccess = () => {
-  router.push({ name: destinoTrasLogin.value });
+  if (redirectTrasLogin.value) {
+    router.push(redirectTrasLogin.value);
+  } else {
+    router.push({ name: destinoTrasLogin.value });
+  }
 };
 
 const irABiblioteca = () => {
   if (authStore.isAuthenticated) {
     router.push({ name: 'biblioteca' });
   } else {
+    redirectTrasLogin.value = null
     destinoTrasLogin.value = 'biblioteca'
     showLogin.value = true;
   }
