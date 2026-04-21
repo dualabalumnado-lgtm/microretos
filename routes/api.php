@@ -59,6 +59,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/centros/{id}',       [DatosFPController::class, 'actualizarCentro']);
     Route::delete('/centros/{id}',    [DatosFPController::class, 'eliminarCentro']);
 
+    // Familias profesionales — CRUD protegido
+    Route::post('/familias',          [DatosFPController::class, 'storeFamilia']);
+    Route::put('/familias/{id}',      [DatosFPController::class, 'updateFamilia']);
+    Route::delete('/familias/{id}',   [DatosFPController::class, 'destroyFamilia']);
+
+    // Ciclos formativos — CRUD protegido
+    Route::post('/ciclos',            [DatosFPController::class, 'storeCiclo']);
+    Route::put('/ciclos/{id}',        [DatosFPController::class, 'updateCiclo']);
+    Route::delete('/ciclos/{id}',     [DatosFPController::class, 'destroyCiclo']);
+
     // Empresas — datos completos solo para usuarios autenticados
     Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);
     Route::get('/empresas/dashboard',      [DatosFPController::class, 'getDashboardEmpresas']);

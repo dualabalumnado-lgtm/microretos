@@ -12,7 +12,12 @@
  *   @cerrar
  */
 import { ref, reactive, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
+
+const router    = useRouter()
+const authStore = useAuthStore()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -158,6 +163,11 @@ async function guardar() {
       emit('centro-guardado', data.centro)
     }
   } catch (e) {
+    if (e.response?.status === 401) {
+      authStore.logout()
+      router.push('/')
+      return
+    }
     if (e.response?.status === 422) {
       const errors = e.response.data.errors
       if (errors?.nombre) nombreError.value = errors.nombre[0]
