@@ -7,6 +7,7 @@ import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue'
 import CentroEducativoModal from '../components/CentroEducativoModal.vue'
 import EliminarCentroModal from '../components/EliminarCentroModal.vue'
 import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
+import GestionFamiliasCiclosModal from '../components/GestionFamiliasCiclosModal.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -48,6 +49,18 @@ const familiasExpandidas  = ref(new Set())
 
 // ─── Empresa expandida (panel de detalle inline) ─────────
 const empresaExpandida = ref(null)
+
+// ─── Modal CATÁLOGO FP (familias y ciclos) ────────────────
+const mostrarConfirmCatalogo = ref(false)
+const mostrarCatalogo        = ref(false)
+
+function pedirAbrirCatalogo() {
+  mostrarConfirmCatalogo.value = true
+}
+function confirmarAbrirCatalogo() {
+  mostrarConfirmCatalogo.value = false
+  mostrarCatalogo.value        = true
+}
 
 // ─── Modal CREAR / EDITAR CENTRO EDUCATIVO ───────────────
 const mostrarNuevoCentro  = ref(false)
@@ -412,6 +425,34 @@ function onEmpresaEliminada(data) {
 
           <!-- Acciones de cabecera -->
           <div class="flex flex-wrap items-center gap-2">
+            <!-- Botón catálogo FP — low-visibility -->
+            <div class="relative group/cat-tip">
+              <button
+                @click="pedirAbrirCatalogo"
+                :disabled="cargando"
+                class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs
+                       bg-white text-gray-400 border border-gray-200
+                       hover:text-[#1F2937] hover:border-gray-300 hover:bg-gray-50
+                       transition-all duration-200
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span class="hidden sm:inline">Catálogo FP</span>
+              </button>
+              <div class="pointer-events-none absolute right-0 top-full mt-2 z-20
+                          w-max max-w-[200px] px-3 py-2 rounded-xl
+                          bg-[#1F2937] text-white text-[11px] font-semibold leading-snug
+                          shadow-lg opacity-0 group-hover/cat-tip:opacity-100
+                          translate-y-1 group-hover/cat-tip:translate-y-0
+                          transition-all duration-150">
+                Gestionar familias y ciclos del catálogo
+                <div class="absolute -top-1 right-3 w-2 h-2 bg-[#1F2937] rotate-45"></div>
+              </div>
+            </div>
+
             <!-- Botón nuevo centro educativo -->
             <button
               @click="mostrarNuevoCentro = true"
@@ -1251,6 +1292,58 @@ function onEmpresaEliminada(data) {
         </div>
       </div>
     </Transition>
+
+    <!-- ════════════ MODAL: CONFIRMAR APERTURA CATÁLOGO FP ═══ -->
+    <Transition name="modal-fade">
+      <div v-if="mostrarConfirmCatalogo"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-[#1F2937]/8 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-[#1F2937]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-black text-lg text-[#1F2937]">Editar catálogo de FP</h3>
+              <p class="text-xs text-gray-400">Familias profesionales y ciclos formativos</p>
+            </div>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+            <p class="text-xs text-amber-700 font-semibold leading-relaxed">
+              Estás accediendo a la edición del catálogo académico. Los cambios en familias y ciclos
+              afectan a <span class="font-black">todo el sistema</span>: centros, empresas y generación de microretos.
+              Procede solo si estás seguro.
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="mostrarConfirmCatalogo = false"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200
+                     text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              @click="confirmarAbrirCatalogo"
+              class="flex-1 py-2.5 rounded-xl
+                     bg-[#1F2937] text-white text-sm font-black
+                     hover:bg-[#374151] transition-all shadow-sm"
+            >
+              Abrir catálogo
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ════════════ MODAL: CATÁLOGO FAMILIAS Y CICLOS ═══════ -->
+    <GestionFamiliasCiclosModal
+      :visible="mostrarCatalogo"
+      @cerrar="mostrarCatalogo = false"
+      @cambios="cargarDatos"
+    />
 
     <!-- ════════════ MODAL: ELIMINAR EMPRESA ══════════════════ -->
     <EliminarEmpresaModal

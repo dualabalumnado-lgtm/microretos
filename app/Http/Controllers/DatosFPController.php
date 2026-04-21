@@ -281,6 +281,140 @@ class DatosFPController extends Controller
     }
 
     // ==========================================
+    // CRUD FAMILIAS PROFESIONALES
+    // ==========================================
+
+    public function storeFamilia(Request $request)
+    {
+        $request->validate([
+            'nombre'     => 'required|string|max:255|unique:familias,nombre',
+            'imagen_url' => 'nullable|string|max:255',
+        ]);
+
+        $familia = Familia::create([
+            'nombre'     => $request->nombre,
+            'imagen_url' => $request->imagen_url,
+        ]);
+
+        return response()->json(['message' => 'Familia creada', 'familia' => $familia], 201);
+    }
+
+    public function updateFamilia(Request $request, $id)
+    {
+        $familia = Familia::find($id);
+        if (!$familia) return response()->json(['error' => 'Familia no encontrada'], 404);
+
+        $request->validate([
+            'nombre'     => 'required|string|max:255|unique:familias,nombre,' . $id,
+            'imagen_url' => 'nullable|string|max:255',
+        ]);
+
+        $nombreAnterior = $familia->nombre;
+        $familia->update([
+            'nombre'     => $request->nombre,
+            'imagen_url' => $request->imagen_url,
+        ]);
+
+        if ($nombreAnterior !== $request->nombre) {
+            CicloFormativo::where('familia', $nombreAnterior)->update(['familia' => $request->nombre]);
+            DB::table('empresa_familia')->where('familia', $nombreAnterior)->update(['familia' => $request->nombre]);
+        }
+
+        return response()->json(['message' => 'Familia actualizada', 'familia' => $familia]);
+    }
+
+    public function destroyFamilia($id)
+    {
+        $familia = Familia::find($id);
+        if (!$familia) return response()->json(['error' => 'Familia no encontrada'], 404);
+
+        $numCiclos   = CicloFormativo::where('familia_id', $id)->count();
+        $numEmpresas = DB::table('empresa_familia')->where('familia_id', $id)->count();
+
+        if ($numCiclos > 0 || $numEmpresas > 0) {
+            return response()->json([
+                'error'        => 'No se puede eliminar: tiene ciclos o empresas asociados.',
+                'num_ciclos'   => $numCiclos,
+                'num_empresas' => $numEmpresas,
+            ], 422);
+        }
+
+        $familia->delete();
+        return response()->json(['message' => 'Familia eliminada']);
+    }
+
+    // ==========================================
+    // CRUD CICLOS FORMATIVOS
+    // ==========================================
+
+    public function storeCiclo(Request $request)
+    {
+        $request->validate([
+            'nombre'      => 'required|string|max:255',
+            'familia_id'  => 'required|integer|exists:familias,id',
+            'grado'       => 'nullable|string|max:100',
+            'siglasGrado' => 'nullable|string|max:3',
+        ]);
+
+        $familia = Familia::find($request->familia_id);
+
+        $ciclo = CicloFormativo::create([
+            'idCiclo'     => 0,
+            'nombre'      => $request->nombre,
+            'familia'     => $familia->nombre,
+            'familia_id'  => $request->familia_id,
+            'grado'       => $request->grado,
+            'siglasGrado' => $request->siglasGrado ?? 'FP',
+        ]);
+
+        return response()->json(['message' => 'Ciclo creado', 'ciclo' => $ciclo], 201);
+    }
+
+    public function updateCiclo(Request $request, $id)
+    {
+        $ciclo = CicloFormativo::find($id);
+        if (!$ciclo) return response()->json(['error' => 'Ciclo no encontrado'], 404);
+
+        $request->validate([
+            'nombre'      => 'required|string|max:255',
+            'familia_id'  => 'required|integer|exists:familias,id',
+            'grado'       => 'nullable|string|max:100',
+            'siglasGrado' => 'nullable|string|max:3',
+        ]);
+
+        $familia = Familia::find($request->familia_id);
+
+        $ciclo->nombre      = $request->nombre;
+        $ciclo->familia_id  = $request->familia_id;
+        $ciclo->familia     = $familia->nombre;
+        $ciclo->grado       = $request->grado;
+        if ($request->filled('siglasGrado')) {
+            $ciclo->siglasGrado = $request->siglasGrado;
+        }
+        $ciclo->save();
+
+        return response()->json(['message' => 'Ciclo actualizado', 'ciclo' => $ciclo]);
+    }
+
+    public function destroyCiclo($id)
+    {
+        $ciclo = CicloFormativo::find($id);
+        if (!$ciclo) return response()->json(['error' => 'Ciclo no encontrado'], 404);
+
+        $numCentros = DB::table('centro_ciclo')->where('ciclo_id', $id)->count();
+
+        if ($numCentros > 0) {
+            return response()->json([
+                'error'       => 'No se puede eliminar: el ciclo está asignado a ' . $numCentros . ' centro(s).',
+                'num_centros' => $numCentros,
+            ], 422);
+        }
+
+        $ciclo->delete();
+        return response()->json(['message' => 'Ciclo eliminado']);
+    }
+
+    // ==========================================
     // GUARDADO Y ACTUALIZACIÓN DE EMPRESAS
     // ==========================================
 
