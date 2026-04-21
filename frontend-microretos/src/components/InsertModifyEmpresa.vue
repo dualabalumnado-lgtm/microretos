@@ -84,6 +84,7 @@ const nuevaForm               = reactive({
 
 watch(() => props.mostrarNuevaEmpresa, (v) => {
   if (v) {
+    cargarCentros()
     Object.keys(nuevaErrors).forEach(k => delete nuevaErrors[k])
     Object.keys(nuevaForm).forEach(k => (nuevaForm[k] = ''))
     nuevaForm.nombre_comercial = props.nombreBuscado || ''
@@ -199,6 +200,7 @@ const editarForm               = reactive({
 
 watch(() => props.mostrarEditarEmpresa, (v) => {
   if (v && props.empresaAEditar) {
+    cargarCentros()
     Object.keys(editarErrors).forEach(k => delete editarErrors[k])
     const e = props.empresaAEditar
     editarForm.nombre_comercial = e.nombre_comercial || ''

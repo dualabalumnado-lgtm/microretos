@@ -6,7 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class CicloFormativo extends Model
 {
-    protected $table = 'ciclos_formativos';
+    protected $table    = 'ciclos_formativos';
+    protected $fillable = ['idCiclo', 'nombre', 'familia', 'familia_id', 'grado', 'referenciaBOE', 'siglasGrado'];
 
     public function familia()
     {
