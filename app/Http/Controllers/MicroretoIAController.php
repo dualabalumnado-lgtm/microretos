@@ -68,9 +68,12 @@ class MicroretoIAController extends Controller
 
             $reto->familia = $reto->empresa->familias->first()?->nombre
                 ?? 'Familia Desconocida';
+
+            $reto->empresa_es_simulada = (bool) $reto->empresa->es_simulada;
         } else {
-            $reto->centro_educativo = 'Centro Desconocido';
-            $reto->familia          = 'Familia Desconocida';
+            $reto->centro_educativo    = 'Centro Desconocido';
+            $reto->familia             = 'Familia Desconocida';
+            $reto->empresa_es_simulada = false;
         }
 
         // Derivar curso si no está guardado aún
