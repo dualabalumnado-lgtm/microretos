@@ -9,6 +9,7 @@ import { usePdfExport } from '../composables/usePdfExport.js';
 const router = useRouter();
 const isLoaded = ref(false);
 const microretos = ref([]);
+const centros = ref([]);
 const cargando = ref(true);
 const familias = ref([]);
 const showLogin = ref(false);
@@ -23,13 +24,11 @@ const filtroCentro      = ref('');
 const filtroCiclo       = ref('');
 const filtroNivel       = ref('');        // '' | 'Bajo' | 'Medio' | 'Alto'
 const filtroCurso       = ref('');        // '' | '1' | '2'
-const filtroTipoEmpresa = ref('');        // '' | 'real' | 'simulada'
+const filtroInfoSimulada = ref('');       // '' | 'real' | 'simulada'  → es_simulado
+const filtroEmpresaTipo  = ref('');       // '' | 'real' | 'ficticia'  → empresa_es_simulada
 const busqueda          = ref('');
 
-const centrosDisponibles = computed(() => {
-  const c = microretos.value.map(m => m.centro_educativo || m.centro).filter(Boolean);
-  return [...new Set(c)].sort();
-});
+const centrosDisponibles = computed(() => centros.value.map(c => c.nombre).sort());
 
 const ciclosDisponibles = computed(() => {
   let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
@@ -53,8 +52,21 @@ const conteoNiveles = computed(() => {
   return r;
 });
 
-// Conteo por tipo (real vs simulada) dentro de familia+centro
-const conteoTipos = computed(() => {
+// Conteo por tipo de empresa (real vs ficticia)
+const conteoEmpresaTipo = computed(() => {
+  const r = { real: 0, ficticia: 0, total: 0 };
+  if (!familiaSeleccionada.value) return r;
+  let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
+  if (filtroCentro.value) d = d.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  d.forEach(m => {
+    r.total++;
+    if (m.empresa_es_simulada) r.ficticia++; else r.real++;
+  });
+  return r;
+});
+
+// Conteo por tipo de información (real vs simulada con IA)
+const conteoInfoSimulada = computed(() => {
   const r = { real: 0, simulada: 0, total: 0 };
   if (!familiaSeleccionada.value) return r;
   let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
@@ -70,18 +82,23 @@ const microretosFiltrados = computed(() => {
   const q = busqueda.value.toLowerCase().trim();
   return microretos.value.filter(reto => {
     const centro = reto.centro_educativo || reto.centro;
-    const tipoOk = filtroTipoEmpresa.value === ''
+    const infoOk = filtroInfoSimulada.value === ''
       ? true
-      : filtroTipoEmpresa.value === 'simulada'
+      : filtroInfoSimulada.value === 'simulada'
         ? reto.es_simulado === true
         : reto.es_simulado !== true;
+    const empresaOk = filtroEmpresaTipo.value === ''
+      ? true
+      : filtroEmpresaTipo.value === 'ficticia'
+        ? reto.empresa_es_simulada === true
+        : reto.empresa_es_simulada !== true;
     return (
       reto.familia === familiaSeleccionada.value &&
       (filtroCentro.value === '' || centro === filtroCentro.value) &&
       (filtroCiclo.value  === '' || reto.ciclo === filtroCiclo.value) &&
       (filtroNivel.value  === '' || reto.nivel_grupo === filtroNivel.value) &&
       (filtroCurso.value  === '' || String(reto.curso) === filtroCurso.value) &&
-      tipoOk &&
+      infoOk && empresaOk &&
       (!q || [reto.titulo, reto.pregunta_reto, reto.empresa_nombre, reto.ciclo]
         .some(f => f && f.toLowerCase().includes(q)))
     );
@@ -89,7 +106,7 @@ const microretosFiltrados = computed(() => {
 });
 
 const hayFiltrosActivos = computed(() =>
-  !!(filtroCiclo.value || filtroNivel.value || filtroCurso.value || filtroTipoEmpresa.value || busqueda.value)
+  !!(filtroCiclo.value || filtroNivel.value || filtroCurso.value || filtroInfoSimulada.value || filtroEmpresaTipo.value || busqueda.value)
 );
 
 const conteoPorFamilia = computed(() => {
@@ -116,17 +133,24 @@ const nivelClase = (nivel) => ({
 const cargarDatos = async () => {
   cargando.value = true;
   try {
-    const [resMicroretos, resFamilias] = await Promise.all([
+    const [resMicroretos, resFamilias, resCentros] = await Promise.all([
       api.get('/microretos'),
       api.get('/familias'),
+      api.get('/centros'),
     ]);
-    microretos.value = resMicroretos.data.filter(m => {
-      const centro = m.centro_educativo || m.centro;
-      return centro && centro !== 'Centro Desconocido' && m.familia && m.familia !== 'Familia Desconocida';
-    });
+    microretos.value = resMicroretos.data
+      .filter(m => {
+        const centro = m.centro_educativo || m.centro;
+        return centro && centro !== 'Centro Desconocido' && m.familia && m.familia !== 'Familia Desconocida';
+      })
+      .map(m => ({
+        ...m,
+        nivel_grupo: m.nivel_grupo === 'Básico' ? 'Bajo' : m.nivel_grupo,
+      }));
     familias.value = resFamilias.data.map(f =>
       typeof f === 'string' ? { nombre: f, imagen_url: null } : f
     );
+    centros.value = resCentros.data;
     await nextTick();
     if (centrosDisponibles.value.length > 0) filtroCentro.value = centrosDisponibles.value[0];
   } catch (error) {
@@ -157,7 +181,8 @@ const resetFiltrosDetalle = () => {
   filtroCiclo.value = '';
   filtroNivel.value = '';
   filtroCurso.value = '';
-  filtroTipoEmpresa.value = '';
+  filtroInfoSimulada.value = '';
+  filtroEmpresaTipo.value = '';
   busqueda.value = '';
 };
 
@@ -508,59 +533,118 @@ const confirmarEliminar = async () => {
 
             </div>
 
-            <!-- ── CARDS TIPO EMPRESA ─────────────────────────────── -->
-            <div class="grid grid-cols-3 gap-3 mb-6">
+            <!-- ── CARDS TIPO EMPRESA + TIPO INFORMACIÓN ─────────── -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
-              <!-- TODAS -->
-              <button
-                @click="filtroTipoEmpresa = ''"
-                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
-                :class="filtroTipoEmpresa === ''
-                  ? 'bg-[#1F2937] border-[#1F2937] shadow-lg scale-[1.02]'
-                  : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-md'">
-                <div class="flex items-end justify-between mb-2">
-                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                  </svg>
-                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-400'">{{ conteoTipos.total }}</span>
-                </div>
-                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === '' ? 'text-white' : 'text-gray-600'">Todas</p>
-                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === '' ? 'text-white/60' : 'text-gray-400'">sin filtrar</p>
-              </button>
+              <!-- GRUPO: EMPRESA -->
+              <div class="bg-white/70 rounded-2xl p-3 border border-gray-100">
+                <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2.5 px-1">Empresa</p>
+                <div class="grid grid-cols-3 gap-2">
 
-              <!-- EMPRESA REAL -->
-              <button
-                @click="filtroTipoEmpresa = filtroTipoEmpresa === 'real' ? '' : 'real'"
-                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
-                :class="filtroTipoEmpresa === 'real'
-                  ? 'bg-[#00A859] border-[#00A859] shadow-lg scale-[1.02]'
-                  : 'bg-white border-gray-100 hover:border-[#00A859]/50 hover:shadow-md'">
-                <div class="flex items-end justify-between mb-2">
-                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-[#00A859]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"/>
-                  </svg>
-                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-[#00A859]'">{{ conteoTipos.real }}</span>
-                </div>
-                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white' : 'text-gray-600'">Empresa Real</p>
-                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === 'real' ? 'text-white/60' : 'text-gray-400'">contacto real</p>
-              </button>
+                  <button
+                    @click="filtroEmpresaTipo = ''"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroEmpresaTipo === ''
+                      ? 'bg-[#1F2937] border-[#1F2937] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroEmpresaTipo === '' ? 'text-white' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroEmpresaTipo === '' ? 'text-white' : 'text-gray-400'">{{ conteoEmpresaTipo.total }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroEmpresaTipo === '' ? 'text-white' : 'text-gray-600'">Todas</p>
+                  </button>
 
-              <!-- INFO SIMULADA -->
-              <button
-                @click="filtroTipoEmpresa = filtroTipoEmpresa === 'simulada' ? '' : 'simulada'"
-                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none"
-                :class="filtroTipoEmpresa === 'simulada'
-                  ? 'bg-[#6366F1] border-[#6366F1] shadow-lg scale-[1.02]'
-                  : 'bg-white border-gray-100 hover:border-[#6366F1]/50 hover:shadow-md'">
-                <div class="flex items-end justify-between mb-2">
-                  <svg class="w-5 h-5 transition-colors" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-[#6366F1]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                  </svg>
-                  <span class="text-2xl font-black leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-[#6366F1]'">{{ conteoTipos.simulada }}</span>
+                  <button
+                    @click="filtroEmpresaTipo = filtroEmpresaTipo === 'real' ? '' : 'real'"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroEmpresaTipo === 'real'
+                      ? 'bg-[#00A859] border-[#00A859] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-[#00A859]/50 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroEmpresaTipo === 'real' ? 'text-white' : 'text-[#00A859]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v1H9V7zm5 0h1v1h-1V7zm-5 4h1v1H9v-1zm5 0h1v1h-1v-1z"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroEmpresaTipo === 'real' ? 'text-white' : 'text-[#00A859]'">{{ conteoEmpresaTipo.real }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroEmpresaTipo === 'real' ? 'text-white' : 'text-gray-600'">Real</p>
+                    <p class="text-[8px] mt-0.5 leading-none" :class="filtroEmpresaTipo === 'real' ? 'text-white/60' : 'text-gray-400'">empresa real</p>
+                  </button>
+
+                  <button
+                    @click="filtroEmpresaTipo = filtroEmpresaTipo === 'ficticia' ? '' : 'ficticia'"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroEmpresaTipo === 'ficticia'
+                      ? 'bg-[#F59E0B] border-[#F59E0B] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-[#F59E0B]/50 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroEmpresaTipo === 'ficticia' ? 'text-white' : 'text-[#F59E0B]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroEmpresaTipo === 'ficticia' ? 'text-white' : 'text-[#F59E0B]'">{{ conteoEmpresaTipo.ficticia }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroEmpresaTipo === 'ficticia' ? 'text-white' : 'text-gray-600'">Ficticia</p>
+                    <p class="text-[8px] mt-0.5 leading-none" :class="filtroEmpresaTipo === 'ficticia' ? 'text-white/60' : 'text-gray-400'">inventada</p>
+                  </button>
+
                 </div>
-                <p class="text-[10px] font-black uppercase tracking-[0.18em] leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white' : 'text-gray-600'">Info Simulada</p>
-                <p class="text-[9px] mt-1 leading-none" :class="filtroTipoEmpresa === 'simulada' ? 'text-white/60' : 'text-gray-400'">datos de IA</p>
-              </button>
+              </div>
+
+              <!-- GRUPO: INFORMACIÓN -->
+              <div class="bg-white/70 rounded-2xl p-3 border border-gray-100">
+                <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2.5 px-1">Información del reto</p>
+                <div class="grid grid-cols-3 gap-2">
+
+                  <button
+                    @click="filtroInfoSimulada = ''"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroInfoSimulada === ''
+                      ? 'bg-[#1F2937] border-[#1F2937] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroInfoSimulada === '' ? 'text-white' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroInfoSimulada === '' ? 'text-white' : 'text-gray-400'">{{ conteoInfoSimulada.total }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroInfoSimulada === '' ? 'text-white' : 'text-gray-600'">Toda</p>
+                  </button>
+
+                  <button
+                    @click="filtroInfoSimulada = filtroInfoSimulada === 'real' ? '' : 'real'"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroInfoSimulada === 'real'
+                      ? 'bg-[#00A859] border-[#00A859] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-[#00A859]/50 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroInfoSimulada === 'real' ? 'text-white' : 'text-[#00A859]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroInfoSimulada === 'real' ? 'text-white' : 'text-[#00A859]'">{{ conteoInfoSimulada.real }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroInfoSimulada === 'real' ? 'text-white' : 'text-gray-600'">Real</p>
+                    <p class="text-[8px] mt-0.5 leading-none" :class="filtroInfoSimulada === 'real' ? 'text-white/60' : 'text-gray-400'">datos reales</p>
+                  </button>
+
+                  <button
+                    @click="filtroInfoSimulada = filtroInfoSimulada === 'simulada' ? '' : 'simulada'"
+                    class="relative p-3 rounded-xl border-2 text-left transition-all duration-200 focus:outline-none"
+                    :class="filtroInfoSimulada === 'simulada'
+                      ? 'bg-[#6366F1] border-[#6366F1] shadow-md scale-[1.02]'
+                      : 'bg-white border-gray-100 hover:border-[#6366F1]/50 hover:shadow-sm'">
+                    <div class="flex items-end justify-between mb-1.5">
+                      <svg class="w-4 h-4" :class="filtroInfoSimulada === 'simulada' ? 'text-white' : 'text-[#6366F1]'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                      </svg>
+                      <span class="text-xl font-black leading-none" :class="filtroInfoSimulada === 'simulada' ? 'text-white' : 'text-[#6366F1]'">{{ conteoInfoSimulada.simulada }}</span>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.15em] leading-none" :class="filtroInfoSimulada === 'simulada' ? 'text-white' : 'text-gray-600'">Simulada</p>
+                    <p class="text-[8px] mt-0.5 leading-none" :class="filtroInfoSimulada === 'simulada' ? 'text-white/60' : 'text-gray-400'">generada IA</p>
+                  </button>
+
+                </div>
+              </div>
 
             </div>
 
@@ -642,11 +726,22 @@ const confirmarEliminar = async () => {
                 <div v-if="hayFiltrosActivos" class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
                   <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Activos:</span>
 
-                  <span v-if="filtroTipoEmpresa"
+                  <span v-if="filtroEmpresaTipo"
                     class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
-                    :class="filtroTipoEmpresa === 'simulada' ? 'bg-[#6366F1]/10 text-[#6366F1]' : 'bg-[#00A859]/10 text-[#00A859]'">
-                    {{ filtroTipoEmpresa === 'simulada' ? 'Info Simulada' : 'Empresa Real' }}
-                    <button @click="filtroTipoEmpresa = ''" class="ml-0.5 hover:opacity-70 transition-opacity">
+                    :class="filtroEmpresaTipo === 'ficticia' ? 'bg-[#F59E0B]/10 text-[#F59E0B]' : 'bg-[#00A859]/10 text-[#00A859]'">
+                    {{ filtroEmpresaTipo === 'ficticia' ? 'Empresa Ficticia' : 'Empresa Real' }}
+                    <button @click="filtroEmpresaTipo = ''" class="ml-0.5 hover:opacity-70 transition-opacity">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+
+                  <span v-if="filtroInfoSimulada"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
+                    :class="filtroInfoSimulada === 'simulada' ? 'bg-[#6366F1]/10 text-[#6366F1]' : 'bg-[#00A859]/10 text-[#00A859]'">
+                    {{ filtroInfoSimulada === 'simulada' ? 'Info Simulada' : 'Info Real' }}
+                    <button @click="filtroInfoSimulada = ''" class="ml-0.5 hover:opacity-70 transition-opacity">
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -730,9 +825,16 @@ const confirmarEliminar = async () => {
                       :class="nivelClase(reto.nivel_grupo)">
                       Nivel: {{ reto.nivel_grupo || 'N/D' }}
                     </span>
+                    <span
+                      class="px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full whitespace-nowrap border"
+                      :class="reto.empresa_es_simulada
+                        ? 'bg-[#F59E0B]/10 border-[#F59E0B]/20 text-[#F59E0B]'
+                        : 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]'">
+                      {{ reto.empresa_es_simulada ? 'Empresa ficticia' : 'Empresa real' }}
+                    </span>
                     <span v-if="reto.es_simulado"
                       class="bg-[#6366F1]/10 border border-[#6366F1]/20 text-[#6366F1] px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full whitespace-nowrap">
-                      IA ficticia
+                      Info simulada
                     </span>
                   </div>
                 </div>

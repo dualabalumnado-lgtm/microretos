@@ -309,7 +309,7 @@ const cargarDemo = async (familiaProfesional) => {
 
     // Paso 3
     familiasFiltradas.value = [demo.familia_profesional];
-    seleccion.value.nivelGrupo = demo.nivel_grupo || 'Medio';
+    seleccion.value.nivelGrupo = (demo.nivel_grupo === 'Básico' ? 'Bajo' : demo.nivel_grupo) || 'Medio';
     seleccion.value.cursoSeleccionado = demo.curso_seleccionado || 2;
     seleccion.value.duracion = demo.duracion || '1 a 2 semanas';
     seleccion.value.cantidadMicroretos = 1;
@@ -607,6 +607,7 @@ const generarReto = async () => {
                 curso:        seleccion.value.cursoSeleccionado,
                 duracion:     seleccion.value.duracion,
                 nivel_grupo:  seleccion.value.nivelGrupo,
+                es_simulado:  esInfoSimulada.value || !!(empresaDetalle.value?.es_simulada),
                 _ui_familia:  seleccion.value.familia,
                 _ui_guardado: false,
                 _ui_guardando: false
@@ -1336,7 +1337,7 @@ const estadoBadgeGen = (estado) =>
                 <div class="col-span-2 md:col-span-1">
                   <label class="label-style">Nivel de exigencia del microreto *</label>
                   <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
-                    <option value="Básico">Básico — El grupo tiene un nivel de comprensión inicial; el microreto debe ser sencillo y guiado</option>
+                    <option value="Bajo">Básico — El grupo tiene un nivel de comprensión inicial; el microreto debe ser sencillo y guiado</option>
                     <option value="Medio">Medio — El grupo maneja conceptos con soltura; el microreto puede tener cierta complejidad y autonomía</option>
                     <option value="Alto">Alto — El grupo domina la materia; el microreto es exigente, abierto y requiere criterio propio</option>
                   </select>

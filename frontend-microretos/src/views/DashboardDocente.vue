@@ -42,6 +42,7 @@ function cargarSesiones() {
 // ─── Buscador / selector de microretos ───────────────────────────────────────
 const mostrarBuscador    = ref(false)
 const todosMicroretos    = ref([])      // todos los microretos de la API
+const todosCentros       = ref([])      // todos los centros de la API
 const cargandoCatalogo   = ref(false)
 const catalogoCargado    = ref(false)
 
@@ -55,31 +56,34 @@ const filtroSimulado = ref('') // '' | 'si' | 'no'
 
 // ── Derivados para los selects ────────────────────────────────────────────────
 
-const centrosDisponibles = computed(() => {
-  const set = new Set(
-    todosMicroretos.value
-      .map(m => m.centro_educativo || m.centro)
-      .filter(Boolean)
-  )
-  return [...set].sort()
-})
+const centrosDisponibles = computed(() => todosCentros.value.map(c => c.nombre).sort())
 
 // Familias filtradas por centro seleccionado
 const familiasDisponibles = computed(() => {
-  const base = filtroCentro.value
-    ? todosMicroretos.value.filter(m =>
-        (m.centro_educativo || m.centro) === filtroCentro.value
-      )
-    : todosMicroretos.value
-  const set = new Set(base.map(m => m.familia).filter(Boolean))
+  if (filtroCentro.value) {
+    const centro = todosCentros.value.find(c => c.nombre === filtroCentro.value)
+    if (centro) {
+      const set = new Set(centro.ciclos.map(c => c.familia_nombre).filter(Boolean))
+      return [...set].sort()
+    }
+  }
+  const set = new Set(todosMicroretos.value.map(m => m.familia).filter(Boolean))
   return [...set].sort()
 })
 
 // Ciclos filtrados por centro + familia
 const ciclosDisponibles = computed(() => {
+  if (filtroCentro.value) {
+    const centro = todosCentros.value.find(c => c.nombre === filtroCentro.value)
+    if (centro) {
+      let ciclos = centro.ciclos
+      if (filtroFamilia.value)
+        ciclos = ciclos.filter(c => c.familia_nombre === filtroFamilia.value)
+      const set = new Set(ciclos.map(c => c.nombre).filter(Boolean))
+      return [...set].sort()
+    }
+  }
   let base = todosMicroretos.value
-  if (filtroCentro.value)
-    base = base.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
   if (filtroFamilia.value)
     base = base.filter(m => m.familia === filtroFamilia.value)
   const set = new Set(base.map(m => m.ciclo).filter(Boolean))
@@ -145,8 +149,11 @@ async function abrirBuscador() {
   if (catalogoCargado.value) return
   cargandoCatalogo.value = true
   try {
-    const res = await api.get('/microretos')
-    todosMicroretos.value = res.data.filter(m => {
+    const [resMicroretos, resCentros] = await Promise.all([
+      api.get('/microretos'),
+      api.get('/centros'),
+    ])
+    todosMicroretos.value = resMicroretos.data.filter(m => {
       const centro  = m.centro_educativo || m.centro
       const familia = m.familia
       return (
@@ -154,6 +161,7 @@ async function abrirBuscador() {
         familia && familia !== 'Familia Desconocida'
       )
     })
+    todosCentros.value = resCentros.data
     catalogoCargado.value = true
   } catch (e) {
     console.error('Error cargando catálogo:', e)
@@ -249,9 +257,10 @@ watch(filtroSes, () => { paginaSesiones.value = 1 }, { deep: true })
 
 // ─── Limpiar selección de microreto ──────────────────────────────────────────
 function limpiarFormulario() {
-  microretoSeleccionado.value = null
-  form.value.microreto_id     = ''
-  form.value.microreto_titulo = ''
+  microretoSeleccionado.value  = null
+  form.value.microreto_id      = ''
+  form.value.microreto_titulo  = ''
+  autocompletados.value        = { centro_educativo: false, ciclo_formativo: false, curso: false }
   router.replace({ path: '/dashboard' })
 }
 
@@ -265,6 +274,33 @@ function abrirMicroretoModal(id) {
 function cerrarMicroretoModal() {
   microretoModalId.value = null
 }
+
+// ─── Autocompletado de datos de sesión desde el microreto ────────────────────
+const autocompletados = ref({ centro_educativo: false, ciclo_formativo: false, curso: false })
+
+watch(microretoSeleccionado, (m) => {
+  autocompletados.value = { centro_educativo: false, ciclo_formativo: false, curso: false }
+  if (!m) return
+  const centro = m.centro_educativo || m.centro
+  if (centro)  { form.value.centro_educativo = centro;          autocompletados.value.centro_educativo = true }
+  if (m.ciclo) { form.value.ciclo_formativo  = m.ciclo;         autocompletados.value.ciclo_formativo  = true }
+  if (m.curso) { form.value.curso            = normalizarCurso(m.curso); autocompletados.value.curso = true }
+})
+
+// Opciones para datalist — combinan historial guardado + catálogo si ya fue cargado
+const centrosParaAutocompletar = computed(() => {
+  const set = new Set()
+  sesiones.value.forEach(s => { if (s.centro_educativo) set.add(s.centro_educativo) })
+  todosCentros.value.forEach(c => { if (c.nombre) set.add(c.nombre) })
+  return [...set].sort()
+})
+
+const ciclosParaAutocompletar = computed(() => {
+  const set = new Set()
+  sesiones.value.forEach(s => { if (s.ciclo_formativo) set.add(s.ciclo_formativo) })
+  todosMicroretos.value.forEach(m => { if (m.ciclo) set.add(m.ciclo) })
+  return [...set].sort()
+})
 
 // ─── Modal de detalle de sesión ───────────────────────────────────────────────
 const sesionAbierta = ref(null)
@@ -667,10 +703,19 @@ function formatFecha(isoDate) {
 
           <!-- ══ DATOS DE LA SESIÓN ══════════════════════════════════════════ -->
           <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-50">
+            <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
                 Datos de la sesión
               </p>
+              <span v-if="autocompletados.centro_educativo || autocompletados.ciclo_formativo || autocompletados.curso"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                           bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859]
+                           text-[8px] font-black uppercase tracking-widest">
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                </svg>
+                Autocompletado
+              </span>
             </div>
             <div class="px-6 py-5 space-y-4">
 
@@ -680,23 +725,49 @@ function formatFecha(isoDate) {
               </div>
 
               <div>
-                <label class="field-label">Centro educativo</label>
-                <input v-model="form.centro_educativo" type="text"
+                <label class="field-label flex items-center gap-2">
+                  Centro educativo
+                  <span v-if="autocompletados.centro_educativo"
+                        class="text-[8px] font-black bg-[#00A859]/10 text-[#00A859] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                    Auto
+                  </span>
+                </label>
+                <input v-model="form.centro_educativo" type="text" list="centros-datalist"
+                       @input="autocompletados.centro_educativo = false"
                        placeholder="Ej. IES Aguas Nuevas" class="field-input" />
+                <datalist id="centros-datalist">
+                  <option v-for="c in centrosParaAutocompletar" :key="c" :value="c" />
+                </datalist>
               </div>
 
               <div>
-                <label class="field-label">Ciclo formativo</label>
-                <input v-model="form.ciclo_formativo" type="text"
+                <label class="field-label flex items-center gap-2">
+                  Ciclo formativo
+                  <span v-if="autocompletados.ciclo_formativo"
+                        class="text-[8px] font-black bg-[#00A859]/10 text-[#00A859] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                    Auto
+                  </span>
+                </label>
+                <input v-model="form.ciclo_formativo" type="text" list="ciclos-datalist"
+                       @input="autocompletados.ciclo_formativo = false"
                        placeholder="Ej. CFGM Sistemas Microinformáticos" class="field-input" />
+                <datalist id="ciclos-datalist">
+                  <option v-for="c in ciclosParaAutocompletar" :key="c" :value="c" />
+                </datalist>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="field-label">Curso</label>
+                  <label class="field-label flex items-center gap-2">
+                    Curso
+                    <span v-if="autocompletados.curso"
+                          class="text-[8px] font-black bg-[#00A859]/10 text-[#00A859] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                      Auto
+                    </span>
+                  </label>
                   <div class="flex gap-2 mt-1">
                     <button v-for="c in ['1º', '2º']" :key="c"
-                            @click="form.curso = c"
+                            @click="form.curso = c; autocompletados.curso = false"
                             class="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest
                                    border transition-all"
                             :class="form.curso === c
