@@ -257,7 +257,8 @@ const guardar = async () => {
       ciclo: ciclos.value.find(c => c.id === seleccion.value.cicloId)?.nombre,
       modulo: nombresModulosSeleccionados.length > 0 ? nombresModulosSeleccionados.join(' y ') : 'Transversal',
       duracion: seleccion.value.duracion,
-      nivel_grupo: seleccion.value.nivelGrupo
+      nivel_grupo: seleccion.value.nivelGrupo,
+      es_simulado: !!(empresaDetalle.value?.es_simulada),
     });
     guardadoExitoso.value = true;
   } catch (e) { alert("Error al guardar"); }
@@ -499,7 +500,7 @@ const guardar = async () => {
                 <div class="col-span-2 md:col-span-1">
                   <label class="label-style">Nivel del Grupo-Clase *</label>
                   <select v-model="seleccion.nivelGrupo" class="input-style">
-                    <option value="Básico">Básico (Ej: FP Básica o 1º de GM)</option>
+                    <option value="Bajo">Básico (Ej: FP Básica o 1º de GM)</option>
                     <option value="Medio">Medio (Ej: 2º de GM o 1º de GS)</option>
                     <option value="Alto">Alto (Ej: 2º de GS o Especialización)</option>
                   </select>
