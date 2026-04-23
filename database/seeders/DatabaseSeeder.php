@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
         ]
     );
 
+    $this->call(EnergiasRenovablesSeeder::class);
     $this->call(DemosSeeder::class);
     $this->call(MicorretosDemoSeeder::class);
 }
