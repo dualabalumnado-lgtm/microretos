@@ -18,6 +18,12 @@ class MicroretoIAController extends Controller
         // Cuando el volumen crezca habrá que añadir filtros server-side.
         $limit = min((int) $request->query('limit', 500), 500);
 
+        // Pre-cargar módulos y ciclos para derivar curso sin N+1
+        $modulosPorCiclo = \App\Models\Modulo::select('idcicloformativo', 'nombre', 'curso')
+            ->get()
+            ->groupBy('idcicloformativo');
+        $ciclosPorNombre = CicloFormativo::pluck('id', 'nombre');
+
         $microretos = Microreto::with([
             'empresa.centroEducativo',
             'empresa.familias',
@@ -25,7 +31,7 @@ class MicroretoIAController extends Controller
         ->orderByDesc('created_at')
         ->limit($limit)
         ->get()
-        ->map(function ($reto) {
+        ->map(function ($reto) use ($modulosPorCiclo, $ciclosPorNombre) {
 
             $reto->es_simulado = (bool) $reto->es_simulado;
 
@@ -42,6 +48,20 @@ class MicroretoIAController extends Controller
                 $reto->centro_educativo    = 'Centro Desconocido';
                 $reto->familia             = 'Familia Desconocida';
                 $reto->empresa_es_simulada = false;
+            }
+
+            // Derivar curso en memoria si no está guardado (evita N+1)
+            if (is_null($reto->curso) && $reto->modulo && $reto->modulo !== 'Transversal') {
+                $cicloId = $reto->ciclo_id ?? $ciclosPorNombre->get($reto->ciclo);
+                if ($cicloId) {
+                    $primerModulo    = trim(explode(' y ', $reto->modulo)[0]);
+                    $modulosDelCiclo = $modulosPorCiclo->get($cicloId, collect());
+                    $modulo = $modulosDelCiclo->first(fn($m) =>
+                        $m->nombre === $primerModulo ||
+                        str_starts_with($m->nombre, rtrim($primerModulo, '.'))
+                    );
+                    $reto->curso = $modulo?->curso;
+                }
             }
 
             return $reto;
