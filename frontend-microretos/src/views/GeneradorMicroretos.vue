@@ -25,6 +25,7 @@ const totalPasos = 3;
 const empresas = ref([]);
 const familiasFiltradas = ref([]); 
 const buscadorEmpresa = ref('');
+const filtroTipoEmpresa = ref('');   // '' = todas, 'simulada', 'real'
 const mostrarDropdownEmpresas = ref(false);
 const empresaDetalle = ref(null);
 
@@ -184,8 +185,13 @@ const empresasFiltradasBusqueda = computed(() => {
   if (centroFiltro.value) {
     filtradas = filtradas.filter(e => e.centro_educativo === centroFiltro.value);
   }
-  if (buscadorEmpresa.value) { 
-    filtradas = filtradas.filter(e => 
+  if (filtroTipoEmpresa.value === 'simulada') {
+    filtradas = filtradas.filter(e => e.es_simulada);
+  } else if (filtroTipoEmpresa.value === 'real') {
+    filtradas = filtradas.filter(e => !e.es_simulada);
+  }
+  if (buscadorEmpresa.value) {
+    filtradas = filtradas.filter(e =>
       e.nombre_comercial?.toLowerCase().includes(buscadorEmpresa.value.toLowerCase())
     );
   }
@@ -371,6 +377,7 @@ const cerrarDropdownFuera = (e) => {
   if (demoSelectorRef.value && !demoSelectorRef.value.contains(e.target)) {
     mostrarSelectorDemo.value = false;
   }
+  estadoDropdownGenAbierto.value = false;
 };
 
 const cargarEmpresas = async () => {
@@ -664,17 +671,44 @@ const tieneContextoEmpresa = computed(() => {
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-// ── ESTADO DE CONTACTO (solo lectura, badge) ──────────
+// ── ESTADO DE CONTACTO (editable inline) ──────────────
+const ESTADOS_OPCIONES_GEN = [
+  'Pendiente de llamar',
+  'Llamado - Información obtenida',
+  'Llamado - Negativa',
+  'Llamado - Llamar más tarde',
+  'En colaboración activa',
+  'Descartada',
+]
 const ESTADO_BADGE_GEN = {
-  'Pendiente de llamar':            { bg: 'bg-amber-100',    text: 'text-amber-700',  border: 'border-amber-300',    dot: 'bg-amber-400 animate-pulse' },
-  'Llamado - Información obtenida': { bg: 'bg-[#00A859]/10', text: 'text-[#00A859]',  border: 'border-[#00A859]/30', dot: 'bg-[#00A859]' },
-  'Llamado - Negativa':             { bg: 'bg-red-50',       text: 'text-red-600',    border: 'border-red-200',      dot: 'bg-red-400' },
-  'Llamado - Llamar más tarde':     { bg: 'bg-blue-50',      text: 'text-blue-600',   border: 'border-blue-200',     dot: 'bg-blue-400' },
-  'En colaboración activa':         { bg: 'bg-gray-100',     text: 'text-gray-700',   border: 'border-gray-300',     dot: 'bg-gray-600' },
-  'Descartada':                     { bg: 'bg-gray-50',      text: 'text-gray-400',   border: 'border-gray-200',     dot: 'bg-gray-300' },
+  'Pendiente de llamar':            { bg: 'bg-amber-100',    text: 'text-amber-700',  border: 'border-amber-300',    dot: 'bg-amber-400', pulse: true  },
+  'Llamado - Información obtenida': { bg: 'bg-[#00A859]/10', text: 'text-[#00A859]',  border: 'border-[#00A859]/30', dot: 'bg-[#00A859]', pulse: false },
+  'Llamado - Negativa':             { bg: 'bg-red-50',       text: 'text-red-600',    border: 'border-red-200',      dot: 'bg-red-400',   pulse: false },
+  'Llamado - Llamar más tarde':     { bg: 'bg-blue-50',      text: 'text-blue-600',   border: 'border-blue-200',     dot: 'bg-blue-400',  pulse: false },
+  'En colaboración activa':         { bg: 'bg-gray-100',     text: 'text-gray-700',   border: 'border-gray-300',     dot: 'bg-gray-600',  pulse: false },
+  'Descartada':                     { bg: 'bg-gray-50',      text: 'text-gray-400',   border: 'border-gray-200',     dot: 'bg-gray-300',  pulse: false },
 }
 const estadoBadgeGen = (estado) =>
-  ESTADO_BADGE_GEN[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-300' }
+  ESTADO_BADGE_GEN[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-300', pulse: false }
+
+const estadoDropdownGenAbierto = ref(false)
+const guardandoEstadoGen       = ref(false)
+
+async function guardarEstadoGen(nuevoEstado) {
+  if (!empresaDetalle.value?.id || guardandoEstadoGen.value) return
+  guardandoEstadoGen.value = true
+  estadoDropdownGenAbierto.value = false
+  try {
+    await api.patch(`/empresas/${empresaDetalle.value.id}/estado`, { estadoContacto: nuevoEstado || null })
+    empresaDetalle.value.estado_contacto = nuevoEstado || null
+    const emp = empresas.value.find(e => String(e.id) === String(empresaDetalle.value.id))
+    if (emp) emp.estado_contacto = nuevoEstado || null
+  } catch (e) {
+    console.error('Error actualizando estado:', e)
+  } finally {
+    guardandoEstadoGen.value = false
+  }
+}
 
 </script>
 
@@ -865,24 +899,40 @@ const estadoBadgeGen = (estado) =>
                     <template v-else-if="!centroFiltro && !esModoDemo">Empresa (elige primero un centro)</template>
                     <template v-else>Buscar empresa</template>
                   </label>
-                  <div class="absolute left-5 top-[38px] flex items-center pointer-events-none">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
+
+                  <!-- Filtro simulada/real — visible solo cuando hay centro seleccionado -->
+                  <div v-if="centroFiltro && !esModoDemo" class="flex items-center gap-1.5 mb-2">
+                    <button
+                      v-for="(label, val) in { '': 'Todas', 'simulada': 'Simuladas', 'real': 'Verídicas' }"
+                      :key="val"
+                      @click="filtroTipoEmpresa = val; if (!buscadorEmpresa) mostrarDropdownEmpresas = true"
+                      :class="filtroTipoEmpresa === val
+                        ? (val === 'simulada' ? 'bg-[#1F2937] text-white border-[#1F2937]' : val === 'real' ? 'bg-[#00A859] text-white border-[#00A859]' : 'bg-gray-200 text-gray-700 border-gray-300')
+                        : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'"
+                      class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all"
+                    >{{ label }}</button>
                   </div>
-                  
-                  <input
-                    v-model="buscadorEmpresa"
-                    @input="onBuscadorInput"
-                    @focus="mostrarDropdownEmpresas = true"
-                    :disabled="!centroFiltro && !esModoDemo"
-                    autocomplete="new-password"
-                    name="buscar-empresa-dualab"
-                    type="search"
-                    class="input-style pl-14 text-lg"
-                    :placeholder="!centroFiltro && !esModoDemo ? 'Selecciona primero un centro...' : 'Ej: Fundación Sergio Alonso...'"
-                  />
-                  
+
+                  <div class="relative">
+                    <div class="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                      <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                      </svg>
+                    </div>
+
+                    <input
+                      v-model="buscadorEmpresa"
+                      @input="onBuscadorInput"
+                      @focus="mostrarDropdownEmpresas = true"
+                      :disabled="!centroFiltro && !esModoDemo"
+                      autocomplete="new-password"
+                      name="buscar-empresa-dualab"
+                      type="search"
+                      class="input-style !pl-14 text-lg"
+                      :placeholder="!centroFiltro && !esModoDemo ? 'Selecciona primero un centro...' : 'Ej: Fundación Sergio Alonso...'"
+                    />
+                  </div>
+
                   <Transition name="dropdown">
                     <div
                       v-if="mostrarDropdownEmpresas && empresasFiltradasBusqueda.length > 0"
@@ -893,7 +943,7 @@ const estadoBadgeGen = (estado) =>
                           {{ empresasFiltradasBusqueda.length }} resultado(s) para "{{ buscadorEmpresa }}"
                         </span>
                       </div>
-                      
+
                       <button
                         v-for="emp in empresasFiltradasBusqueda"
                         :key="emp.id"
@@ -949,17 +999,54 @@ const estadoBadgeGen = (estado) =>
               </div>
             </div>
               
-              <!-- Estado de contacto (solo lectura) -->
+              <!-- Estado de contacto (editable inline) -->
               <div v-if="!esModoDemo" class="mb-6">
-                <div class="flex items-center gap-3 mb-3">
+                <div class="flex items-center gap-3 mb-3 flex-wrap">
                   <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Estado de Contacto</h3>
-                  <span v-if="empresaDetalle.estado_contacto"
-                    :class="[estadoBadgeGen(empresaDetalle.estado_contacto).bg, estadoBadgeGen(empresaDetalle.estado_contacto).text, estadoBadgeGen(empresaDetalle.estado_contacto).border]"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border">
-                    <span :class="estadoBadgeGen(empresaDetalle.estado_contacto).dot" class="w-1.5 h-1.5 rounded-full shrink-0"></span>
-                    {{ empresaDetalle.estado_contacto }}
-                  </span>
-                  <span v-else class="text-[10px] text-gray-400 italic">Sin estado asignado</span>
+
+                  <!-- Dropdown editable -->
+                  <div class="relative inline-block" @click.stop>
+                    <button
+                      @click="estadoDropdownGenAbierto = !estadoDropdownGenAbierto"
+                      :disabled="guardandoEstadoGen"
+                      :class="empresaDetalle.estado_contacto
+                        ? [estadoBadgeGen(empresaDetalle.estado_contacto).bg, estadoBadgeGen(empresaDetalle.estado_contacto).text, estadoBadgeGen(empresaDetalle.estado_contacto).border]
+                        : 'bg-gray-100 text-gray-400 border-gray-200'"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-40"
+                    >
+                      <span v-if="empresaDetalle.estado_contacto"
+                        :class="[estadoBadgeGen(empresaDetalle.estado_contacto).dot, estadoBadgeGen(empresaDetalle.estado_contacto).pulse ? 'animate-pulse' : '']"
+                        class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                      <svg v-if="guardandoEstadoGen" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                      </svg>
+                      {{ guardandoEstadoGen ? 'Guardando...' : (empresaDetalle.estado_contacto || 'Sin estado') }}
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    <Transition name="dropdown">
+                      <div v-if="estadoDropdownGenAbierto"
+                        class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[240px]">
+                        <button
+                          v-for="opcion in ESTADOS_OPCIONES_GEN" :key="opcion"
+                          @click="guardarEstadoGen(opcion)"
+                          :class="[estadoBadgeGen(opcion).bg, estadoBadgeGen(opcion).text, 'hover:opacity-80']"
+                          class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                        >
+                          <span :class="[estadoBadgeGen(opcion).dot, estadoBadgeGen(opcion).pulse ? 'animate-pulse' : '']" class="w-2 h-2 rounded-full shrink-0"></span>
+                          {{ opcion }}
+                        </button>
+                        <button
+                          @click="guardarEstadoGen('')"
+                          class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                        >
+                          <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                          Sin estado
+                        </button>
+                      </div>
+                    </Transition>
+                  </div>
                 </div>
 
                 <!-- Banner para pendiente de llamar -->

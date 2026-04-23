@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
@@ -24,8 +24,12 @@ onMounted(() => {
       router.push('/')
     }
   }, 60_000)
+  document.addEventListener('click', cerrarEstadoDropdown)
 })
-onUnmounted(() => clearInterval(tokenTimer))
+onUnmounted(() => {
+  clearInterval(tokenTimer)
+  document.removeEventListener('click', cerrarEstadoDropdown)
+})
 
 const mostrarAvisoToken = computed(() =>
   minutosRestantes.value >= 0 && minutosRestantes.value <= 60
@@ -46,6 +50,10 @@ const filtroCentro  = ref('')
 // ─── Acordeón: qué centros/familias están abiertos ───────
 const centrosExpandidos   = ref(new Set())
 const familiasExpandidas  = ref(new Set())
+
+// ─── Highlights al buscar empresa ────────────────────────
+const centrosResaltados  = ref(new Set())
+const familiasResaltadas = ref(new Set())
 
 // ─── Empresa expandida (panel de detalle inline) ─────────
 const empresaExpandida = ref(null)
@@ -94,6 +102,15 @@ const mostrarNuevoCentro  = ref(false)
 const mostrarEditarCentro = ref(false)
 const centroAEditar       = ref(null)   // { id, nombre, ciclos[] }
 
+// ─── Confirmación NUEVO CENTRO ────────────────────────────
+const mostrarConfirmNuevoCentro = ref(false)
+function pedirNuevoCentro() { mostrarConfirmNuevoCentro.value = true }
+function confirmarNuevoCentro() { mostrarConfirmNuevoCentro.value = false; mostrarNuevoCentro.value = true }
+
+// ─── Confirmación EDITAR CENTRO ───────────────────────────
+const mostrarConfirmEditarCentro = ref(false)
+const centroEditarTemp           = ref(null)
+
 function onCentroCreado(centro) {
   mostrarSnack(`Centro "${centro.nombre}" creado correctamente.`, 'ok')
   cargarDatos()
@@ -102,8 +119,14 @@ function onCentroCreado(centro) {
 function pedirEditarCentro(centroNombre) {
   const datos = centros.value.find(c => c.nombre === centroNombre)
   if (!datos?.id) return
-  centroAEditar.value       = datos        // { id, nombre, ciclos[] }
-  mostrarEditarCentro.value = true
+  centroEditarTemp.value           = datos
+  mostrarConfirmEditarCentro.value = true
+}
+
+function confirmarEditarCentro() {
+  mostrarConfirmEditarCentro.value = false
+  centroAEditar.value              = centroEditarTemp.value
+  mostrarEditarCentro.value        = true
 }
 
 function onCentroGuardado(centro) {
@@ -138,6 +161,11 @@ function onCentroEliminado(centro) {
 
 // ─── Modal NUEVA EMPRESA ──────────────────────────────────
 const mostrarNuevaEmpresa = ref(false)
+
+// ─── Confirmación NUEVA EMPRESA ───────────────────────────
+const mostrarConfirmNuevaEmpresa = ref(false)
+function pedirNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = true }
+function confirmarNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = false; mostrarNuevaEmpresa.value = true }
 
 // ─── Modal EDITAR ─────────────────────────────────────────
 const mostrarEditarEmpresa = ref(false)
@@ -341,6 +369,38 @@ function estadoBadge(estado) {
   return ESTADO_BADGE[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200', dot: 'bg-gray-300', pulse: false }
 }
 
+// ─── Estados de contacto: opciones canónicas ──────────
+const ESTADOS_OPCIONES = [
+  'Pendiente de llamar',
+  'Llamado - Información obtenida',
+  'Llamado - Negativa',
+  'Llamado - Llamar más tarde',
+  'En colaboración activa',
+  'Descartada',
+]
+
+const estadoDropdownAbierto = ref(null)   // empresa.id o null
+const guardandoEstado       = ref(new Set())
+
+async function guardarEstadoContacto(empresa, nuevoEstado) {
+  if (guardandoEstado.value.has(empresa.id)) return
+  guardandoEstado.value = new Set([...guardandoEstado.value, empresa.id])
+  estadoDropdownAbierto.value = null
+  try {
+    await api.patch(`/empresas/${empresa.id}/estado`, { estadoContacto: nuevoEstado || null })
+    empresa.estado_contacto = nuevoEstado || null
+    mostrarSnack(`Estado de "${empresa.nombre_comercial}" actualizado.`, 'ok')
+  } catch (e) {
+    mostrarSnack('Error al actualizar el estado.', 'error')
+  } finally {
+    guardandoEstado.value = new Set([...guardandoEstado.value].filter(id => id !== empresa.id))
+  }
+}
+
+function cerrarEstadoDropdown(_e) {
+  estadoDropdownAbierto.value = null
+}
+
 // ═══════════════════════════════════════════════════════════
 //  ACORDEÓN
 // ═══════════════════════════════════════════════════════════
@@ -362,6 +422,47 @@ function toggleFamilia(centro, familia) {
 function toggleEmpresa(id) {
   empresaExpandida.value = empresaExpandida.value === id ? null : id
 }
+
+// ─── Auto-expandir y resaltar centros/familias al buscar ──
+watch(busqueda, (q) => {
+  const qLower = q.toLowerCase().trim()
+
+  if (!qLower) {
+    centrosResaltados.value  = new Set()
+    familiasResaltadas.value = new Set()
+    return
+  }
+
+  const nuevosResaltados = new Set()
+  const nuevasFamilias   = new Set()
+
+  for (const empresa of empresas.value) {
+    const coincide =
+      empresa.nombre_comercial?.toLowerCase().includes(qLower) ||
+      empresa.cif?.toLowerCase().includes(qLower) ||
+      empresa.municipio?.toLowerCase().includes(qLower) ||
+      empresa.persona_contacto?.toLowerCase().includes(qLower)
+    if (!coincide) continue
+
+    const centroNombre = empresa.centro_educativo
+    if (!centroNombre) continue
+
+    nuevosResaltados.add(centroNombre)
+    centrosExpandidos.value.add(centroNombre)
+
+    const fams = empresa.familias_nombres?.length
+      ? empresa.familias_nombres
+      : ['— Sin familia asignada —']
+    for (const fam of fams) {
+      const key = familiaKey(centroNombre, fam)
+      nuevasFamilias.add(key)
+      familiasExpandidas.value.add(key)
+    }
+  }
+
+  centrosResaltados.value  = nuevosResaltados
+  familiasResaltadas.value = nuevasFamilias
+})
 
 // ═══════════════════════════════════════════════════════════
 //  FLUJO EDITAR
@@ -514,7 +615,7 @@ function onEmpresaEliminada(data) {
 
             <!-- Botón nuevo centro educativo -->
             <button
-              @click="mostrarNuevoCentro = true"
+              @click="pedirNuevoCentro"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
                      bg-[#1F2937] text-white border border-[#333333]
@@ -530,7 +631,7 @@ function onEmpresaEliminada(data) {
 
             <!-- Botón nueva empresa -->
             <button
-              @click="mostrarNuevaEmpresa = true"
+              @click="pedirNuevaEmpresa"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
                      bg-[#00A859] text-white
@@ -701,7 +802,10 @@ function onEmpresaEliminada(data) {
         <div
           v-for="centro in centrosOrdenados"
           :key="centro"
-          class="bg-white rounded-[1.75rem] border border-gray-100 shadow-sm overflow-hidden"
+          class="bg-white rounded-[1.75rem] border shadow-sm overflow-hidden transition-all duration-500"
+          :class="centrosResaltados.has(centro)
+            ? 'border-[#00A859]/40 centro-resaltado'
+            : 'border-gray-100'"
         >
           <!-- Cabecera del centro -->
           <div class="flex items-center pr-3 gap-1">
@@ -793,7 +897,10 @@ function onEmpresaEliminada(data) {
               <button
                 @click="toggleFamilia(centro, familia)"
                 class="w-full flex items-center gap-3 pl-4 sm:pl-8 pr-4 sm:pr-6 py-3.5
-                       hover:bg-gray-50/60 transition-colors duration-150 text-left"
+                       transition-colors duration-150 text-left"
+                :class="familiasResaltadas.has(familiaKey(centro, familia))
+                  ? 'bg-[#00A859]/5 hover:bg-[#00A859]/10 familia-resaltada'
+                  : 'hover:bg-gray-50/60'"
               >
                 <div class="w-2 h-2 rounded-full bg-[#00A859] shrink-0" />
                 <span class="flex-1 font-bold text-sm text-gray-700 truncate">{{ familia }}</span>
@@ -876,13 +983,45 @@ function onEmpresaEliminada(data) {
                                        bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full shrink-0">
                             {{ empresa.tamano }}
                           </span>
-                          <span v-if="empresa.estado_contacto"
-                            :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
-                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shrink-0">
-                            <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
-                              class="w-1.5 h-1.5 rounded-full"></span>
-                            {{ empresa.estado_contacto }}
-                          </span>
+                          <div class="relative inline-block shrink-0" @click.stop>
+                            <button
+                              @click="estadoDropdownAbierto = estadoDropdownAbierto === empresa.id ? null : empresa.id"
+                              :disabled="guardandoEstado.has(empresa.id)"
+                              :class="empresa.estado_contacto
+                                ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
+                                : 'bg-gray-100 text-gray-400 border-gray-200'"
+                              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-40"
+                            >
+                              <span v-if="empresa.estado_contacto"
+                                :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                                class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                              {{ empresa.estado_contacto || 'Sin estado' }}
+                              <svg class="w-2.5 h-2.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                              </svg>
+                            </button>
+                            <Transition name="dropdown-fade">
+                              <div v-if="estadoDropdownAbierto === empresa.id"
+                                class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[220px]">
+                                <button
+                                  v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
+                                  @click="guardarEstadoContacto(empresa, opcion)"
+                                  :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
+                                  class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                                >
+                                  <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
+                                  {{ opcion }}
+                                </button>
+                                <button
+                                  @click="guardarEstadoContacto(empresa, '')"
+                                  class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                                >
+                                  <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                                  Sin estado
+                                </button>
+                              </div>
+                            </Transition>
+                          </div>
                         </div>
                         <p class="text-xs text-gray-400 mt-0.5 truncate">
                           <span v-if="empresa.municipio">{{ empresa.municipio }}</span>
@@ -1023,15 +1162,48 @@ function onEmpresaEliminada(data) {
                               <dt class="text-gray-400 shrink-0 w-24">Horario</dt>
                               <dd class="font-medium text-gray-700">{{ empresa.horario_atencion }}</dd>
                             </div>
-                            <div v-if="empresa.estado_contacto" class="flex gap-2 items-start">
-                              <dt class="text-gray-400 shrink-0 w-24 pt-0.5">Estado</dt>
+                            <div class="flex gap-2 items-start">
+                              <dt class="text-gray-400 shrink-0 w-24 pt-1">Estado</dt>
                               <dd>
-                                <span :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
-                                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border">
-                                  <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
-                                    class="w-1.5 h-1.5 rounded-full shrink-0"></span>
-                                  {{ empresa.estado_contacto }}
-                                </span>
+                                <div class="relative inline-block" @click.stop>
+                                  <button
+                                    @click="estadoDropdownAbierto = estadoDropdownAbierto === `det-${empresa.id}` ? null : `det-${empresa.id}`"
+                                    :disabled="guardandoEstado.has(empresa.id)"
+                                    :class="empresa.estado_contacto
+                                      ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
+                                      : 'bg-gray-100 text-gray-400 border-gray-200'"
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-40"
+                                  >
+                                    <span v-if="empresa.estado_contacto"
+                                      :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                                      class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                                    {{ empresa.estado_contacto || 'Sin estado' }}
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                  </button>
+                                  <Transition name="dropdown-fade">
+                                    <div v-if="estadoDropdownAbierto === `det-${empresa.id}`"
+                                      class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[220px]">
+                                      <button
+                                        v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
+                                        @click="guardarEstadoContacto(empresa, opcion)"
+                                        :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
+                                        class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                                      >
+                                        <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
+                                        {{ opcion }}
+                                      </button>
+                                      <button
+                                        @click="guardarEstadoContacto(empresa, '')"
+                                        class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                                      >
+                                        <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                                        Sin estado
+                                      </button>
+                                    </div>
+                                  </Transition>
+                                </div>
                               </dd>
                             </div>
                             <div v-if="empresa.fecha_cita" class="flex gap-2">
@@ -1184,13 +1356,45 @@ function onEmpresaEliminada(data) {
                                    bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full shrink-0">
                         {{ empresa.sector }}
                       </span>
-                      <span v-if="empresa.estado_contacto"
-                        :class="[estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shrink-0">
-                        <span :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
-                          class="w-1.5 h-1.5 rounded-full"></span>
-                        {{ empresa.estado_contacto }}
-                      </span>
+                      <div class="relative inline-block shrink-0" @click.stop>
+                        <button
+                          @click="estadoDropdownAbierto = estadoDropdownAbierto === empresa.id ? null : empresa.id"
+                          :disabled="guardandoEstado.has(empresa.id)"
+                          :class="empresa.estado_contacto
+                            ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
+                            : 'bg-gray-100 text-gray-400 border-gray-200'"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-40"
+                        >
+                          <span v-if="empresa.estado_contacto"
+                            :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                            class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                          {{ empresa.estado_contacto || 'Sin estado' }}
+                          <svg class="w-2.5 h-2.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                          </svg>
+                        </button>
+                        <Transition name="dropdown-fade">
+                          <div v-if="estadoDropdownAbierto === empresa.id"
+                            class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[220px]">
+                            <button
+                              v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
+                              @click="guardarEstadoContacto(empresa, opcion)"
+                              :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
+                              class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                            >
+                              <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
+                              {{ opcion }}
+                            </button>
+                            <button
+                              @click="guardarEstadoContacto(empresa, '')"
+                              class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                            >
+                              <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                              Sin estado
+                            </button>
+                          </div>
+                        </Transition>
+                      </div>
                     </div>
                     <p class="text-xs text-amber-500 mt-0.5 truncate">
                       <span v-if="empresa.municipio">{{ empresa.municipio }}</span>
@@ -1304,6 +1508,117 @@ function onEmpresaEliminada(data) {
       </Transition>
 
     </div>
+
+    <!-- ══════════════ MODAL: CONFIRMAR NUEVA EMPRESA ══════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="mostrarConfirmNuevaEmpresa"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           @click.self="mostrarConfirmNuevaEmpresa = false">
+        <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-[#00A859]/10 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-black text-lg text-[#1F2937]">Nueva empresa</h3>
+              <p class="text-xs text-gray-400">Vas a añadir una empresa a la base de datos</p>
+            </div>
+          </div>
+          <div class="bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl p-4 mb-5">
+            <p class="text-xs text-[#00A859] font-semibold leading-relaxed">
+              Se creará un nuevo registro de empresa. Asegúrate de tener los datos necesarios antes de continuar.
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button @click="mostrarConfirmNuevaEmpresa = false"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+              Cancelar
+            </button>
+            <button @click="confirmarNuevaEmpresa"
+              class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-sm font-black hover:bg-[#009950] transition-all shadow-sm">
+              Continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══════════════ MODAL: CONFIRMAR NUEVO CENTRO ══════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="mostrarConfirmNuevoCentro"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           @click.self="mostrarConfirmNuevoCentro = false">
+        <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-[#1F2937]/10 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-[#1F2937]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-black text-lg text-[#1F2937]">Nuevo centro educativo</h3>
+              <p class="text-xs text-gray-400">Vas a añadir un centro al catálogo</p>
+            </div>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-5">
+            <p class="text-xs text-gray-600 font-semibold leading-relaxed">
+              El centro quedará disponible en todo el sistema y podrá vincularse a empresas y ciclos formativos.
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button @click="mostrarConfirmNuevoCentro = false"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+              Cancelar
+            </button>
+            <button @click="confirmarNuevoCentro"
+              class="flex-1 py-2.5 rounded-xl bg-[#1F2937] text-white text-sm font-black hover:bg-[#374151] transition-all shadow-sm">
+              Continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══════════════ MODAL: CONFIRMAR EDITAR CENTRO ═════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="mostrarConfirmEditarCentro"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           @click.self="mostrarConfirmEditarCentro = false">
+        <div class="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-7 border border-gray-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-black text-lg text-[#1F2937]">Modificar centro</h3>
+              <p class="text-xs text-gray-400">Vas a editar los datos de este centro educativo</p>
+            </div>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+            <p class="text-sm font-bold text-amber-800 mb-1">"{{ centroEditarTemp?.nombre }}"</p>
+            <p class="text-xs text-amber-600">
+              Los cambios afectarán a todos los ciclos vinculados y a las empresas que pertenezcan a este centro.
+            </p>
+          </div>
+          <div class="flex gap-3">
+            <button @click="mostrarConfirmEditarCentro = false"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+              Cancelar
+            </button>
+            <button @click="confirmarEditarCentro"
+              class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-sm font-black hover:bg-[#009950] transition-all shadow-sm">
+              Abrir editor
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- ════════════════ MODAL: CONFIRMAR EDICIÓN ════════════════ -->
     <Transition name="modal-fade">
@@ -1549,4 +1864,17 @@ function onEmpresaEliminada(data) {
 .snack-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .snack-enter-from,
 .snack-leave-to     { opacity: 0; transform: translateY(12px) scale(0.95); }
+
+/* Highlight de búsqueda de empresa */
+@keyframes centro-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,168,89,0); }
+  40%       { box-shadow: 0 0 0 5px rgba(0,168,89,0.18); }
+}
+.centro-resaltado  { animation: centro-pulse 1.4s ease-in-out 3; }
+
+@keyframes familia-pulse {
+  0%, 100% { border-left-color: transparent; }
+  40%       { border-left-color: #00A859; }
+}
+.familia-resaltada { border-left: 2px solid #00A859; animation: familia-pulse 1.4s ease-in-out 3; }
 </style>
