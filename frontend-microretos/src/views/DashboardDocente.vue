@@ -448,13 +448,13 @@ function formatFecha(isoDate) {
 
                 <!-- Indicador de pasos -->
                 <div class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
-                  <span :class="filtroCentro ? 'text-[#00A859]' : 'text-gray-300'">① Centro</span>
+                  <span :class="filtroCentro ? 'text-[#00A859]' : 'text-gray-300'">① Centro <span class="text-red-400">*</span></span>
                   <span class="text-gray-200">›</span>
                   <span :class="filtroFamilia ? 'text-[#00A859]' : filtroCentro ? 'text-gray-400' : 'text-gray-200'">② Familia</span>
                   <span class="text-gray-200">›</span>
-                  <span :class="filtroCiclo ? 'text-[#00A859]' : filtroFamilia ? 'text-gray-400' : 'text-gray-200'">③ Ciclo</span>
+                  <span :class="filtroCiclo ? 'text-[#00A859]' : filtroCentro ? 'text-gray-400' : 'text-gray-200'">③ Ciclo</span>
                   <span class="text-gray-200">›</span>
-                  <span :class="filtroCurso ? 'text-[#00A859]' : filtroCiclo ? 'text-gray-400' : 'text-gray-200'">④ Curso</span>
+                  <span :class="filtroCurso ? 'text-[#00A859]' : filtroCentro ? 'text-gray-400' : 'text-gray-200'">④ Curso</span>
                 </div>
 
                 <!-- Filtro: tipo de microreto (simulado / real) -->
@@ -489,7 +489,7 @@ function formatFecha(isoDate) {
                     </select>
                   </div>
 
-                  <!-- ② Familia — requiere centro -->
+                  <!-- ② Familia — opcional, todas por defecto -->
                   <div>
                     <label class="field-label flex items-center gap-1">
                       <span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black
@@ -498,36 +498,36 @@ function formatFecha(isoDate) {
                     </label>
                     <select v-model="filtroFamilia" class="field-input"
                             :disabled="!filtroCentro">
-                      <option value="">{{ filtroCentro ? 'Selecciona una familia...' : 'Primero elige un centro' }}</option>
+                      <option value="">Todas las familias</option>
                       <option v-for="f in familiasDisponibles" :key="f" :value="f">{{ f }}</option>
                     </select>
                   </div>
 
-                  <!-- ③ Ciclo — requiere familia -->
+                  <!-- ③ Ciclo — opcional, todos por defecto -->
                   <div>
                     <label class="field-label flex items-center gap-1">
                       <span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black
-                                   border" :class="filtroCiclo ? 'bg-[#00A859] border-[#00A859] text-white' : filtroFamilia ? 'border-gray-300 text-gray-400' : 'border-gray-200 text-gray-300'">3</span>
+                                   border" :class="filtroCiclo ? 'bg-[#00A859] border-[#00A859] text-white' : filtroCentro ? 'border-gray-300 text-gray-400' : 'border-gray-200 text-gray-300'">3</span>
                       Ciclo formativo
                     </label>
                     <select v-model="filtroCiclo" class="field-input"
-                            :disabled="!filtroFamilia">
-                      <option value="">{{ filtroFamilia ? 'Selecciona un ciclo...' : 'Primero elige una familia' }}</option>
+                            :disabled="!filtroCentro">
+                      <option value="">Todos los ciclos</option>
                       <option v-for="c in ciclosDisponibles" :key="c" :value="c">{{ c }}</option>
                     </select>
                   </div>
 
-                  <!-- ④ Curso — requiere ciclo -->
+                  <!-- ④ Curso — opcional, todos por defecto -->
                   <div>
                     <label class="field-label flex items-center gap-1">
                       <span class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black
-                                   border" :class="filtroCurso ? 'bg-[#00A859] border-[#00A859] text-white' : filtroCiclo ? 'border-gray-300 text-gray-400' : 'border-gray-200 text-gray-300'">4</span>
+                                   border" :class="filtroCurso ? 'bg-[#00A859] border-[#00A859] text-white' : filtroCentro ? 'border-gray-300 text-gray-400' : 'border-gray-200 text-gray-300'">4</span>
                       Curso
                     </label>
-                    <div class="flex gap-2 mt-1" :class="!filtroCiclo ? 'opacity-40 pointer-events-none' : ''">
+                    <div class="flex gap-2 mt-1" :class="!filtroCentro ? 'opacity-40 pointer-events-none' : ''">
                       <button v-for="op in ['', '1º', '2º']" :key="op"
                               @click="filtroCurso = op"
-                              :disabled="!filtroCiclo"
+                              :disabled="!filtroCentro"
                               class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase
                                      tracking-widest border transition-all disabled:cursor-not-allowed"
                               :class="filtroCurso === op
@@ -536,15 +536,12 @@ function formatFecha(isoDate) {
                         {{ op === '' ? 'Todos' : op }}
                       </button>
                     </div>
-                    <p v-if="!filtroCiclo" class="text-[9px] text-gray-300 mt-1 font-medium">
-                      Primero elige un ciclo
-                    </p>
                   </div>
 
                 </div>
 
-                <!-- Barra de búsqueda por texto — cuando hay ciclo o filtro simulado activo -->
-                <div v-if="filtroCiclo || filtroSimulado" class="relative">
+                <!-- Barra de búsqueda por texto — cuando hay centro o filtro simulado activo -->
+                <div v-if="filtroCentro || filtroSimulado" class="relative">
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300
                                pointer-events-none"
                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -560,12 +557,12 @@ function formatFecha(isoDate) {
                 <div class="flex items-center justify-between">
                   <p class="text-[10px] text-gray-400 font-medium">
                     <span v-if="cargandoCatalogo">Cargando catálogo...</span>
-                    <span v-else-if="filtroCiclo || filtroSimulado">
+                    <span v-else-if="filtroCentro || filtroSimulado">
                       {{ resultadosFiltrados.length }}
                       {{ resultadosFiltrados.length === 1 ? 'microreto' : 'microretos' }}
                       encontrados
                     </span>
-                    <span v-else class="text-gray-300">Completa los filtros para ver resultados</span>
+                    <span v-else class="text-gray-300">Selecciona un centro para ver resultados</span>
                   </p>
                   <div class="flex gap-2">
                     <button v-if="filtroCentro || filtroFamilia || filtroCiclo || filtroCurso || busqueda || filtroSimulado"
@@ -590,8 +587,8 @@ function formatFecha(isoDate) {
                   </svg>
                 </div>
 
-                <!-- Lista de resultados — cuando hay ciclo elegido o filtro simulado activo -->
-                <ul v-else-if="(filtroCiclo || filtroSimulado) && resultadosFiltrados.length"
+                <!-- Lista de resultados — cuando hay centro elegido o filtro simulado activo -->
+                <ul v-else-if="(filtroCentro || filtroSimulado) && resultadosFiltrados.length"
                     class="space-y-2 max-h-72 overflow-y-auto pr-1 -mr-1">
                   <li v-for="m in resultadosFiltrados" :key="m.uuid || m.id">
                     <button @click="seleccionarMicroreto(m)"
@@ -616,8 +613,8 @@ function formatFecha(isoDate) {
                   </li>
                 </ul>
 
-                <!-- Sin resultados (con ciclo o filtro simulado activo pero sin matches) -->
-                <div v-else-if="filtroCiclo || filtroSimulado"
+                <!-- Sin resultados (con centro o filtro simulado activo pero sin matches) -->
+                <div v-else-if="filtroCentro || filtroSimulado"
                      class="text-center py-8 text-gray-400">
                   <svg class="w-8 h-8 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -625,8 +622,8 @@ function formatFecha(isoDate) {
                   <p class="text-xs font-medium">Sin resultados para esos filtros</p>
                 </div>
 
-                <!-- Indicador visual cuando el buscador está bloqueado esperando filtros -->
-                <div v-else-if="!filtroCiclo && !filtroSimulado && !cargandoCatalogo"
+                <!-- Indicador visual cuando el buscador está esperando que se elija un centro -->
+                <div v-else-if="!filtroCentro && !filtroSimulado && !cargandoCatalogo"
                      class="rounded-xl border border-dashed border-gray-200 py-8 text-center">
                   <div class="flex items-center justify-center gap-1.5 text-gray-300 mb-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,8 +632,8 @@ function formatFecha(isoDate) {
                     </svg>
                   </div>
                   <p class="text-xs text-gray-400 font-medium">
-                    Selecciona centro → familia → ciclo<br>
-                    <span class="text-gray-300">para desbloquear los resultados,<br>o filtra por tipo arriba</span>
+                    Selecciona un centro educativo<br>
+                    <span class="text-gray-300">para ver los microretos disponibles</span>
                   </p>
                 </div>
 

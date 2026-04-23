@@ -27,6 +27,8 @@ const filtroCurso       = ref('');        // '' | '1' | '2'
 const filtroInfoSimulada = ref('');       // '' | 'real' | 'simulada'  → es_simulado
 const filtroEmpresaTipo  = ref('');       // '' | 'real' | 'ficticia'  → empresa_es_simulada
 const busqueda          = ref('');
+const empresaFiltroAbierto = ref(false);
+const infoFiltroAbierto    = ref(false);
 
 const centrosDisponibles = computed(() => centros.value.map(c => c.nombre).sort());
 
@@ -126,7 +128,7 @@ const familiasFiltradas = computed(() => {
 const nivelClase = (nivel) => ({
   Bajo:  'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
   Medio: 'bg-[#F59E0B]/10 border-[#F59E0B]/20 text-[#F59E0B]',
-  Alto:  'bg-[#EF4444]/10 border-[#EF4444]/20 text-[#EF4444]',
+  Alto:  'bg-[#D64545]/10 border-[#D64545]/20 text-[#D64545]',
 }[nivel] || 'bg-gray-100 border-gray-200 text-gray-500');
 
 // ── CICLO DE VIDA ─────────────────────────────────────────
@@ -421,6 +423,7 @@ const confirmarEliminar = async () => {
             </div>
 
             <!-- ── CARDS DE DIFICULTAD ───────────────────────────── -->
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 px-1">Nivel del microreto</p>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
 
               <!-- TODOS -->
@@ -507,21 +510,21 @@ const confirmarEliminar = async () => {
               <!-- ALTO -->
               <button
                 @click="filtroNivel = filtroNivel === 'Alto' ? '' : 'Alto'"
-                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#EF4444]/30"
+                class="relative p-4 rounded-2xl border-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#D64545]/30"
                 :class="filtroNivel === 'Alto'
-                  ? 'bg-[#EF4444] border-[#EF4444] shadow-lg scale-[1.02]'
-                  : 'bg-white border-gray-100 hover:border-[#EF4444]/50 hover:shadow-md'">
+                  ? 'bg-[#D64545] border-[#D64545] shadow-lg scale-[1.02]'
+                  : 'bg-white border-gray-100 hover:border-[#D64545]/50 hover:shadow-md'">
                 <div class="flex items-end justify-between mb-3">
                   <div class="flex items-end gap-0.5">
                     <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:8px"
-                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#D64545]'"></span>
                     <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:12px"
-                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#D64545]'"></span>
                     <span class="w-1.5 rounded-sm inline-block transition-colors" style="height:16px"
-                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#EF4444]'"></span>
+                      :class="filtroNivel === 'Alto' ? 'bg-white' : 'bg-[#D64545]'"></span>
                   </div>
                   <span class="text-2xl font-black leading-none"
-                    :class="filtroNivel === 'Alto' ? 'text-white' : 'text-[#EF4444]'">
+                    :class="filtroNivel === 'Alto' ? 'text-white' : 'text-[#D64545]'">
                     {{ conteoNiveles.Alto }}
                   </span>
                 </div>
@@ -537,8 +540,25 @@ const confirmarEliminar = async () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
               <!-- GRUPO: EMPRESA -->
-              <div class="bg-white/70 rounded-2xl p-3 border border-gray-100">
-                <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2.5 px-1">Empresa</p>
+              <div class="bg-white/70 rounded-2xl border border-gray-100 overflow-hidden">
+                <button @click="empresaFiltroAbierto = !empresaFiltroAbierto"
+                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
+                  <div class="flex items-center gap-2">
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Empresa</p>
+                    <span v-if="!empresaFiltroAbierto && filtroEmpresaTipo"
+                      class="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      :class="filtroEmpresaTipo === 'ficticia' ? 'bg-[#F59E0B]/10 text-[#F59E0B]' : 'bg-[#00A859]/10 text-[#00A859]'">
+                      {{ filtroEmpresaTipo === 'ficticia' ? 'Ficticia' : 'Real' }}
+                    </span>
+                  </div>
+                  <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"
+                    :class="empresaFiltroAbierto ? 'rotate-180' : ''"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                <Transition name="filter-collapse">
+                  <div v-if="empresaFiltroAbierto" class="px-3 pb-3">
                 <div class="grid grid-cols-3 gap-2">
 
                   <button
@@ -589,11 +609,30 @@ const confirmarEliminar = async () => {
                   </button>
 
                 </div>
+                  </div>
+                </Transition>
               </div>
 
               <!-- GRUPO: INFORMACIÓN -->
-              <div class="bg-white/70 rounded-2xl p-3 border border-gray-100">
-                <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2.5 px-1">Información del reto</p>
+              <div class="bg-white/70 rounded-2xl border border-gray-100 overflow-hidden">
+                <button @click="infoFiltroAbierto = !infoFiltroAbierto"
+                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
+                  <div class="flex items-center gap-2">
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Información del reto</p>
+                    <span v-if="!infoFiltroAbierto && filtroInfoSimulada"
+                      class="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      :class="filtroInfoSimulada === 'simulada' ? 'bg-[#6366F1]/10 text-[#6366F1]' : 'bg-[#00A859]/10 text-[#00A859]'">
+                      {{ filtroInfoSimulada === 'simulada' ? 'Simulada' : 'Real' }}
+                    </span>
+                  </div>
+                  <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"
+                    :class="infoFiltroAbierto ? 'rotate-180' : ''"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                <Transition name="filter-collapse">
+                  <div v-if="infoFiltroAbierto" class="px-3 pb-3">
                 <div class="grid grid-cols-3 gap-2">
 
                   <button
@@ -644,6 +683,8 @@ const confirmarEliminar = async () => {
                   </button>
 
                 </div>
+                  </div>
+                </Transition>
               </div>
 
             </div>
@@ -968,4 +1009,8 @@ const confirmarEliminar = async () => {
 .slide-up-leave-active { transition: all 0.2s ease-in; }
 .slide-up-enter-from { opacity: 0; transform: translateY(20px); }
 .slide-up-leave-to { opacity: 0; transform: translateY(-10px); }
+
+.filter-collapse-enter-active { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.filter-collapse-leave-active { transition: all 0.15s ease-in; }
+.filter-collapse-enter-from, .filter-collapse-leave-to { opacity: 0; transform: translateY(-6px); }
 </style>

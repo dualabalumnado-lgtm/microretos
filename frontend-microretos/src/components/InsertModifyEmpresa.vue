@@ -92,6 +92,7 @@ watch(() => props.mostrarNuevaEmpresa, (v) => {
     nuevaConfirmando.value = false
     tabNueva.value = 'basico'
   }
+  estadoDropdownNuevaAbierto.value = false
 })
 
 // Interceptar "nuevo centro" → abrir modal en lugar de flujo inline
@@ -183,13 +184,20 @@ const tabEditar     = ref('basico')
 const editarLoading = ref(false)
 const editarErrors  = reactive({})
 const ESTADOS_CONTACTO = [
-  { value: 'Pendiente de llamar',            label: 'Pendiente de llamar',      activeClass: 'bg-amber-500 text-white border-amber-500 shadow-md',         inactiveClass: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100',       dotClass: 'bg-amber-400' },
-  { value: 'Llamado - Información obtenida', label: 'Llamado — Info obtenida ✓', activeClass: 'bg-[#00A859] text-white border-[#00A859] shadow-md',           inactiveClass: 'bg-[#00A859]/5 text-[#00A859] border-[#00A859]/20 hover:bg-[#00A859]/10', dotClass: 'bg-[#00A859]' },
-  { value: 'Llamado - Negativa',             label: 'Llamado — Negativa ✗',     activeClass: 'bg-red-500 text-white border-red-500 shadow-md',               inactiveClass: 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100',               dotClass: 'bg-red-400' },
-  { value: 'Llamado - Llamar más tarde',     label: 'Llamado — Llamar más tarde', activeClass: 'bg-blue-500 text-white border-blue-500 shadow-md',            inactiveClass: 'bg-blue-50 text-blue-500 border-blue-200 hover:bg-blue-100',           dotClass: 'bg-blue-400' },
-  { value: 'En colaboración activa',         label: 'En colaboración activa ★',  activeClass: 'bg-[#1F2937] text-white border-[#1F2937] shadow-md',           inactiveClass: 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200',         dotClass: 'bg-gray-500' },
-  { value: 'Descartada',                     label: 'Descartada',               activeClass: 'bg-gray-500 text-white border-gray-500 shadow-md',             inactiveClass: 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100',           dotClass: 'bg-gray-300' },
+  { value: 'Pendiente de llamar',            label: 'Pendiente de llamar',       bg: 'bg-amber-100',    text: 'text-amber-700',  border: 'border-amber-300',    dot: 'bg-amber-400',   pulse: true  },
+  { value: 'Llamado - Información obtenida', label: 'Llamado — Info obtenida ✓', bg: 'bg-[#00A859]/10', text: 'text-[#00A859]',  border: 'border-[#00A859]/30', dot: 'bg-[#00A859]',   pulse: false },
+  { value: 'Llamado - Negativa',             label: 'Llamado — Negativa ✗',      bg: 'bg-red-50',       text: 'text-red-600',    border: 'border-red-200',      dot: 'bg-red-400',     pulse: false },
+  { value: 'Llamado - Llamar más tarde',     label: 'Llamado — Llamar más tarde', bg: 'bg-blue-50',     text: 'text-blue-600',   border: 'border-blue-200',     dot: 'bg-blue-400',    pulse: false },
+  { value: 'En colaboración activa',         label: 'En colaboración activa ★',  bg: 'bg-gray-100',     text: 'text-gray-700',   border: 'border-gray-300',     dot: 'bg-gray-600',    pulse: false },
+  { value: 'Descartada',                     label: 'Descartada',                bg: 'bg-gray-50',      text: 'text-gray-400',   border: 'border-gray-200',     dot: 'bg-gray-300',    pulse: false },
 ]
+
+function estadoActual(valor) {
+  return ESTADOS_CONTACTO.find(e => e.value === valor) ?? null
+}
+
+const estadoDropdownNuevaAbierto  = ref(false)
+const estadoDropdownEditarAbierto = ref(false)
 
 const editarForm               = reactive({
   nombre_comercial: '', razon_social: '', cif: '', sector: '', tamano: '',
@@ -199,6 +207,7 @@ const editarForm               = reactive({
 })
 
 watch(() => props.mostrarEditarEmpresa, (v) => {
+  estadoDropdownEditarAbierto.value = false
   if (v && props.empresaAEditar) {
     cargarCentros()
     Object.keys(editarErrors).forEach(k => delete editarErrors[k])
@@ -400,21 +409,49 @@ defineExpose({ abrirTrasLogin })
               <!-- Estado de contacto -->
               <div>
                 <label class="ime-label">Estado de Contacto</label>
-                <div class="flex flex-wrap gap-2 mt-1">
+                <div class="relative inline-block mt-1" @click.stop>
                   <button
-                    v-for="est in ESTADOS_CONTACTO"
-                    :key="est.value"
                     type="button"
-                    @click="nuevaForm.estado_contacto = nuevaForm.estado_contacto === est.value ? '' : est.value"
-                    :class="[nuevaForm.estado_contacto === est.value ? est.activeClass : est.inactiveClass]"
-                    class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer">
-                    {{ est.label }}
+                    @click="estadoDropdownNuevaAbierto = !estadoDropdownNuevaAbierto"
+                    :class="estadoActual(nuevaForm.estado_contacto)
+                      ? [estadoActual(nuevaForm.estado_contacto).bg, estadoActual(nuevaForm.estado_contacto).text, estadoActual(nuevaForm.estado_contacto).border]
+                      : 'bg-gray-100 text-gray-400 border-gray-200'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <span v-if="estadoActual(nuevaForm.estado_contacto)"
+                      :class="[estadoActual(nuevaForm.estado_contacto).dot, estadoActual(nuevaForm.estado_contacto).pulse ? 'animate-pulse' : '']"
+                      class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                    {{ nuevaForm.estado_contacto || 'Sin estado' }}
+                    <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                    </svg>
                   </button>
-                  <button v-if="nuevaForm.estado_contacto" type="button"
-                    @click="nuevaForm.estado_contacto = ''"
-                    class="px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest transition-all border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 cursor-pointer">
-                    ✕ Sin estado
-                  </button>
+                  <Transition name="ime-fade">
+                    <div v-if="estadoDropdownNuevaAbierto"
+                      class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[250px]">
+                      <button
+                        v-for="est in ESTADOS_CONTACTO" :key="est.value"
+                        type="button"
+                        @click="nuevaForm.estado_contacto = est.value; estadoDropdownNuevaAbierto = false"
+                        :class="[est.bg, est.text, nuevaForm.estado_contacto === est.value ? 'font-black ring-2 ring-inset ring-current/30' : 'hover:opacity-80']"
+                        class="w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                      >
+                        <span :class="[est.dot, est.pulse ? 'animate-pulse' : '']" class="w-2 h-2 rounded-full shrink-0"></span>
+                        {{ est.label }}
+                        <svg v-if="nuevaForm.estado_contacto === est.value" class="w-3.5 h-3.5 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        @click="nuevaForm.estado_contacto = ''; estadoDropdownNuevaAbierto = false"
+                        class="w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                      >
+                        <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                        Sin estado
+                      </button>
+                    </div>
+                  </Transition>
                 </div>
               </div>
               <div class="ime-g2">
@@ -685,21 +722,49 @@ defineExpose({ abrirTrasLogin })
               <!-- Estado de contacto -->
               <div>
                 <label class="ime-label">Estado de Contacto</label>
-                <div class="flex flex-wrap gap-2 mt-1">
+                <div class="relative inline-block mt-1" @click.stop>
                   <button
-                    v-for="est in ESTADOS_CONTACTO"
-                    :key="est.value"
                     type="button"
-                    @click="editarForm.estado_contacto = editarForm.estado_contacto === est.value ? '' : est.value"
-                    :class="[editarForm.estado_contacto === est.value ? est.activeClass : est.inactiveClass]"
-                    class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer">
-                    {{ est.label }}
+                    @click="estadoDropdownEditarAbierto = !estadoDropdownEditarAbierto"
+                    :class="estadoActual(editarForm.estado_contacto)
+                      ? [estadoActual(editarForm.estado_contacto).bg, estadoActual(editarForm.estado_contacto).text, estadoActual(editarForm.estado_contacto).border]
+                      : 'bg-gray-100 text-gray-400 border-gray-200'"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <span v-if="estadoActual(editarForm.estado_contacto)"
+                      :class="[estadoActual(editarForm.estado_contacto).dot, estadoActual(editarForm.estado_contacto).pulse ? 'animate-pulse' : '']"
+                      class="w-1.5 h-1.5 rounded-full shrink-0"></span>
+                    {{ editarForm.estado_contacto || 'Sin estado' }}
+                    <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                    </svg>
                   </button>
-                  <button v-if="editarForm.estado_contacto" type="button"
-                    @click="editarForm.estado_contacto = ''"
-                    class="px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest transition-all border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 cursor-pointer">
-                    ✕ Sin estado
-                  </button>
+                  <Transition name="ime-fade">
+                    <div v-if="estadoDropdownEditarAbierto"
+                      class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[250px]">
+                      <button
+                        v-for="est in ESTADOS_CONTACTO" :key="est.value"
+                        type="button"
+                        @click="editarForm.estado_contacto = est.value; estadoDropdownEditarAbierto = false"
+                        :class="[est.bg, est.text, editarForm.estado_contacto === est.value ? 'font-black ring-2 ring-inset ring-current/30' : 'hover:opacity-80']"
+                        class="w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                      >
+                        <span :class="[est.dot, est.pulse ? 'animate-pulse' : '']" class="w-2 h-2 rounded-full shrink-0"></span>
+                        {{ est.label }}
+                        <svg v-if="editarForm.estado_contacto === est.value" class="w-3.5 h-3.5 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        @click="editarForm.estado_contacto = ''; estadoDropdownEditarAbierto = false"
+                        class="w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                      >
+                        <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                        Sin estado
+                      </button>
+                    </div>
+                  </Transition>
                 </div>
               </div>
               <div class="ime-g2">
