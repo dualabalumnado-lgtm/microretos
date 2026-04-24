@@ -312,6 +312,10 @@ const confirmarEliminar = async () => {
                     d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 Centro Educativo
+                <span class="tooltip-wrap">
+                  <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                  <span class="tooltip-text">Filtra microretos del centro de formación profesional seleccionado.</span>
+                </span>
               </label>
               <div class="flex flex-wrap gap-2 flex-1">
                 <button
@@ -423,7 +427,13 @@ const confirmarEliminar = async () => {
             </div>
 
             <!-- ── CARDS DE DIFICULTAD ───────────────────────────── -->
-            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 px-1">Nivel del microreto</p>
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 px-1 flex items-center gap-1.5">
+              Nivel del microreto
+              <span class="tooltip-wrap">
+                <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                <span class="tooltip-text">Dificultad del reto: Bajo (básico/introductorio), Medio (aplicado), Alto (avanzado).</span>
+              </span>
+            </p>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
 
               <!-- TODOS -->
@@ -540,11 +550,15 @@ const confirmarEliminar = async () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
               <!-- GRUPO: EMPRESA -->
-              <div class="bg-white/70 rounded-2xl border border-gray-100 overflow-hidden">
+              <div class="bg-white/70 rounded-2xl border border-gray-100">
                 <button @click="empresaFiltroAbierto = !empresaFiltroAbierto"
                   class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
                   <div class="flex items-center gap-2">
                     <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Empresa</p>
+                    <span class="tooltip-wrap" @click.stop>
+                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <span class="tooltip-text">Empresa real (existente) o ficticia (inventada para la práctica docente).</span>
+                    </span>
                     <span v-if="!empresaFiltroAbierto && filtroEmpresaTipo"
                       class="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
                       :class="filtroEmpresaTipo === 'ficticia' ? 'bg-[#F59E0B]/10 text-[#F59E0B]' : 'bg-[#00A859]/10 text-[#00A859]'">
@@ -614,11 +628,15 @@ const confirmarEliminar = async () => {
               </div>
 
               <!-- GRUPO: INFORMACIÓN -->
-              <div class="bg-white/70 rounded-2xl border border-gray-100 overflow-hidden">
+              <div class="bg-white/70 rounded-2xl border border-gray-100">
                 <button @click="infoFiltroAbierto = !infoFiltroAbierto"
                   class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
                   <div class="flex items-center gap-2">
                     <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Información del reto</p>
+                    <span class="tooltip-wrap" @click.stop>
+                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <span class="tooltip-text">Datos del reto reales (de empresa existente) o generados por IA para simulación.</span>
+                    </span>
                     <span v-if="!infoFiltroAbierto && filtroInfoSimulada"
                       class="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
                       :class="filtroInfoSimulada === 'simulada' ? 'bg-[#6366F1]/10 text-[#6366F1]' : 'bg-[#00A859]/10 text-[#00A859]'">
@@ -694,8 +712,12 @@ const confirmarEliminar = async () => {
 
               <!-- Búsqueda -->
               <div class="mb-4">
-                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
+                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 flex items-center gap-1.5">
                   Búsqueda por palabras clave
+                  <span class="tooltip-wrap">
+                    <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                    <span class="tooltip-text">Busca en título, empresa, ciclo formativo y pregunta del microreto.</span>
+                  </span>
                 </label>
                 <div class="relative">
                   <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
@@ -723,8 +745,12 @@ const confirmarEliminar = async () => {
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
-                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
+                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 flex items-center gap-1.5">
                     Ciclo Formativo
+                    <span class="tooltip-wrap">
+                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <span class="tooltip-text">Filtra por ciclo formativo al que está orientado el microreto.</span>
+                    </span>
                   </label>
                   <select v-model="filtroCiclo"
                     class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-[#1F2937] focus:bg-white focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/10 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -735,8 +761,12 @@ const confirmarEliminar = async () => {
                 </div>
 
                 <div>
-                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 block">
+                  <label class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1 mb-2 flex items-center gap-1.5">
                     Curso
+                    <span class="tooltip-wrap">
+                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <span class="tooltip-text">Filtra por el año del ciclo: 1º (primer año) o 2º (segundo año).</span>
+                    </span>
                   </label>
                   <div class="flex gap-2">
                     <button
@@ -1013,4 +1043,43 @@ const confirmarEliminar = async () => {
 .filter-collapse-enter-active { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 .filter-collapse-leave-active { transition: all 0.15s ease-in; }
 .filter-collapse-enter-from, .filter-collapse-leave-to { opacity: 0; transform: translateY(-6px); }
+
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.tooltip-text {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1F2937;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 8px;
+  width: max-content;
+  max-width: 210px;
+  white-space: normal;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 30;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+.tooltip-wrap:hover .tooltip-text { opacity: 1; }
+.tooltip-text::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1F2937;
+}
 </style>
