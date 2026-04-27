@@ -1028,7 +1028,7 @@ const confirmarEliminar = async () => {
                       {{ reto.empresa_es_simulada ? 'Empresa ficticia' : 'Empresa real' }}
                     </span>
                     <span v-if="reto.es_simulado"
-                      class="bg-[#6366F1]/10 border border-[#6366F1]/20 text-[#6366F1] px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full whitespace-nowrap">
+                      class="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full whitespace-nowrap">
                       Info simulada
                     </span>
                   </div>
