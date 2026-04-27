@@ -36,8 +36,9 @@ Route::get('/demos', [DemoController::class, 'index']);
 Route::get('/demos/{familia}/microretos', [DemoController::class, 'microretos']);
 Route::get('/demos/{familia}', [DemoController::class, 'show']);
 
-// Auth pública
-Route::post('/admin/login', [AdminAuthController::class, 'login']);
+// Auth pública — throttle estricto para prevenir fuerza bruta
+Route::middleware('throttle:5,1')
+    ->post('/admin/login', [AdminAuthController::class, 'login']);
 
 
 // --- RUTAS PROTEGIDAS (requieren token Sanctum) ---
@@ -47,7 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/admin/logout',          [AdminAuthController::class, 'logout']);
     Route::post('/admin/refresh',         [AdminAuthController::class, 'refresh']);
-    Route::post('/admin/verify-password', [AdminAuthController::class, 'verifyPassword']);
+    Route::middleware('throttle:5,1')
+        ->post('/admin/verify-password', [AdminAuthController::class, 'verifyPassword']);
 
     // Biblioteca de microretos (requiere login — protege contra enumeración IDOR)
     // Los IDs en URL son UUIDs, no secuenciales
