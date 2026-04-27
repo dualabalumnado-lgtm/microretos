@@ -341,7 +341,7 @@ async function copiarUrl() {
 
                 <span v-if="reto.empresa_es_simulada != null"
                       :class="reto.empresa_es_simulada
-                        ? 'bg-purple-50 border-purple-200 text-purple-700'
+                        ? 'bg-amber-50 border-amber-200 text-amber-700'
                         : 'bg-emerald-50 border-emerald-200 text-emerald-700'"
                       class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
                              border rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider">
@@ -358,9 +358,20 @@ async function copiarUrl() {
                   {{ reto.empresa_es_simulada ? 'Empresa ficticia' : 'Empresa real' }}
                 </span>
 
+                <span v-if="reto.es_simulado"
+                      class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
+                             bg-rose-50 border border-rose-200 text-rose-700 rounded-lg
+                             text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  Info simulada
+                </span>
+
                 <span v-if="reto.familia"
                       class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                             bg-white/80 backdrop-blur-sm border border-gray-200 text-[#1F2937] rounded-lg
+                             bg-sky-50 border border-sky-200 text-sky-700 rounded-lg
                              text-[10px] md:text-xs font-bold uppercase tracking-wider">
                   <svg class="w-3.5 h-3.5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -373,7 +384,7 @@ async function copiarUrl() {
 
                 <span v-if="reto.nivel_grupo"
                       class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                             bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-500 rounded-lg
+                             bg-violet-50 border border-violet-200 text-violet-700 rounded-lg
                              text-[10px] md:text-xs font-bold uppercase tracking-wider">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -387,7 +398,7 @@ async function copiarUrl() {
 
                 <span v-if="reto.ciclo"
                       class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                             bg-[#00A859]/10 backdrop-blur-sm border border-[#00A859]/20 text-[#00A859] rounded-lg
+                             bg-teal-50 border border-teal-200 text-teal-700 rounded-lg
                              text-[10px] md:text-xs font-bold uppercase tracking-wider">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -402,7 +413,7 @@ async function copiarUrl() {
 
                 <span v-if="reto.curso"
                       class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2
-                             bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg
+                             bg-blue-50 border border-blue-200 text-blue-700 rounded-lg
                              text-[10px] md:text-xs font-bold uppercase tracking-wider">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
