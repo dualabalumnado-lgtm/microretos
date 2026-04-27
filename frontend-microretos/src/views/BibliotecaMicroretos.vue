@@ -674,13 +674,13 @@ const confirmarEliminar = async () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
               <!-- GRUPO: EMPRESA -->
-              <div class="bg-white/70 rounded-2xl border border-gray-100">
+              <div class="bg-[#00A859]/10 rounded-2xl border border-[#00A859]/30">
                 <button @click="empresaFiltroAbierto = !empresaFiltroAbierto"
-                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
+                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#00A859]/15 transition-colors">
                   <div class="flex items-center gap-2">
-                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Empresa</p>
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-[#00A859]">Empresa</p>
                     <span class="tooltip-wrap" @click.stop>
-                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <svg class="w-3 h-3 text-[#00A859]/60 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
                       <span class="tooltip-text">Empresa real (existente) o ficticia (inventada para la práctica docente).</span>
                     </span>
                     <span v-if="!empresaFiltroAbierto && filtroEmpresaTipo"
@@ -689,7 +689,7 @@ const confirmarEliminar = async () => {
                       {{ filtroEmpresaTipo === 'ficticia' ? 'Ficticia' : 'Real' }}
                     </span>
                   </div>
-                  <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"
+                  <svg class="w-3.5 h-3.5 text-[#00A859]/70 transition-transform duration-200"
                     :class="empresaFiltroAbierto ? 'rotate-180' : ''"
                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
@@ -752,13 +752,13 @@ const confirmarEliminar = async () => {
               </div>
 
               <!-- GRUPO: INFORMACIÓN -->
-              <div class="bg-white/70 rounded-2xl border border-gray-100">
+              <div class="bg-[#6366F1]/10 rounded-2xl border border-[#6366F1]/30">
                 <button @click="infoFiltroAbierto = !infoFiltroAbierto"
-                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/80 transition-colors">
+                  class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#6366F1]/15 transition-colors">
                   <div class="flex items-center gap-2">
-                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Información del reto</p>
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-[#6366F1]">Información del reto</p>
                     <span class="tooltip-wrap" @click.stop>
-                      <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                      <svg class="w-3 h-3 text-[#6366F1]/60 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
                       <span class="tooltip-text">Datos del reto reales (de empresa existente) o generados por IA para simulación.</span>
                     </span>
                     <span v-if="!infoFiltroAbierto && filtroInfoSimulada"
@@ -767,7 +767,7 @@ const confirmarEliminar = async () => {
                       {{ filtroInfoSimulada === 'simulada' ? 'Simulada' : 'Real' }}
                     </span>
                   </div>
-                  <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"
+                  <svg class="w-3.5 h-3.5 text-[#6366F1]/70 transition-transform duration-200"
                     :class="infoFiltroAbierto ? 'rotate-180' : ''"
                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
