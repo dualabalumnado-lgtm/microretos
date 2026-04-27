@@ -33,7 +33,7 @@ const isActive = (path) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
 
 onMounted(() => { isOpen.value = route.path !== '/' })
-watch(() => route.path, () => closeOnMobile())
+watch(() => route.path, () => close())
 
 watch(
   () => route.query.redirect,
@@ -84,7 +84,7 @@ defineExpose({ isOpen, toggle, close })
   <Transition name="sp-fade">
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/50 z-30 lg:hidden"
+      class="fixed inset-0 bg-black/50 lg:bg-transparent z-30"
       @click="close"
     />
   </Transition>
