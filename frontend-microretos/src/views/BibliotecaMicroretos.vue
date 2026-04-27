@@ -17,7 +17,10 @@ const accionPendiente = ref(null);
 const familiaSeleccionada = ref(null);
 
 const authStore = useAuthStore();
-const { descargarPDF } = usePdfExport();
+const { descargarPDF, descargarPDFGrupo } = usePdfExport();
+
+// Estado de generación de PDF de grupo (evita dobles clics y muestra feedback)
+const generandoPDFGrupo = ref(false);
 
 // ── FILTROS ──────────────────────────────────────────────
 const filtroCentro      = ref('');
@@ -31,6 +34,12 @@ const empresaFiltroAbierto = ref(false);
 const infoFiltroAbierto    = ref(false);
 
 const centrosDisponibles = computed(() => centros.value.map(c => c.nombre).sort());
+
+// Total de microretos del centro seleccionado (para mostrar en el botón de descarga)
+const countCentroActual = computed(() => {
+  if (!filtroCentro.value) return microretos.value.length;
+  return microretos.value.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value).length;
+});
 
 const ciclosDisponibles = computed(() => {
   let d = microretos.value.filter(m => m.familia === familiaSeleccionada.value);
@@ -226,6 +235,63 @@ const onLoginSuccess = async () => {
   else if (tipo === 'ver') router.push({ name: 'detalle-microreto', params: { id: payload.uuid || payload.id } });
 };
 
+// ── DESCARGA PDF DE GRUPO ─────────────────────────────────────────────────────
+
+// Ayudante interno: espera a que Vue renderice el estado "Generando...",
+// ejecuta la generación (síncrona) y libera el flag al terminar.
+const _lanzarGeneracion = (fn) => {
+  generandoPDFGrupo.value = true;
+  nextTick(() => {
+    setTimeout(() => {
+      try { fn(); } finally { generandoPDFGrupo.value = false; }
+    }, 50);
+  });
+};
+
+// Nivel 1: descarga TODOS los microretos del centro seleccionado
+const descargarGrupoCentro = () => {
+  const retos = filtroCentro.value
+    ? microretos.value.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value)
+    : microretos.value;
+  if (!retos.length) return;
+  _lanzarGeneracion(() => {
+    const titulo    = filtroCentro.value || 'Todos los centros';
+    const subtitulo = `${retos.length} micro-reto${retos.length !== 1 ? 's' : ''}`;
+    descargarPDFGrupo(retos, titulo, subtitulo);
+  });
+};
+
+// Nivel 2: descarga todos los microretos de una familia en el centro seleccionado
+const descargarGrupoFamilia = (familiaName) => {
+  let retos = microretos.value.filter(m => m.familia === familiaName);
+  if (filtroCentro.value)
+    retos = retos.filter(m => (m.centro_educativo || m.centro) === filtroCentro.value);
+  if (!retos.length) return;
+  _lanzarGeneracion(() => {
+    const titulo    = filtroCentro.value ? `${familiaName} – ${filtroCentro.value}` : familiaName;
+    const subtitulo = `${retos.length} micro-reto${retos.length !== 1 ? 's' : ''}`;
+    descargarPDFGrupo(retos, titulo, subtitulo);
+  });
+};
+
+// Nivel 3: descarga exactamente los microretos visibles (respeta todos los filtros activos)
+const descargarGrupoFiltrado = () => {
+  const retos = microretosFiltrados.value;
+  if (!retos.length) return;
+  _lanzarGeneracion(() => {
+    let titulo = familiaSeleccionada.value || 'Microretos';
+    if (filtroCentro.value) titulo += ` – ${filtroCentro.value}`;
+    const partes = [];
+    if (filtroCiclo.value)        partes.push(`Ciclo: ${filtroCiclo.value}`);
+    if (filtroNivel.value)        partes.push(`Nivel: ${filtroNivel.value}`);
+    if (filtroCurso.value)        partes.push(`${filtroCurso.value}º curso`);
+    if (filtroEmpresaTipo.value)  partes.push(`Empresa ${filtroEmpresaTipo.value}`);
+    if (filtroInfoSimulada.value) partes.push(`Info ${filtroInfoSimulada.value}`);
+    const subtitulo = `${retos.length} micro-reto${retos.length !== 1 ? 's' : ''}${partes.length ? ' · ' + partes.join(' · ') : ''}`;
+    descargarPDFGrupo(retos, titulo, subtitulo);
+  });
+};
+
 const modalVisible   = ref(false);
 const retoAEliminar  = ref(null);
 
@@ -317,7 +383,7 @@ const confirmarEliminar = async () => {
                   <span class="tooltip-text">Filtra microretos del centro de formación profesional seleccionado.</span>
                 </span>
               </label>
-              <div class="flex flex-wrap gap-2 flex-1">
+              <div class="flex flex-wrap items-center gap-2 flex-1">
                 <button
                   v-for="centro in centrosDisponibles"
                   :key="centro"
@@ -327,6 +393,23 @@ const confirmarEliminar = async () => {
                     ? 'bg-[#00A859] text-white border-[#00A859] shadow-md'
                     : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'">
                   {{ centro }}
+                </button>
+
+                <!-- Descarga de todos los microretos del centro seleccionado -->
+                <button
+                  v-if="filtroCentro && countCentroActual > 0 && !cargando"
+                  @click="descargarGrupoCentro"
+                  :disabled="generandoPDFGrupo"
+                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all duration-200"
+                  :class="generandoPDFGrupo
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-wait'
+                    : 'border-[#00A859]/40 text-[#00A859] hover:bg-[#00A859] hover:text-white hover:border-[#00A859]'"
+                  :title="`Descargar todos los microretos de ${filtroCentro}`">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {{ generandoPDFGrupo ? 'Generando...' : `PDF centro (${countCentroActual})` }}
                 </button>
               </div>
             </div>
@@ -346,11 +429,16 @@ const confirmarEliminar = async () => {
             </p>
 
             <div v-if="familiasFiltradas.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <button
+              <!-- Tarjeta de familia: div en lugar de button para poder anidar el botón de descarga -->
+              <div
                 v-for="familia in familiasFiltradas"
                 :key="familia.nombre"
                 @click="seleccionarFamilia(familia.nombre)"
-                class="group relative rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white text-left focus:outline-none focus:ring-2 focus:ring-[#00A859]/40">
+                @keydown.enter.prevent="seleccionarFamilia(familia.nombre)"
+                @keydown.space.prevent="seleccionarFamilia(familia.nombre)"
+                role="button"
+                tabindex="0"
+                class="group relative rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white text-left focus:outline-none focus:ring-2 focus:ring-[#00A859]/40 cursor-pointer">
 
                 <div class="relative h-44 overflow-hidden">
                   <img
@@ -372,19 +460,36 @@ const confirmarEliminar = async () => {
                   </div>
                 </div>
 
-                <div class="p-5">
-                  <h3 class="font-black text-[#1F2937] text-base leading-tight mb-3 group-hover:text-[#00A859] transition-colors line-clamp-2">
-                    {{ familia.nombre }}
-                  </h3>
-                  <div class="flex items-center gap-2 text-[#00A859] text-xs font-black uppercase tracking-widest">
-                    <span>Explorar</span>
-                    <svg class="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
+                <div class="p-5 flex items-end justify-between gap-2">
+                  <div class="min-w-0">
+                    <h3 class="font-black text-[#1F2937] text-base leading-tight mb-3 group-hover:text-[#00A859] transition-colors line-clamp-2">
+                      {{ familia.nombre }}
+                    </h3>
+                    <div class="flex items-center gap-2 text-[#00A859] text-xs font-black uppercase tracking-widest">
+                      <span>Explorar</span>
+                      <svg class="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </div>
                   </div>
+
+                  <!-- Botón de descarga PDF de toda la familia (nivel 2) -->
+                  <button
+                    @click.stop="descargarGrupoFamilia(familia.nombre)"
+                    :disabled="generandoPDFGrupo || !conteoPorFamilia[familia.nombre]"
+                    class="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border transition-all duration-200"
+                    :class="generandoPDFGrupo
+                      ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-wait'
+                      : 'border-gray-200 text-gray-400 bg-white hover:border-[#00A859] hover:bg-[#00A859]/5 hover:text-[#00A859]'"
+                    :title="`Descargar PDF de ${familia.nombre} (${conteoPorFamilia[familia.nombre] || 0} retos)`">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
                 </div>
-              </button>
+              </div>
             </div>
 
             <div v-else class="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-300 shadow-sm">
@@ -421,9 +526,28 @@ const confirmarEliminar = async () => {
                 <span class="text-gray-200">|</span>
                 <h2 class="text-xl font-black text-[#1F2937]">{{ familiaSeleccionada }}</h2>
               </div>
-              <span class="text-xs text-gray-400 font-bold">
-                {{ microretosFiltrados.length }} micro-reto{{ microretosFiltrados.length !== 1 ? 's' : '' }}
-              </span>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-400 font-bold">
+                  {{ microretosFiltrados.length }} micro-reto{{ microretosFiltrados.length !== 1 ? 's' : '' }}
+                </span>
+
+                <!-- Botón de descarga del grupo filtrado actual (nivel 3) -->
+                <button
+                  v-if="microretosFiltrados.length > 0"
+                  @click="descargarGrupoFiltrado"
+                  :disabled="generandoPDFGrupo"
+                  class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all duration-200"
+                  :class="generandoPDFGrupo
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-wait'
+                    : 'border-[#00A859]/30 text-[#00A859] hover:bg-[#00A859] hover:text-white hover:border-[#00A859]'"
+                  :title="hayFiltrosActivos ? 'Descargar microretos con los filtros actuales' : 'Descargar todos los microretos de esta familia'">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {{ generandoPDFGrupo ? 'Generando...' : `Descargar ${microretosFiltrados.length}` }}
+                </button>
+              </div>
             </div>
 
             <!-- ── CARDS DE DIFICULTAD ───────────────────────────── -->
