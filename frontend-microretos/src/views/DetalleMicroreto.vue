@@ -85,9 +85,7 @@ const qrExpiraFormateado = computed(() => {
 });
 
 function buildQrUrl(token) {
-  // Mismo patrón de detección de entorno que api.js
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const base = isLocal ? window.location.origin : 'https://dualab.es';
+  const base = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
   return `${base}/reto/${token}`;
 }
 
