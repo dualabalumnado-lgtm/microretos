@@ -336,6 +336,7 @@ class MicorretosDemoSeeder extends Seeder
                     ->delete();
 
                 \App\Models\Microreto::create(array_merge($reto, [
+                    'uuid'       => (string) \Illuminate\Support\Str::uuid(),
                     'demo_id'    => $demo->id,
                     'created_at' => now(),
                     'updated_at' => now(),
