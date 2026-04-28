@@ -7,6 +7,10 @@ import BaseDatosDashboard from '../views/BaseDatosDashboard.vue'
 import PublicMicroreto from '../views/PublicMicroreto.vue'
 import DashboardDocente from '../views/DashboardDocente.vue'
 import SesionesRegistradas from '../views/SesionesRegistradas.vue'
+import StartupDayProyectos from '../views/StartupDayProyectos.vue'
+import StartupDayWizard from '../views/StartupDayWizard.vue'
+import StartupDayDetalle from '../views/StartupDayDetalle.vue'
+import StartupDayLanding from '../views/StartupDayLanding.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -57,6 +61,36 @@ const router = createRouter({
       path: '/reto/:token',
       name: 'public-microreto',
       component: PublicMicroreto
+    },
+    {
+      path: '/startup-day',
+      name: 'startup-day',
+      component: StartupDayProyectos,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/startup-day/crear',
+      name: 'startup-day-crear',
+      component: StartupDayWizard,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/startup-day/:uuid/editar',
+      name: 'startup-day-editar',
+      component: StartupDayWizard,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/startup-day/:uuid',
+      name: 'startup-day-detalle',
+      component: StartupDayDetalle,
+      meta: { requiresAuth: true }
+    },
+    {
+      // Vista pública para validación por parte de la empresa
+      path: '/startup/landing/:token',
+      name: 'startup-day-landing',
+      component: StartupDayLanding
     }
   ]
 })

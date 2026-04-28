@@ -27,15 +27,19 @@ const form = ref({
 const guardando  = ref(false)
 const guardadoOk = ref(false)
 
-// ─── Historial de sesiones (localStorage) ─────────────────────────────────────
-const STORAGE_KEY = 'dualab_sesiones'
-const sesiones    = ref([])
+// ─── Historial de sesiones (API) ─────────────────────────────────────────────
+const sesiones         = ref([])
+const cargandoSesiones = ref(false)
 
-function cargarSesiones() {
+async function cargarSesiones() {
+  cargandoSesiones.value = true
   try {
-    sesiones.value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  } catch {
-    sesiones.value = []
+    const res = await api.get('/sesiones')
+    sesiones.value = res.data
+  } catch (e) {
+    console.error('Error cargando sesiones:', e)
+  } finally {
+    cargandoSesiones.value = false
   }
 }
 
@@ -189,14 +193,39 @@ function seleccionarMicroreto(m) {
 
 // ─── Cargar microreto desde la URL (?microreto_id=...) ────────────────────────
 onMounted(async () => {
-  cargarSesiones()
+  await cargarSesiones()
+
+  // Migración silenciosa desde localStorage (una sola vez)
+  try {
+    const LEGACY_KEY = 'dualab_sesiones'
+    const local = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]')
+    if (local.length > 0) {
+      const payload = local.map(s => ({
+        microreto_id:     s.microreto_id     || null,
+        microreto_titulo: s.microreto_titulo || '(sin título)',
+        fecha:            s.fecha,
+        centro_educativo: s.centro_educativo || null,
+        ciclo_formativo:  s.ciclo_formativo  || null,
+        curso:            s.curso            || null,
+        grupo:            s.grupo            || null,
+        num_alumnos:      s.num_alumnos ? Number(s.num_alumnos) : null,
+        notas:            s.notas            || null,
+      }))
+      await api.post('/sesiones/lote', { sesiones: payload })
+      localStorage.removeItem(LEGACY_KEY)
+      await cargarSesiones()
+    }
+  } catch (e) {
+    console.error('Error migrando sesiones desde localStorage:', e)
+  }
+
   const id = route.query.microreto_id
   if (id) {
     cargandoMicroreto.value = true
     try {
       const res = await api.get(`/microretos/${id}`)
       microretoSeleccionado.value = res.data
-      form.value.microreto_id     = res.data.uuid || res.data.id
+      form.value.microreto_id     = res.data.id
       form.value.microreto_titulo = res.data.titulo
     } catch (e) {
       console.error('Error cargando microreto:', e)
@@ -207,23 +236,34 @@ onMounted(async () => {
 })
 
 // ─── Guardar sesión ───────────────────────────────────────────────────────────
-function guardarSesion() {
+async function guardarSesion() {
   if (!form.value.microreto_titulo || !form.value.fecha) return
   guardando.value = true
-  const sesion = { id: Date.now(), ...form.value, creada_en: new Date().toISOString() }
-  const lista = [...sesiones.value, sesion]
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
-  sesiones.value   = lista
-  guardando.value  = false
-  guardadoOk.value = true
-  setTimeout(() => { guardadoOk.value = false }, 2500)
+  try {
+    const payload = {
+      ...form.value,
+      num_alumnos: form.value.num_alumnos !== '' ? Number(form.value.num_alumnos) : null,
+    }
+    const res = await api.post('/sesiones', payload)
+    sesiones.value = [res.data, ...sesiones.value]
+    guardadoOk.value = true
+    setTimeout(() => { guardadoOk.value = false }, 2500)
+  } catch (e) {
+    console.error('Error guardando sesión:', e)
+  } finally {
+    guardando.value = false
+  }
 }
 
 // ─── Eliminar sesión ──────────────────────────────────────────────────────────
-function eliminarSesion(id) {
-  const lista = sesiones.value.filter(s => s.id !== id)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
-  sesiones.value = lista
+async function eliminarSesion(id) {
+  sesiones.value = sesiones.value.filter(s => s.id !== id)
+  try {
+    await api.delete(`/sesiones/${id}`)
+  } catch (e) {
+    console.error('Error eliminando sesión:', e)
+    await cargarSesiones() // revertir si falla
+  }
 }
 
 // ─── Filtros y paginación del panel de sesiones ───────────────────────────────
@@ -232,7 +272,7 @@ const paginaSesiones = ref(1)
 const SESIONES_POR_PAGINA = 5
 
 const sesionesFiltradas = computed(() => {
-  let lista = [...sesiones.value].reverse()
+  let lista = [...sesiones.value]
   if (filtroSes.value.fecha)
     lista = lista.filter(s => s.fecha === filtroSes.value.fecha)
   if (filtroSes.value.titulo.trim()) {
@@ -807,7 +847,7 @@ function formatFecha(isoDate) {
 
             <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
               <p class="text-[10px] text-gray-400 font-medium">
-                La sesión se guarda localmente en este navegador.
+                La sesión se guarda en la base de datos.
               </p>
               <button @click="guardarSesion"
                       :disabled="!formularioValido || guardando"
@@ -925,8 +965,15 @@ function formatFecha(isoDate) {
               </div>
             </div>
 
+            <!-- Cargando sesiones -->
+            <div v-if="cargandoSesiones" class="px-5 py-10 flex justify-center">
+              <svg class="animate-spin w-5 h-5 text-[#00A859]" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+              </svg>
+            </div>
+
             <!-- Estado vacío -->
-            <div v-if="sesiones.length === 0" class="px-5 py-10 text-center">
+            <div v-else-if="sesiones.length === 0" class="px-5 py-10 text-center">
               <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100
                           flex items-center justify-center mx-auto mb-3">
                 <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -940,12 +987,12 @@ function formatFecha(isoDate) {
             </div>
 
             <!-- Sin resultados tras filtrar -->
-            <div v-else-if="sesionesFiltradas.length === 0" class="px-5 py-8 text-center">
+            <div v-else-if="!cargandoSesiones && sesionesFiltradas.length === 0" class="px-5 py-8 text-center">
               <p class="text-xs text-gray-400 font-medium">Sin resultados para esos filtros.</p>
             </div>
 
             <!-- Lista de sesiones (miniaturas) -->
-            <ul v-else class="divide-y divide-gray-50">
+            <ul v-else-if="!cargandoSesiones" class="divide-y divide-gray-50">
               <li v-for="s in sesionesVisibles" :key="s.id"
                   class="px-4 py-3 hover:bg-gray-50/60 transition-colors group cursor-pointer"
                   @click="verSesion(s)">
@@ -965,6 +1012,16 @@ function formatFecha(isoDate) {
                     </div>
                   </div>
                   <div class="flex flex-col items-end gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                    <button v-if="s.microreto_id"
+                            @click.stop="router.push({ name: 'startup-day-crear', query: { microreto_id: s.microreto_id, sesion_id: s.id } })"
+                            class="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[#99CC33]/15 text-[#5a7a00]
+                                   text-[8px] font-black uppercase tracking-widest hover:bg-[#99CC33]/25 transition-all"
+                            title="Crear microproyecto StartupDay">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                      </svg>
+                      Proyecto
+                    </button>
                     <button v-if="s.microreto_id"
                             @click.stop="abrirMicroretoModal(s.microreto_id)"
                             class="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[#00A859]/10 text-[#00A859]
@@ -1113,17 +1170,28 @@ function formatFecha(isoDate) {
                            tracking-widest transition-colors">
               Eliminar sesión
             </button>
-            <button v-if="sesionAbierta.microreto_id"
-                    @click="cerrarSesionModal(); abrirMicroretoModal(sesionAbierta.microreto_id)"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00A859] text-white
-                           text-xs font-black uppercase tracking-widest hover:bg-[#00A859]/90
-                           transition-all shadow-sm">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-              </svg>
-              Ver ficha del microreto
-            </button>
+            <div v-if="sesionAbierta.microreto_id" class="flex items-center gap-2">
+              <button @click="cerrarSesionModal(); abrirMicroretoModal(sesionAbierta.microreto_id)"
+                      class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl
+                             bg-white border border-gray-200 text-gray-500
+                             text-xs font-black uppercase tracking-widest
+                             hover:border-[#00A859] hover:text-[#00A859] transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                </svg>
+                Ver ficha
+              </button>
+              <button @click="cerrarSesionModal(); router.push({ name: 'startup-day-crear', query: { microreto_id: sesionAbierta.microreto_id, sesion_id: sesionAbierta.id } })"
+                      class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#99CC33] text-white
+                             text-xs font-black uppercase tracking-widest hover:bg-[#99CC33]/90
+                             transition-all shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Crear microproyecto
+              </button>
+            </div>
           </div>
 
         </div>
