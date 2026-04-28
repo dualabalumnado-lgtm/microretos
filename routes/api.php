@@ -6,6 +6,8 @@ use App\Http\Controllers\MicroretoIAController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\MicroretoTokenController;
+use App\Http\Controllers\MicroproyectoController;
+use App\Http\Controllers\SesionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +25,12 @@ Route::middleware('throttle:60,1')->group(function () {
 // Acceso público por token temporal (QR para alumnado)
 Route::middleware('throttle:60,1')
      ->get('/public/microreto/{token}', [MicroretoTokenController::class, 'show']);
+
+// Validación pública del microproyecto por parte de la empresa (acceso por token)
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/startup/landing/{token}',          [MicroproyectoController::class, 'showByToken']);
+    Route::post('/startup/landing/{token}/validar', [MicroproyectoController::class, 'validarEmpresa']);
+});
 
 // Datos académicos (ciclos, módulos) — throttle estándar
 Route::middleware('throttle:120,1')->group(function () {
@@ -97,6 +105,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/microretos/{id}/token',      [MicroretoTokenController::class, 'get']);
     Route::post('/microretos/{id}/token',     [MicroretoTokenController::class, 'generate']);
     Route::delete('/microretos/{id}/token',   [MicroretoTokenController::class, 'destroy']);
+
+    // Sesiones de docentes
+    Route::get('/sesiones',              [SesionController::class, 'index']);
+    Route::post('/sesiones',             [SesionController::class, 'store']);
+    Route::post('/sesiones/lote',        [SesionController::class, 'storeLote']);
+    Route::get('/sesiones/{id}',         [SesionController::class, 'show']);
+    Route::delete('/sesiones/{id}',      [SesionController::class, 'destroy']);
+
+    // StartUp Day — microproyectos CRUD
+    Route::get('/startup/proyectos',          [MicroproyectoController::class, 'index']);
+    Route::post('/startup/proyectos',         [MicroproyectoController::class, 'store']);
+    Route::get('/startup/proyectos/{uuid}',   [MicroproyectoController::class, 'show']);
+    Route::put('/startup/proyectos/{uuid}',   [MicroproyectoController::class, 'update']);
+    Route::delete('/startup/proyectos/{uuid}',[MicroproyectoController::class, 'destroy']);
 
 });
 

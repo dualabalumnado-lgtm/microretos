@@ -40,6 +40,7 @@ const trabajarMicroreto = () => {
   router.push({ name: 'dashboard-docente', query: { microreto_id: id } })
 };
 
+
 const { descargarPDF } = usePdfExport();
 
 const showLoginModal = ref(false);
@@ -247,6 +248,7 @@ async function copiarUrl() {
           </svg>
           Trabajar este microreto
         </button>
+
       </div>
 
       <!-- ── CARGANDO ── -->
