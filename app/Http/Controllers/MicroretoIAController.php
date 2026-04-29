@@ -72,12 +72,16 @@ class MicroretoIAController extends Controller
 
     public function show($id)
     {
-        // $id es ahora un UUID (no el ID numérico interno).
-        // Esto protege contra enumeración IDOR: el atacante no puede iterar 1,2,3,...
-        $reto = Microreto::with([
+        // Acepta UUID (formato preferido, IDOR-safe) o ID entero (legacy: sesiones antiguas
+        // guardadas antes de que el frontend migrara a uuid).
+        $query = Microreto::with([
             'empresa.centroEducativo',
             'empresa.familias',
-        ])->where('uuid', $id)->firstOrFail();
+        ]);
+
+        $reto = is_numeric($id)
+            ? $query->findOrFail((int) $id)
+            : $query->where('uuid', $id)->firstOrFail();
 
         $reto->es_simulado = (bool) $reto->es_simulado;
 
