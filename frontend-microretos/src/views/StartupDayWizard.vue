@@ -22,8 +22,12 @@ const centros    = ref([]);
 const microretos = ref([]);
 
 // Autocomplete desde microreto
-const autocompletando    = ref(false);
-const pendingCicloId     = ref(null);   // ciclo a seleccionar cuando carguen los ciclos del watch
+const autocompletando        = ref(false);
+const pendingCicloId         = ref(null);   // ciclo a seleccionar cuando carguen los ciclos del watch
+const cursoAutocompletado    = ref(false);  // para destacar el campo curso
+const modulosAutocompletados = ref(false);  // para mostrar callout en paso 4
+const raCeAutocompletado     = ref(false);  // para mostrar callout en paso 4
+const mrEvalOficial          = ref([]);     // evaluacion_oficial del microreto vinculado
 
 // ── Sesiones ──────────────────────────────────────────────────────────────────
 const sesiones           = ref([])
@@ -161,6 +165,17 @@ watch(() => form.value.ciclo_id, async (id) => {
   if (!id) return;
   const res = await api.get(`/ciclos/${id}/modulos`);
   modulos.value = res.data;
+  // Auto-seleccionar módulos que coincidan con los del microreto vinculado
+  if (mrEvalOficial.value.length) {
+    const nombresEval = mrEvalOficial.value.map(e => e.modulo?.toLowerCase().trim()).filter(Boolean);
+    const matches = modulos.value.filter(m =>
+      nombresEval.some(n => m.nombre?.toLowerCase().includes(n) || n.includes(m.nombre?.toLowerCase()))
+    );
+    if (matches.length) {
+      form.value.modulos_seleccionados = matches.map(m => ({ id: m.id, nombre: m.nombre }));
+      modulosAutocompletados.value = true;
+    }
+  }
 });
 
 watch(() => form.value.empresa_id, (id) => {
@@ -186,11 +201,20 @@ async function autocompletarDesdeMicroreto(mr) {
   if (!mr) return;
   autocompletando.value = true;
 
+  // Guardar evaluacion_oficial para auto-seleccionar módulos cuando carguen
+  if (Array.isArray(mr.evaluacion_oficial) && mr.evaluacion_oficial.length) {
+    mrEvalOficial.value = mr.evaluacion_oficial;
+  }
+
   // Título (solo si vacío)
   if (!form.value.titulo && mr.titulo) form.value.titulo = mr.titulo;
 
-  // Curso
-  if (mr.curso) form.value.curso = String(mr.curso) === '1' ? '1º' : '2º';
+  // Curso (con indicador visual)
+  if (mr.curso) {
+    form.value.curso = String(mr.curso) === '1' ? '1º' : '2º';
+    cursoAutocompletado.value = true;
+    setTimeout(() => { cursoAutocompletado.value = false; }, 6000);
+  }
 
   // Campos de texto (solo si vacíos)
   if (!form.value.diseno_reto.pregunta_reto && mr.pregunta_reto)
@@ -223,6 +247,15 @@ async function autocompletarDesdeMicroreto(mr) {
   if (!form.value.centro_id) {
     const centroId = mr.empresa?.centro_id ?? mr.empresa?.centroEducativo?.id;
     if (centroId) form.value.centro_id = centroId; // el watch rellena datos_centro.nombre y municipio
+  }
+
+  // RA/CE desde evaluacion_oficial del microreto (solo si vacío)
+  if (!form.value.ra_ce && Array.isArray(mr.evaluacion_oficial) && mr.evaluacion_oficial.length) {
+    form.value.ra_ce = mr.evaluacion_oficial.map(e => {
+      const ces = Array.isArray(e.ce) ? e.ce.map(c => `  • ${c}`).join('\n') : '';
+      return `[${e.modulo}]\nRA: ${e.ra}\nCE:\n${ces}`;
+    }).join('\n\n');
+    raCeAutocompletado.value = true;
   }
 
   setTimeout(() => { autocompletando.value = false; }, 3000);
@@ -590,12 +623,43 @@ const pasos = [
                     <option v-for="c in ciclos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
                   </select>
                 </div>
-                <div>
-                  <label class="field-label">Curso</label>
-                  <select v-model="form.curso" class="field-input">
+                <div class="relative">
+                  <label class="field-label flex items-center gap-2">
+                    Curso
+                    <Transition enter-active-class="transition-all duration-300"
+                                enter-from-class="opacity-0 scale-75"
+                                leave-active-class="transition-all duration-300"
+                                leave-to-class="opacity-0 scale-75">
+                      <span v-if="cursoAutocompletado"
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                                   bg-[#00A859]/15 border border-[#00A859]/30 text-[#00A859]
+                                   text-[9px] font-black uppercase tracking-widest">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] animate-ping" />
+                        Del microreto
+                      </span>
+                    </Transition>
+                  </label>
+                  <select v-model="form.curso"
+                          :class="['field-input transition-all duration-500',
+                                   cursoAutocompletado ? 'ring-2 ring-[#00A859]/40 border-[#00A859]/50' : '']">
                     <option value="">— Curso —</option>
                     <option>1º</option><option>2º</option>
                   </select>
+                  <!-- Toast bocadillo -->
+                  <Transition enter-active-class="transition-all duration-300"
+                              enter-from-class="opacity-0 translate-y-1"
+                              leave-active-class="transition-all duration-300"
+                              leave-to-class="opacity-0 translate-y-1">
+                    <div v-if="cursoAutocompletado"
+                         class="absolute -bottom-8 left-0 z-10 flex items-center gap-1.5
+                                bg-[#00A859] text-white px-3 py-1 rounded-full shadow-md
+                                text-[10px] font-bold whitespace-nowrap pointer-events-none">
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                      </svg>
+                      Rellenado automáticamente desde el microreto
+                    </div>
+                  </Transition>
                 </div>
               </div>
             </div>
@@ -706,6 +770,35 @@ const pasos = [
           </div>
 
           <div class="space-y-4">
+
+            <!-- Callout módulos autocompletados -->
+            <Transition enter-active-class="transition-all duration-300"
+                        enter-from-class="opacity-0 -translate-y-2"
+                        leave-active-class="transition-all duration-200"
+                        leave-to-class="opacity-0 -translate-y-2">
+              <div v-if="modulosAutocompletados"
+                   class="flex items-start gap-3 bg-[#00A859]/8 border border-[#00A859]/25
+                          rounded-2xl px-4 py-3">
+                <svg class="w-4 h-4 text-[#00A859] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-black text-[#00A859] mb-0.5">Módulos seleccionados automáticamente</p>
+                  <p class="text-xs text-[#00A859]/70 leading-relaxed">
+                    Esto se basa en el microreto vinculado. Si crees que se trabajan otros módulos,
+                    revisa el microreto para que esté acorde, o ajusta la selección manualmente.
+                  </p>
+                </div>
+                <button @click="modulosAutocompletados = false"
+                        class="shrink-0 text-[#00A859]/40 hover:text-[#00A859] transition-colors mt-0.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </Transition>
+
             <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Módulos formativos</p>
               <div v-if="!modulos.length" class="text-center py-8 text-gray-400 text-sm">
@@ -726,8 +819,49 @@ const pasos = [
             </div>
 
             <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
-              <label class="field-label">Resultados de Aprendizaje y Criterios de Evaluación</label>
-              <textarea v-model="form.ra_ce" rows="4" class="field-input resize-none mt-3"
+              <div class="flex items-start justify-between gap-3 mb-3">
+                <label class="field-label">Resultados de Aprendizaje y Criterios de Evaluación</label>
+                <!-- Badge autocompletado -->
+                <Transition enter-active-class="transition-all duration-300"
+                            enter-from-class="opacity-0 scale-75"
+                            leave-active-class="transition-all duration-200"
+                            leave-to-class="opacity-0 scale-75">
+                  <span v-if="raCeAutocompletado"
+                        class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full
+                               bg-amber-50 border border-amber-200 text-amber-600
+                               text-[9px] font-black uppercase tracking-widest">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    Del microreto
+                  </span>
+                </Transition>
+              </div>
+
+              <!-- Callout RA/CE -->
+              <Transition enter-active-class="transition-all duration-300"
+                          enter-from-class="opacity-0 -translate-y-2"
+                          leave-active-class="transition-all duration-200"
+                          leave-to-class="opacity-0 -translate-y-2">
+                <div v-if="raCeAutocompletado"
+                     class="flex items-start gap-3 bg-amber-50 border border-amber-200
+                            rounded-2xl px-4 py-3 mb-3">
+                  <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <p class="text-xs text-amber-700 leading-relaxed flex-1">
+                    RA y CE generados a partir del microreto vinculado. Revisa que estén alineados con tu
+                    programación o añade/modifica los que consideres oportunos.
+                  </p>
+                  <button @click="raCeAutocompletado = false"
+                          class="shrink-0 text-amber-400 hover:text-amber-600 transition-colors mt-0.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </Transition>
+
+              <textarea v-model="form.ra_ce" rows="6" class="field-input resize-none"
                         placeholder="Describe los RA y CE que se trabajarán en este microproyecto…" />
             </div>
           </div>
