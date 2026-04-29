@@ -304,6 +304,50 @@ function limpiarFormulario() {
   router.replace({ path: '/dashboard' })
 }
 
+// ─── Modal de bienvenida "¿Qué necesitas?" ───────────────────────────────────
+const guiaBienvenida   = ref(true)
+const modoGuia         = ref(false)
+const pasoGuia         = ref(1)
+const TOTAL_PASOS_GUIA = 3
+
+const guiaPasos = [
+  {
+    titulo: 'Selecciona un microreto',
+    texto:  'Busca y elige el microreto que vas a trabajar con tu grupo. Es el punto de partida de la sesión.',
+  },
+  {
+    titulo: 'Rellena los datos de la sesión',
+    texto:  'Indica la fecha, el centro, el ciclo, el grupo y cualquier nota relevante sobre cómo fue la sesión.',
+  },
+  {
+    titulo: 'Guarda la sesión',
+    texto:  'Pulsa "Registrar sesión" para guardarla. Aparecerá en el panel derecho y quedará disponible para crear microproyectos StartUp Day.',
+  },
+]
+
+function seleccionarOpcionBienvenida(opcion) {
+  guiaBienvenida.value = false
+  if (opcion === 'sesiones') {
+    router.push({ name: 'sesiones-registradas' })
+  } else if (opcion === 'guia') {
+    modoGuia.value  = true
+    pasoGuia.value  = 1
+  }
+  // 'crear' → se queda en la vista normal
+}
+
+function avanzarGuia() {
+  if (pasoGuia.value < TOTAL_PASOS_GUIA) {
+    pasoGuia.value++
+  } else {
+    modoGuia.value = false
+  }
+}
+
+function saltarGuia() {
+  modoGuia.value = false
+}
+
 // ─── Modal ficha de microreto ─────────────────────────────────────────────────
 const microretoModalId = ref(null)
 
@@ -370,6 +414,139 @@ function formatFecha(isoDate) {
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
+
+    <!-- ══════════ MODAL BIENVENIDA "¿QUÉ NECESITAS?" ══════════════════════════ -->
+    <Transition name="sp-fade">
+      <div v-if="guiaBienvenida"
+           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="relative bg-[#1a2332] border border-white/10 rounded-[2rem]
+                    shadow-2xl max-w-md w-full p-8 text-white">
+
+          <!-- Cabecera -->
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-12 h-12 rounded-2xl bg-[#00A859]/15 border border-[#00A859]/30
+                        flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                     M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-0.5">Dashboard docente</p>
+              <h2 class="text-xl font-black tracking-tight">¿Qué necesitas?</h2>
+            </div>
+          </div>
+
+          <!-- Opciones -->
+          <div class="space-y-3 mb-6">
+
+            <!-- a) Crear sesión -->
+            <button @click="seleccionarOpcionBienvenida('crear')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-[#00A859]/10 hover:border-[#00A859]/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-[#00A859]/15 border border-[#00A859]/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-[#00A859]/25 transition-colors">
+                <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Crear una sesión</p>
+                <p class="text-xs text-white/50 leading-relaxed">Registra una nueva sesión de trabajo con un microreto.</p>
+              </div>
+            </button>
+
+            <!-- b) Ver sesiones creadas -->
+            <button @click="seleccionarOpcionBienvenida('sesiones')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-[#99CC33]/10 hover:border-[#99CC33]/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-[#99CC33]/15 border border-[#99CC33]/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-[#99CC33]/25 transition-colors">
+                <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Ver sesiones creadas</p>
+                <p class="text-xs text-white/50 leading-relaxed">Consulta el historial de sesiones ya registradas.</p>
+              </div>
+            </button>
+
+            <!-- c) Vista general con guía -->
+            <button @click="seleccionarOpcionBienvenida('guia')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-blue-500/25 transition-colors">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Vista general <span class="text-blue-400 font-normal text-xs ml-1">+ guía</span></p>
+                <p class="text-xs text-white/50 leading-relaxed">Explora el dashboard con una guía paso a paso.</p>
+              </div>
+            </button>
+
+          </div>
+
+          <button @click="seleccionarOpcionBienvenida('crear')"
+                  class="w-full text-center text-[10px] font-bold text-white/25
+                         hover:text-white/50 transition-colors py-1">
+            Saltar
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══════════ OVERLAY GUÍA PASO A PASO ══════════════════════════════════ -->
+    <Transition name="sp-fade">
+      <div v-if="modoGuia"
+           class="fixed inset-0 z-[9990] pointer-events-none">
+        <!-- Capa oscura semitransparente -->
+        <div class="absolute inset-0 bg-black/50 pointer-events-auto" @click="saltarGuia" />
+
+        <!-- Tooltip de guía flotante (esquina inferior derecha) -->
+        <div class="absolute bottom-8 right-8 max-w-xs pointer-events-auto
+                    bg-[#1a2332] border border-white/15 rounded-[1.5rem] shadow-2xl p-5 text-white">
+          <!-- Progreso -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex gap-1">
+              <span v-for="i in TOTAL_PASOS_GUIA" :key="i"
+                    :class="['w-5 h-1 rounded-full transition-colors', i <= pasoGuia ? 'bg-[#00A859]' : 'bg-white/20']" />
+            </div>
+            <span class="text-[10px] font-bold text-white/40">{{ pasoGuia }}/{{ TOTAL_PASOS_GUIA }}</span>
+          </div>
+
+          <h3 class="font-black text-sm text-white mb-1.5">{{ guiaPasos[pasoGuia - 1].titulo }}</h3>
+          <p class="text-xs text-white/60 leading-relaxed mb-4">{{ guiaPasos[pasoGuia - 1].texto }}</p>
+
+          <div class="flex items-center gap-2">
+            <button @click="avanzarGuia"
+                    class="flex-1 py-2 rounded-xl bg-[#00A859] text-white
+                           text-[10px] font-black uppercase tracking-widest
+                           hover:bg-[#00A859]/90 transition-all">
+              {{ pasoGuia < TOTAL_PASOS_GUIA ? 'Siguiente →' : 'Finalizar' }}
+            </button>
+            <button @click="saltarGuia"
+                    class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/40
+                           text-[10px] font-black uppercase tracking-widest
+                           hover:text-white/60 transition-all">
+              Saltar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]
@@ -1171,7 +1348,7 @@ function formatFecha(isoDate) {
               Eliminar sesión
             </button>
             <div v-if="sesionAbierta.microreto_id" class="flex items-center gap-2">
-              <button @click="cerrarSesionModal(); abrirMicroretoModal(sesionAbierta.microreto_id)"
+              <button @click="abrirMicroretoModal(sesionAbierta.microreto_id); cerrarSesionModal()"
                       class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl
                              bg-white border border-gray-200 text-gray-500
                              text-xs font-black uppercase tracking-widest
@@ -1182,7 +1359,7 @@ function formatFecha(isoDate) {
                 </svg>
                 Ver ficha
               </button>
-              <button @click="cerrarSesionModal(); router.push({ name: 'startup-day-crear', query: { microreto_id: sesionAbierta.microreto_id, sesion_id: sesionAbierta.id } })"
+              <button @click="router.push({ name: 'startup-day-crear', query: { microreto_id: sesionAbierta.microreto_id, sesion_id: sesionAbierta.id } }); cerrarSesionModal()"
                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#99CC33] text-white
                              text-xs font-black uppercase tracking-widest hover:bg-[#99CC33]/90
                              transition-all shadow-sm">
