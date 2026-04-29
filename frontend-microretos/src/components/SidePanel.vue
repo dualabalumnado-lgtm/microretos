@@ -210,30 +210,26 @@ defineExpose({ isOpen, toggle, close })
         <!-- ═══════════════ STARTUP ═══════════════════════════════ -->
         <div class="group/tip relative">
           <p class="px-3 mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 select-none cursor-default">
-            Startup
+            Startup Day
           </p>
-          <div class="sp-tooltip">Módulo para empresas y startups colaboradoras — en desarrollo<div class="sp-tooltip-arrow"/></div>
+          <div class="sp-tooltip">Gestión de microproyectos y StartUp Day<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <div class="group/tip relative">
           <button
-            disabled
-            class="nav-item w-full text-left nav-item--idle opacity-40 cursor-not-allowed"
+            @click="$router.push({ name: 'startup-day' })"
+            class="nav-item w-full text-left"
+            :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
           >
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
             </svg>
-            <span>Startup</span>
-            <span class="ml-auto text-[8px] font-black uppercase tracking-widest
-                         bg-white/10 text-white/40 px-2 py-0.5 rounded-full shrink-0">
-              Pronto
-            </span>
+            <span>Microproyectos</span>
           </button>
-          <div class="sp-tooltip">Portal de empresas colaboradoras — próximamente<div class="sp-tooltip-arrow"/></div>
+          <div class="sp-tooltip">Crea y gestiona microproyectos StartUp Day<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <div class="my-4 border-t border-white/10" />
@@ -472,8 +468,8 @@ defineExpose({ isOpen, toggle, close })
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
-            <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Startup</p>
-            <p class="text-xs text-white/60">Sección en desarrollo orientada a startups y empresas colaboradoras. Próximamente disponible.</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Startup Day</p>
+            <p class="text-xs text-white/60"><span class="text-white font-bold">Microproyectos</span> — Diseña y gestiona microproyectos StartUp Day: equipo, módulos, objetivos y validación por empresa.</p>
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
