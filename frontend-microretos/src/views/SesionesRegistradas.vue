@@ -2,26 +2,38 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MicroretoModal from '../components/MicroretoModal.vue'
+import api from '../api.js'
 
-const router = useRouter()
+const router  = useRouter()
+const cargando = ref(false)
 
 // ─── Datos de sesiones ────────────────────────────────────────────────────────
-const STORAGE_KEY = 'dualab_sesiones'
-const sesiones    = ref([])
+const sesiones = ref([])
 
-onMounted(() => {
+async function cargarSesiones() {
+  cargando.value = true
   try {
-    sesiones.value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  } catch {
+    const res = await api.get('/sesiones')
+    sesiones.value = res.data
+  } catch (e) {
+    console.error('Error cargando sesiones:', e)
     sesiones.value = []
+  } finally {
+    cargando.value = false
   }
-})
+}
 
-function eliminarSesion(id) {
-  const lista = sesiones.value.filter(s => s.id !== id)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
-  sesiones.value = lista
+onMounted(cargarSesiones)
+
+async function eliminarSesion(id) {
+  sesiones.value = sesiones.value.filter(s => s.id !== id)
   if (sesionAbierta.value?.id === id) sesionAbierta.value = null
+  try {
+    await api.delete(`/sesiones/${id}`)
+  } catch (e) {
+    console.error('Error eliminando sesión:', e)
+    await cargarSesiones()
+  }
 }
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────
@@ -97,6 +109,11 @@ const microretoModalId = ref(null)
 
 function abrirMicroretoModal(id) { microretoModalId.value = id }
 function cerrarMicroretoModal()  { microretoModalId.value = null }
+
+// ─── Crear microproyecto desde sesión ────────────────────────────────────────
+function crearMicroproyecto(sesionId) {
+  router.push({ name: 'startup-day-crear', query: { sesion_id: sesionId } })
+}
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 const stats = computed(() => {
@@ -289,8 +306,16 @@ function irPaginaSiguiente() {
 
       <!-- ─── Grid de sesiones ──────────────────────────────────────────────── -->
 
+      <!-- Cargando -->
+      <div v-if="cargando" class="flex flex-col items-center justify-center py-24">
+        <svg class="animate-spin w-8 h-8 text-[#00A859] mb-3" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+        </svg>
+        <p class="text-[#00A859] font-black tracking-widest uppercase text-xs animate-pulse">Cargando sesiones…</p>
+      </div>
+
       <!-- Estado vacío global -->
-      <div v-if="sesiones.length === 0"
+      <div v-else-if="sesiones.length === 0"
            class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm px-8 py-16 text-center">
         <div class="w-16 h-16 rounded-full bg-gray-50 border border-gray-100
                     flex items-center justify-center mx-auto mb-4">
@@ -341,6 +366,17 @@ function irPaginaSiguiente() {
               </div>
               <!-- Acciones en hover -->
               <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                <!-- Trabajar microreto → crear microproyecto -->
+                <button @click.stop="crearMicroproyecto(s.id)"
+                        class="p-1.5 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 transition-all"
+                        title="Trabajar microreto (crear microproyecto)">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
+                  </svg>
+                </button>
                 <button v-if="s.microreto_id"
                         @click.stop="abrirMicroretoModal(s.microreto_id)"
                         class="p-1.5 rounded-lg bg-[#00A859]/10 text-[#00A859] hover:bg-[#00A859]/20 transition-all"
@@ -504,23 +540,37 @@ function irPaginaSiguiente() {
           </div>
 
           <!-- Pie -->
-          <div class="px-7 py-4 bg-[#F8FAFC] border-t border-gray-100 flex items-center justify-between gap-4">
+          <div class="px-7 py-4 bg-[#F8FAFC] border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <button @click="eliminarSesion(sesionAbierta.id)"
                     class="text-xs text-gray-400 hover:text-red-400 font-black uppercase
                            tracking-widest transition-colors">
               Eliminar sesión
             </button>
-            <button v-if="sesionAbierta.microreto_id"
-                    @click="cerrarSesion(); abrirMicroretoModal(sesionAbierta.microreto_id)"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00A859] text-white
-                           text-xs font-black uppercase tracking-widest hover:bg-[#00A859]/90
-                           transition-all shadow-sm">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-              </svg>
-              Ver ficha del microreto
-            </button>
+            <div class="flex items-center gap-2">
+              <button v-if="sesionAbierta.microreto_id"
+                      @click="abrirMicroretoModal(sesionAbierta.microreto_id); cerrarSesion()"
+                      class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200
+                             bg-white text-gray-600 text-xs font-black uppercase tracking-widest
+                             hover:border-[#00A859]/40 hover:text-[#00A859] transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                </svg>
+                Ver microreto
+              </button>
+              <button @click="crearMicroproyecto(sesionAbierta.id); cerrarSesion()"
+                      class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A859] text-white
+                             text-xs font-black uppercase tracking-widest hover:bg-[#00A859]/90
+                             transition-all shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 2L2 7l10 5 10-5-10-5z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
+                </svg>
+                Trabajar microreto
+              </button>
+            </div>
           </div>
         </div>
       </div>
