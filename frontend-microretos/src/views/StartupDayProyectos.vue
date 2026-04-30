@@ -8,6 +8,17 @@ const proyectos  = ref([]);
 const cargando   = ref(true);
 const busqueda   = ref('');
 const filtroEstado = ref('todos');
+
+// ─── Modal de bienvenida "¿Qué necesitas?" ───────────────────────────────────
+const guiaBienvenida = ref(true)
+
+function seleccionarOpcionBienvenida(opcion) {
+  guiaBienvenida.value = false
+  if (opcion === 'crear') {
+    router.push({ name: 'startup-day-crear' })
+  }
+  // 'biblioteca' y 'trabajar' → se quedan en la vista default
+}
 const isLoaded   = ref(false);
 
 onMounted(async () => {
@@ -51,6 +62,107 @@ async function eliminar(uuid) {
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937]">
 
+    <!-- ══════════ MODAL BIENVENIDA "¿QUÉ NECESITAS?" ══════════════════════════ -->
+    <Transition name="fade-modal">
+      <div v-if="guiaBienvenida"
+           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="relative bg-[#1a2332] border border-white/10 rounded-[2rem]
+                    shadow-2xl max-w-md w-full p-8 text-white">
+
+          <!-- Cabecera -->
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-12 h-12 rounded-2xl bg-amber-400/15 border border-amber-400/30
+                        flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-0.5">Startup Day · Fase 2</p>
+              <h2 class="text-xl font-black tracking-tight">¿Qué necesitas?</h2>
+            </div>
+          </div>
+          <p class="text-xs text-white/40 leading-relaxed mb-6 pl-[3.75rem]">
+            Aquí se trabajan los microretos para convertirlos en microproyectos reales de empresa.
+          </p>
+
+          <!-- Opciones -->
+          <div class="space-y-3 mb-6">
+
+            <!-- a) Crear microproyecto -->
+            <button @click="seleccionarOpcionBienvenida('crear')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-[#00A859]/10 hover:border-[#00A859]/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-[#00A859]/15 border border-[#00A859]/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-[#00A859]/25 transition-colors">
+                <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Crear un microproyecto</p>
+                <p class="text-xs text-white/50 leading-relaxed">Empieza el wizard guiado para registrar un nuevo microproyecto StartUp Day.</p>
+              </div>
+            </button>
+
+            <!-- b) Trabajar microproyecto ya creado -->
+            <button @click="seleccionarOpcionBienvenida('trabajar')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-[#99CC33]/10 hover:border-[#99CC33]/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-[#99CC33]/15 border border-[#99CC33]/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-[#99CC33]/25 transition-colors">
+                <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Trabajar un microproyecto creado</p>
+                <p class="text-xs text-white/50 leading-relaxed">Accede a la biblioteca y continúa editando un microproyecto existente.</p>
+              </div>
+            </button>
+
+            <!-- c) Ir a biblioteca -->
+            <button @click="seleccionarOpcionBienvenida('biblioteca')"
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
+                           bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/30
+                           transition-all duration-200 text-left group">
+              <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25
+                          flex items-center justify-center shrink-0 mt-0.5
+                          group-hover:bg-blue-500/25 transition-colors">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 6h16M4 10h16M4 14h8"/>
+                  <circle cx="17" cy="17" r="3"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 19.5l1.5 1.5"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-black text-white text-sm mb-0.5">Ver todos los microproyectos</p>
+                <p class="text-xs text-white/50 leading-relaxed">Vista general de la biblioteca con todos los microproyectos registrados.</p>
+              </div>
+            </button>
+
+          </div>
+
+          <button @click="seleccionarOpcionBienvenida('biblioteca')"
+                  class="w-full text-center text-[10px] font-bold text-white/25
+                         hover:text-white/50 transition-colors py-1">
+            Saltar
+          </button>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px]
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
@@ -63,14 +175,26 @@ async function eliminar(uuid) {
       <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div class="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full
-                      bg-[#00A859]/10 border border-[#00A859]/20">
-            <span class="w-2 h-2 rounded-full bg-[#00A859]" />
-            <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day</span>
+                      bg-amber-400/10 border border-amber-400/20">
+            <span class="w-2 h-2 rounded-full bg-amber-400" />
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-500">Startup Day · Fase 2</span>
           </div>
           <h1 class="text-3xl md:text-4xl font-black tracking-tight text-[#121212]">
             Micro<span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">proyectos</span>
           </h1>
-          <p class="text-gray-500 text-sm mt-1">Diseña y gestiona microproyectos de aprendizaje basado en retos reales.</p>
+          <p class="text-gray-500 text-sm mt-1">
+            Aquí se trabajan los microretos para convertirlos en microproyectos de empresa reales.
+          </p>
+          <!-- Botón para ver la guía de nuevo -->
+          <button @click="guiaBienvenida = true"
+                  class="mt-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase
+                         tracking-widest text-gray-400 hover:text-[#00A859] transition-colors">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            ¿Qué puedo hacer aquí?
+          </button>
         </div>
         <button
           @click="router.push({ name: 'startup-day-crear' })"
@@ -227,3 +351,10 @@ async function eliminar(uuid) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.fade-modal-enter-active,
+.fade-modal-leave-active { transition: opacity 250ms ease; }
+.fade-modal-enter-from,
+.fade-modal-leave-to     { opacity: 0; }
+</style>

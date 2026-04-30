@@ -259,6 +259,7 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
             'cursoSeleccionado'=> 'required|integer',
             'modulo_id'        => 'nullable|array',
             'cantidad'         => 'required|integer|min:1|max:5',
+            'familia'          => 'nullable|string',
         ]);
 
         $consecuencias = implode(", ", $request->consecuencias ?? []);
@@ -291,9 +292,17 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
             : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
         $reglaExtra .= " TEN EN CUENTA QUE ES PARA ALUMNADO DE {$request->cursoSeleccionado}º CURSO. Adapta el prototipo a sus conocimientos.";
 
+        $familia = $request->filled('familia') ? $request->familia : null;
+
         $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector}). ";
         if ($request->filled('empresaTamano'))    $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
         if ($request->filled('empresaUbicacion')) $contextoEmpresa .= "Ubicación: {$request->empresaUbicacion}. ";
+
+        $contextoFormativo  = "CICLO FORMATIVO: {$request->ciclo_nombre} ({$request->cursoSeleccionado}º curso).\n";
+        if ($familia) {
+            $contextoFormativo .= "FAMILIA PROFESIONAL: {$familia}.\n";
+            $contextoFormativo .= "IMPORTANTE: Todos los prototipos, soluciones sugeridas y terminología deben ser específicos de la Familia Profesional «{$familia}». Usa herramientas, técnicas, documentos y procesos propios de ese perfil profesional. No propongas entregables genéricos.\n";
+        }
 
         $contextoFriccion  = "OPERATIVA Y OFERTA (P1): {$request->diaANormal}\n";
         $contextoFriccion .= "PROCESO QUE DA TRABAJO EXTRA (P2): {$request->friccionArea}\n";
@@ -303,14 +312,28 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
             $contextoFriccion .= "EXPECTATIVA DE LO QUE DEBE HACER EL ALUMNO (P5): {$request->expectativasAlumno}\n";
         }
 
+        $familiaRegla = $familia
+            ? "4. Los prototipos, las necesidades y la terminología de cada microreto DEBEN ser propios de la Familia Profesional «{$familia}». Adapta cada entregable al perfil real del alumnado: usa las herramientas, los procesos y los documentos habituales en esa familia profesional. Nunca propongas entregables genéricos que no encajen con el perfil."
+            : "4. Adapta los prototipos y necesidades al perfil profesional del alumnado según el ciclo formativo indicado.";
+
         $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y metodologías ágiles (Design Thinking).
         REGLAS ESTRICTAS:
         1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar. El alumno debe idear la solución final.
         2. Genera EXACTAMENTE {$request->cantidad} microreto(s) totalmente distintos entre sí para la misma empresa.
-        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto.";
+        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto.
+        {$familiaRegla}";
+
+        $prototiposHint = $familia
+            ? "Entregable específico de la Familia Profesional «{$familia}» (usa herramientas, documentos y técnicas habituales en ese perfil, NO entregables genéricos)"
+            : "Entregable concreto adaptado al ciclo formativo (ej: Diagrama de flujo, Guion de entrevista)";
+
+        $queNecesitanHint = $familia
+            ? "Necesidad técnica expresada en términos propios de la Familia Profesional «{$familia}»"
+            : "Necesidad técnica o organizativa concreta";
 
         $userPrompt = "
         {$contextoEmpresa}
+        {$contextoFormativo}
         {$contextoFriccion}
         LIMITACIONES TÉCNICAS Y LOGÍSTICAS (P3): {$request->restricciones}.
         LO QUE NO QUIEREN (P3b): {$request->loQueNoQuieren}.
@@ -330,23 +353,23 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
                     \"dia_a_dia\": \"1 frase clara sobre cómo operan y dónde falla el proceso actualmente.\",
                     \"dificultades\": [\"Fallo 1\", \"Fallo 2\"],
                     \"pregunta_reto\": \"Formula el desafío en forma de pregunta abierta empezando por ¿Cómo podríamos...?\",
-                    \"que_necesitan\": [\"Necesidad 1\", \"Necesidad 2\"],
+                    \"que_necesitan\": [\"{$queNecesitanHint} 1\", \"{$queNecesitanHint} 2\"],
                     \"limitaciones\": [\"Restricción 1\", \"Restricción 2\"],
-                    \"prototipos\": [\"Entregable concreto 1 (ej: Diagrama de flujo)\", \"Entregable concreto 2 (ej: Guion de entrevista)\"],
+                    \"prototipos\": [\"{$prototiposHint} 1\", \"{$prototiposHint} 2\"],
                     \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\"],
                     \"evaluacion_oficial\": [
                         {
                             \"modulo\": \"Nombre exacto del Módulo 1\",
                             \"ra\": \"Texto del RA asociado\",
                             \"ce\": [\"Texto CE 1\"],
-                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje.\"
+                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje en el contexto de la Familia Profesional.\"
                         }
                     ],
                     \"variantes\": [
-                        \"Nombre de la Variante: Descripción de una modificación del reto.\"
+                        \"Nombre de la Variante: Descripción de una modificación del reto adaptada a la Familia Profesional.\"
                     ],
                     \"tips_profesorado\": [
-                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles].\"
+                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles propios de la Familia Profesional].\"
                     ]
                 }
             ]
