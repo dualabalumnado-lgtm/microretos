@@ -17,7 +17,8 @@ const destinoTrasLogin = ref('/microretos')
 
 // ─── Secciones colapsables ────────────────────────────────
 const microretos_abierto   = ref(true)
-const herramientas_abierto = ref(true)
+const startup_abierto      = ref(true)
+const herramientas_abierto = ref(false)
 
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
@@ -144,7 +145,7 @@ defineExpose({ isOpen, toggle, close })
       <!-- ── Navegación ── -->
       <nav class="flex-1 px-3 py-5 space-y-1 overflow-visible">
 
-        <!-- ═══════════════ MICRORETOS (colapsable) ═══════════════ -->
+        <!-- ═══════════════ FASE 1: MICRORETOS (colapsable) ═══════════ -->
         <div class="group/tip relative">
           <button
             @click="microretos_abierto = !microretos_abierto"
@@ -152,7 +153,11 @@ defineExpose({ isOpen, toggle, close })
                    text-[9px] font-black uppercase tracking-[0.2em]
                    text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
           >
-            <span class="flex-1 text-left">Microretos</span>
+            <span class="flex-1 text-left flex items-center gap-1.5">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                           bg-[#00A859]/20 text-[#00A859] text-[8px] font-black shrink-0">1</span>
+              Microretos
+            </span>
             <svg
               class="w-3 h-3 transition-transform duration-200"
               :class="microretos_abierto ? 'rotate-180' : ''"
@@ -161,7 +166,7 @@ defineExpose({ isOpen, toggle, close })
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
-          <div class="sp-tooltip">Crea y consulta microretos de FP Dual con IA<div class="sp-tooltip-arrow"/></div>
+          <div class="sp-tooltip">Fase 1 — Crea microretos con IA y compártelos con el alumnado<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <Transition name="sp-collapse">
@@ -197,7 +202,7 @@ defineExpose({ isOpen, toggle, close })
                   <line x1="9" y1="7" x2="15" y2="7"/>
                   <line x1="9" y1="11" x2="15" y2="11"/>
                 </svg>
-                <span>Biblioteca de microretos</span>
+                <span>Biblioteca</span>
               </button>
               <div class="sp-tooltip">Consulta todos los microretos guardados y comparte el QR con el alumnado<div class="sp-tooltip-arrow"/></div>
             </div>
@@ -207,55 +212,32 @@ defineExpose({ isOpen, toggle, close })
 
         <div class="my-4 border-t border-white/10" />
 
-        <!-- ═══════════════ STARTUP ═══════════════════════════════ -->
-        <div class="group/tip relative">
-          <p class="px-3 mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 select-none cursor-default">
-            Startup Day
-          </p>
-          <div class="sp-tooltip">Gestión de microproyectos y StartUp Day<div class="sp-tooltip-arrow"/></div>
-        </div>
-
+        <!-- ═══════════════ FASE 2: STARTUP DAY (colapsable) ══════════ -->
         <div class="group/tip relative">
           <button
-            @click="$router.push({ name: 'startup-day' })"
-            class="nav-item w-full text-left"
-            :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
-          >
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
-            </svg>
-            <span>Microproyectos</span>
-          </button>
-          <div class="sp-tooltip">Crea y gestiona microproyectos StartUp Day<div class="sp-tooltip-arrow"/></div>
-        </div>
-
-        <div class="my-4 border-t border-white/10" />
-
-        <!-- ═══════════════ HERRAMIENTAS (colapsable) ══════════════ -->
-        <div class="group/tip relative">
-          <button
-            @click="herramientas_abierto = !herramientas_abierto"
+            @click="startup_abierto = !startup_abierto"
             class="w-full flex items-center gap-2 px-3 mb-1
                    text-[9px] font-black uppercase tracking-[0.2em]
                    text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
           >
-            <span class="flex-1 text-left">Herramientas</span>
+            <span class="flex-1 text-left flex items-center gap-1.5">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                           bg-amber-400/20 text-amber-400 text-[8px] font-black shrink-0">2</span>
+              Startup Day
+            </span>
             <svg
               class="w-3 h-3 transition-transform duration-200"
-              :class="herramientas_abierto ? 'rotate-180' : ''"
+              :class="startup_abierto ? 'rotate-180' : ''"
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
-          <div class="sp-tooltip">Gestión docente y datos de la plataforma<div class="sp-tooltip-arrow"/></div>
+          <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el StartUp Day<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <Transition name="sp-collapse">
-          <div v-if="herramientas_abierto" class="space-y-0.5">
+          <div v-if="startup_abierto" class="space-y-0.5">
 
             <!-- Dashboard docentes -->
             <div class="group/tip relative">
@@ -270,10 +252,56 @@ defineExpose({ isOpen, toggle, close })
                   <rect x="9" y="3" width="6" height="4" rx="1"/>
                   <path d="M9 12l2 2 4-4"/>
                 </svg>
-                <span>Dashboard docentes</span>
+                <span>Dashboard docente</span>
               </button>
-              <div class="sp-tooltip">Seguimiento del alumnado y gestión de proyectos activos<div class="sp-tooltip-arrow"/></div>
+              <div class="sp-tooltip">Registra sesiones de trabajo con microretos<div class="sp-tooltip-arrow"/></div>
             </div>
+
+            <!-- Microproyectos -->
+            <div class="group/tip relative">
+              <button
+                @click="irA('/startup-day')"
+                class="nav-item w-full text-left"
+                :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
+              >
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                  <path d="M2 17l10 5 10-5"/>
+                  <path d="M2 12l10 5 10-5"/>
+                </svg>
+                <span>Microproyectos</span>
+              </button>
+              <div class="sp-tooltip">Crea y gestiona microproyectos StartUp Day<div class="sp-tooltip-arrow"/></div>
+            </div>
+
+          </div>
+        </Transition>
+
+        <div class="my-4 border-t border-white/10" />
+
+        <!-- ═══════════════ ADMINISTRACIÓN (colapsable) ═════════════ -->
+        <div class="group/tip relative">
+          <button
+            @click="herramientas_abierto = !herramientas_abierto"
+            class="w-full flex items-center gap-2 px-3 mb-1
+                   text-[9px] font-black uppercase tracking-[0.2em]
+                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
+          >
+            <span class="flex-1 text-left">Administración</span>
+            <svg
+              class="w-3 h-3 transition-transform duration-200"
+              :class="herramientas_abierto ? 'rotate-180' : ''"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="sp-tooltip">Gestión de datos de la plataforma<div class="sp-tooltip-arrow"/></div>
+        </div>
+
+        <Transition name="sp-collapse">
+          <div v-if="herramientas_abierto" class="space-y-0.5">
 
             <!-- Base de datos -->
             <div class="group/tip relative">
