@@ -8,6 +8,8 @@ use App\Http\Controllers\DemoController;
 use App\Http\Controllers\MicroretoTokenController;
 use App\Http\Controllers\MicroproyectoController;
 use App\Http\Controllers\SesionController;
+use App\Http\Controllers\EmpresaContactoController;
+use App\Http\Controllers\UploadController;
 
 /*
 |--------------------------------------------------------------------------
@@ -112,6 +114,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sesiones/lote',        [SesionController::class, 'storeLote']);
     Route::get('/sesiones/{id}',         [SesionController::class, 'show']);
     Route::delete('/sesiones/{id}',      [SesionController::class, 'destroy']);
+
+    // Subida y gestión de recursos en Cloudinary (documentos y vídeos del microproyecto)
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::get('/upload/recursos',  [UploadController::class, 'listar']);
+        Route::post('/upload/recurso',  [UploadController::class, 'recurso']);
+        Route::delete('/upload/recurso',[UploadController::class, 'destroy']);
+    });
+
+    // Módulo Empresas — verificación de acceso y contacto
+    Route::middleware('throttle:10,1')
+        ->post('/empresas/verificar-acceso', [EmpresaContactoController::class, 'verificarAcceso']);
+    Route::post('/empresas/{id}/contactar',         [EmpresaContactoController::class, 'contactar']);
+    Route::post('/empresas/{id}/enviar-validacion', [EmpresaContactoController::class, 'enviarValidacion']);
 
     // StartUp Day — microproyectos CRUD
     Route::get('/startup/proyectos',          [MicroproyectoController::class, 'index']);
