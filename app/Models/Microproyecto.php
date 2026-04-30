@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Models\MicroproyectoRecurso;
 
 class Microproyecto extends Model
 {
@@ -42,6 +43,11 @@ class Microproyecto extends Model
                 $mp->token_empresa = Str::random(40);
             }
         });
+    }
+
+    public function recursos()
+    {
+        return $this->hasMany(MicroproyectoRecurso::class)->orderBy('created_at');
     }
 
     public function microreto()
