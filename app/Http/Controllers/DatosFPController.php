@@ -133,7 +133,22 @@ class DatosFPController extends Controller
             ->where('idmodulo', $idModulo)
             ->get();
 
-        return response()->json($ras);
+        return response()->json([
+            'ra' => $ras->values()->map(function ($ra, $idx) {
+                return [
+                    'id'          => $ra->id,
+                    'orden'       => $idx + 1,
+                    'descripcion' => $ra->ra,
+                    'criterios'   => $ra->criteriosEvaluacion->values()->map(function ($ce, $ci) {
+                        return [
+                            'id'          => $ce->id,
+                            'orden'       => $ci + 1,
+                            'descripcion' => $ce->ce,
+                        ];
+                    }),
+                ];
+            }),
+        ]);
     }
 
     // ==========================================

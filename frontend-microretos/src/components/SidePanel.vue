@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'
 import api from '../api.js'
 import { useAuthStore } from '../stores/auth'
+import { useUIState } from '../composables/useUIState.js'
 
 const authStore = useAuthStore()
+const { tourActivo } = useUIState()
 const isOpen    = ref(false)
 const logoError = ref(false)
 const route     = useRoute()
@@ -50,7 +52,8 @@ watch(
 const irA = (ruta) => {
   closeOnMobile()
   if (authStore.isAuthenticated) {
-    router.push(ruta)
+    const yaEstoy = route.path === ruta || route.path.startsWith(ruta + '/')
+    router.push(yaEstoy ? { path: ruta, query: { _t: Date.now() } } : ruta)
   } else {
     destinoTrasLogin.value = ruta
     showLogin.value = true
@@ -90,8 +93,9 @@ defineExpose({ isOpen, toggle, close })
     />
   </Transition>
 
-  <!-- Botón hamburguesa -->
+  <!-- Botón hamburguesa (oculto durante el tour) -->
   <button
+    v-show="!tourActivo"
     @click="toggle"
     :aria-label="isOpen ? 'Cerrar menú' : 'Abrir menú'"
     :aria-expanded="isOpen"
@@ -111,10 +115,10 @@ defineExpose({ isOpen, toggle, close })
     </span>
   </button>
 
-  <!-- Panel lateral -->
+  <!-- Panel lateral (también oculto durante el tour) -->
   <Transition name="sp-slide">
     <aside
-      v-if="isOpen"
+      v-if="isOpen && !tourActivo"
       class="fixed top-0 left-0 h-full w-64 z-40 flex flex-col overflow-visible
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
@@ -212,7 +216,7 @@ defineExpose({ isOpen, toggle, close })
 
         <div class="my-4 border-t border-white/10" />
 
-        <!-- ═══════════════ FASE 2: STARTUP DAY (colapsable) ══════════ -->
+        <!-- ═══════════════ FASE 2: STARTUP DAY (Taller de ideas) (colapsable) ══════════ -->
         <div class="group/tip relative">
           <button
             @click="startup_abierto = !startup_abierto"
@@ -223,7 +227,7 @@ defineExpose({ isOpen, toggle, close })
             <span class="flex-1 text-left flex items-center gap-1.5">
               <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
                            bg-amber-400/20 text-amber-400 text-[8px] font-black shrink-0">2</span>
-              Startup Day
+              Taller de Ideas
             </span>
             <svg
               class="w-3 h-3 transition-transform duration-200"
@@ -233,7 +237,7 @@ defineExpose({ isOpen, toggle, close })
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
-          <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el StartUp Day<div class="sp-tooltip-arrow"/></div>
+          <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <Transition name="sp-collapse">
@@ -272,7 +276,7 @@ defineExpose({ isOpen, toggle, close })
                 </svg>
                 <span>Microproyectos</span>
               </button>
-              <div class="sp-tooltip">Crea y gestiona microproyectos StartUp Day<div class="sp-tooltip-arrow"/></div>
+              <div class="sp-tooltip">Crea y gestiona microproyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
             </div>
 
           </div>
@@ -496,8 +500,8 @@ defineExpose({ isOpen, toggle, close })
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
-            <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Startup Day</p>
-            <p class="text-xs text-white/60"><span class="text-white font-bold">Microproyectos</span> — Diseña y gestiona microproyectos StartUp Day: equipo, módulos, objetivos y validación por empresa.</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Taller de Ideas</p>
+            <p class="text-xs text-white/60"><span class="text-white font-bold">Microproyectos</span> — Diseña y gestiona microproyectos Taller de Ideas equipo, módulos, objetivos y validación por empresa.</p>
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
