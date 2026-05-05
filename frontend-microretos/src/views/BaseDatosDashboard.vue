@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRouter, onBeforeRouteUpdate } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
 import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue'
@@ -8,9 +8,12 @@ import CentroEducativoModal from '../components/CentroEducativoModal.vue'
 import EliminarCentroModal from '../components/EliminarCentroModal.vue'
 import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
 import GestionFamiliasCiclosModal from '../components/GestionFamiliasCiclosModal.vue'
+import CatalogoBoeModal from '../components/CatalogoBoeModal.vue'
+import { useUIState } from '../composables/useUIState.js'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { tourActivo } = useUIState()
 
 // ─── Aviso de expiración de sesión ───────────────────────
 const minutosRestantes = ref(authStore.minutosRestantes)
@@ -195,6 +198,10 @@ onMounted(async () => {
     return
   }
   await cargarDatos()
+  // Arrancar el tour por defecto al abrir la vista
+  await nextTick()
+  modoGuia.value = true
+  pasoGuia.value = 1
 })
 
 async function cargarDatos() {
@@ -210,14 +217,7 @@ async function cargarDatos() {
     familiasProfesionales.value = resFamilias.data
     centros.value               = resCentros.data
 
-    // Expandir todos los centros y familias por defecto
-    const todosLosCentros = [
-      ...centros.value.map(c => c.nombre),
-      ...empresas.value.map(e => e.centro_educativo).filter(Boolean),
-    ]
-    todosLosCentros.forEach(c => centrosExpandidos.value.add(c))
-    const fams = [...new Set(empresas.value.flatMap(e => e.familias_nombres?.length ? e.familias_nombres : ['— Sin familia —']))]
-    fams.forEach(f => familiasExpandidas.value.add(f))
+    // Centros cerrados por defecto; se abren al hacer clic
   } catch (e) {
     if (e.response?.status === 401) {
       authStore.logout()
@@ -382,10 +382,33 @@ const ESTADOS_OPCIONES = [
 const estadoDropdownAbierto = ref(null)   // empresa.id o null
 const guardandoEstado       = ref(new Set())
 
+// ─── Confirmación antes de editar estado ─────────────────
+const mostrarConfirmEstado  = ref(false)
+const empresaParaEstado     = ref(null)
+const estadoEditandoId      = ref(null)   // empresa.id en modo edición
+
+function pedirEditarEstado(empresa) {
+  estadoDropdownAbierto.value = null
+  empresaParaEstado.value     = empresa
+  mostrarConfirmEstado.value  = true
+}
+
+function confirmarEditarEstado() {
+  mostrarConfirmEstado.value  = false
+  estadoEditandoId.value      = empresaParaEstado.value.id
+  estadoDropdownAbierto.value = empresaParaEstado.value.id
+}
+
+function cancelarConfirmEstado() {
+  mostrarConfirmEstado.value = false
+  empresaParaEstado.value    = null
+}
+
 async function guardarEstadoContacto(empresa, nuevoEstado) {
   if (guardandoEstado.value.has(empresa.id)) return
   guardandoEstado.value = new Set([...guardandoEstado.value, empresa.id])
   estadoDropdownAbierto.value = null
+  estadoEditandoId.value = null
   try {
     await api.patch(`/empresas/${empresa.id}/estado`, { estadoContacto: nuevoEstado || null })
     empresa.estado_contacto = nuevoEstado || null
@@ -502,11 +525,161 @@ function onEmpresaEliminada(data) {
   cargarDatos()
 }
 
+// ═══════════════════════════════════════════════════════════
+//  TOUR GUIADO
+// ═══════════════════════════════════════════════════════════
+const modoGuia = ref(false)
+const pasoGuia = ref(1)
+
+const refContadores      = ref(null)
+const refBusqueda        = ref(null)
+const refFiltros         = ref(null)
+const refCentros         = ref(null)
+const refCrearNuevoCentro = ref(null)
+const refNuevaEmpresa    = ref(null)
+const refZonaPeligro     = ref(null)
+const refBtnInfoBoe      = ref(null)
+
+const tourRefs = {
+  refContadores, refBusqueda, refFiltros, refCentros,
+  refCrearNuevoCentro, refNuevaEmpresa, refZonaPeligro, refBtnInfoBoe,
+}
+
+const guiaPasosData = [
+  { ref: 'refContadores',       seccion: 'contadores', texto: 'Estos son los contadores para ver el volumen de nuestra base de datos.' },
+  { ref: 'refBusqueda',         seccion: 'filtros',    texto: 'Puedes buscar empresas, centros, familias o ciclos.' },
+  { ref: 'refFiltros',          seccion: 'filtros',    texto: 'Filtra la vista por centro educativo o familia profesional para acotar los resultados.' },
+  { ref: 'refCentros',          seccion: 'acordeon',   texto: 'Cada centro tiene guardadas las empresas asociadas. Despliega para ver toda la información.' },
+  { ref: 'refCrearNuevoCentro', seccion: 'acciones',   texto: 'Añade nueva información: pulsa aquí para registrar un nuevo centro educativo.' },
+  { ref: 'refNuevaEmpresa',     seccion: 'acciones',   texto: 'Añade una nueva empresa a la base de datos.' },
+  { ref: 'refZonaPeligro',      seccion: 'acciones',   texto: 'Cuidado con este botón: aquí puedes modificar información de familias y ciclos formativos. Si quieres ver información del BOE (RA y CE) pulsa el botón Catálogo FP.' },
+  { ref: 'refBtnInfoBoe',       seccion: 'contadores', texto: 'Pulsa aquí para consultar el catálogo del BOE: familias, ciclos, resultados de aprendizaje y criterios de evaluación — solo lectura.' },
+]
+
+const TOTAL_PASOS_GUIA = guiaPasosData.length
+const pasoActual    = computed(() => guiaPasosData[pasoGuia.value - 1])
+const seccionActiva = computed(() => modoGuia.value ? (pasoActual.value?.seccion ?? null) : null)
+
+const bocadilloPos = ref({ top: 60, left: 16, width: 300, dir: 'top', arrowLeft: 150 })
+
+function recalcularBocadillo() {
+  const el = tourRefs[pasoActual.value?.ref]?.value
+  if (!el) return
+  const rect      = el.getBoundingClientRect()
+  const WIN_W     = window.innerWidth
+  const WIN_H     = window.innerHeight
+  const TOOLTIP_W = Math.min(300, WIN_W - 32)
+  const TOOLTIP_H = 150
+  const GAP       = 12
+
+  const visibleTop    = Math.max(0, rect.top)
+  const visibleBottom = Math.min(WIN_H, rect.bottom)
+  const centerX       = rect.left + rect.width / 2
+
+  const dir = (WIN_H - visibleBottom - GAP) >= TOOLTIP_H + GAP ? 'top'
+    : visibleTop - GAP >= TOOLTIP_H + GAP ? 'bottom'
+    : 'top'
+
+  let tooltipTop = dir === 'top' ? visibleBottom + GAP : visibleTop - TOOLTIP_H - GAP
+  tooltipTop = Math.max(10, Math.min(tooltipTop, WIN_H - TOOLTIP_H - 10))
+
+  let tooltipLeft = centerX - TOOLTIP_W / 2
+  tooltipLeft = Math.max(16, Math.min(tooltipLeft, WIN_W - TOOLTIP_W - 16))
+
+  const arrowLeft = Math.max(16, Math.min(centerX - tooltipLeft, TOOLTIP_W - 16))
+  bocadilloPos.value = { top: tooltipTop, left: tooltipLeft, width: TOOLTIP_W, dir, arrowLeft }
+}
+
+function scrollYRecalcular() {
+  const el = tourRefs[pasoActual.value?.ref]?.value
+  if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
+  requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+}
+
+watch(pasoGuia, () => { if (modoGuia.value) nextTick(scrollYRecalcular) })
+watch(modoGuia, (val) => {
+  tourActivo.value = val
+  if (val) nextTick(scrollYRecalcular)
+})
+
+function avanzarPaso() {
+  if (pasoGuia.value < TOTAL_PASOS_GUIA) { pasoGuia.value++ }
+  else { modoGuia.value = false; pasoGuia.value = 1 }
+}
+function saltarGuia() { modoGuia.value = false; pasoGuia.value = 1 }
+
+onUnmounted(() => { tourActivo.value = false })
+
+onBeforeRouteUpdate(async () => {
+  modoGuia.value = false
+  pasoGuia.value = 1
+  await nextTick()
+  modoGuia.value = true
+})
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL INFO BOE (solo lectura) — lógica en CatalogoBoeModal
+// ═══════════════════════════════════════════════════════════
+const mostrarInfoBoe = ref(false)
 
 </script>
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] overflow-x-hidden">
+
+    <!-- ══════════ TOUR BOCADILLO ════════════════════════════ -->
+    <Transition name="modal-fade">
+      <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
+        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
+
+        <div class="absolute pointer-events-auto"
+             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px', zIndex: 9992 }">
+
+          <!-- Flecha hacia arriba (bocadillo debajo del elemento) -->
+          <div v-if="bocadilloPos.dir === 'top'"
+               class="absolute -top-[10px] w-0 h-0"
+               :style="{ left: bocadilloPos.arrowLeft + 'px', transform: 'translateX(-50%)',
+                         borderLeft: '9px solid transparent', borderRight: '9px solid transparent',
+                         borderBottom: '10px solid #1a2332' }" />
+
+          <div class="bg-[#1a2332] border border-white/15 rounded-2xl shadow-2xl p-4 text-white">
+            <!-- Progreso -->
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex gap-1 items-center">
+                <span v-for="i in TOTAL_PASOS_GUIA" :key="i"
+                      class="h-[3px] rounded-full transition-all duration-300"
+                      :class="i <= pasoGuia ? 'bg-[#00A859] w-5' : 'bg-white/20 w-3'" />
+              </div>
+              <span class="text-[9px] font-bold text-white/40">{{ pasoGuia }}/{{ TOTAL_PASOS_GUIA }}</span>
+            </div>
+
+            <p class="text-[11px] text-white/85 leading-relaxed mb-3">{{ pasoActual.texto }}</p>
+
+            <div class="flex items-center gap-2">
+              <button @click="avanzarPaso"
+                      class="flex-1 py-1.5 rounded-xl bg-[#00A859] text-white
+                             text-[9px] font-black uppercase tracking-widest
+                             hover:bg-[#00A859]/90 transition-all">
+                {{ pasoGuia < TOTAL_PASOS_GUIA ? 'Siguiente →' : 'Finalizar' }}
+              </button>
+              <button @click="saltarGuia"
+                      class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10
+                             text-white/40 text-[9px] font-black uppercase tracking-widest
+                             hover:text-white/60 transition-all">
+                Saltar
+              </button>
+            </div>
+          </div>
+
+          <!-- Flecha hacia abajo (bocadillo encima del elemento) -->
+          <div v-if="bocadilloPos.dir === 'bottom'"
+               class="absolute -bottom-[10px] w-0 h-0"
+               :style="{ left: bocadilloPos.arrowLeft + 'px', transform: 'translateX(-50%)',
+                         borderLeft: '9px solid transparent', borderRight: '9px solid transparent',
+                         borderTop: '10px solid #1a2332' }" />
+        </div>
+      </div>
+    </Transition>
 
     <!-- ══════════════ AVISO EXPIRACIÓN DE SESIÓN ═══════════ -->
     <Transition name="modal-fade">
@@ -552,10 +725,11 @@ function onEmpresaEliminada(data) {
           </div>
 
           <!-- Acciones de cabecera -->
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2"
+               :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'acciones' }">
 
             <!-- ── Zona de peligro — desplegable ── -->
-            <div class="relative">
+            <div ref="refZonaPeligro" class="relative">
               <button
                 @click="zonaPeligroAbierta = !zonaPeligroAbierta"
                 :disabled="cargando"
@@ -613,8 +787,12 @@ function onEmpresaEliminada(data) {
               />
             </div>
 
+            <!-- Separador visual entre zona peligro y botones CRUD -->
+            <div class="w-px h-8 bg-gray-200 self-center hidden sm:block" />
+
             <!-- Botón nuevo centro educativo -->
             <button
+              ref="refCrearNuevoCentro"
               @click="pedirNuevoCentro"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
@@ -631,6 +809,7 @@ function onEmpresaEliminada(data) {
 
             <!-- Botón nueva empresa -->
             <button
+              ref="refNuevaEmpresa"
               @click="pedirNuevaEmpresa"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
@@ -665,49 +844,92 @@ function onEmpresaEliminada(data) {
         </div>
 
         <!-- Stats chips -->
-        <div class="flex flex-wrap gap-3" v-if="!cargando && !errorCarga">
-          <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
-            </svg>
-            <span class="font-black text-xl text-[#1F2937]">{{ totalEmpresas }}</span>
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">empresas</span>
+        <div class="flex flex-wrap gap-3 items-center"
+             :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'contadores' }"
+             v-if="!cargando && !errorCarga">
+
+          <!-- ── Grupo de los 3 contadores principales (ref para el tour paso 1) ── -->
+          <div ref="refContadores"
+               class="flex flex-wrap gap-2 items-center
+                      bg-white/70 rounded-[1.4rem] border border-gray-100 shadow-sm
+                      px-2 py-1.5">
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+              </svg>
+              <span class="font-black text-xl text-[#1F2937]">{{ totalEmpresas }}</span>
+              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">empresas</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+              </svg>
+              <span class="font-black text-xl text-[#1F2937]">{{ totalCentros }}</span>
+              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">centros</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+              </svg>
+              <span class="font-black text-xl text-[#1F2937]">{{ todasLasFamilias.length }}</span>
+              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">familias</span>
+            </div>
+            <div v-if="busqueda || filtroFamilia || filtroCentro"
+                 class="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-2xl border border-amber-200 shadow-sm">
+              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+              </svg>
+              <span class="font-black text-xl text-amber-700">{{ totalFiltradas }}</span>
+              <span class="text-xs font-semibold text-amber-600 uppercase tracking-wider">mostrando</span>
+            </div>
           </div>
-          <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+          <!-- Separador vertical -->
+          <div class="w-px h-8 bg-gray-200 self-center hidden sm:block" />
+
+          <!-- Botón Info BOE (catálofo fp) (ref para el tour paso 8) -->
+          <button
+            ref="refBtnInfoBoe"
+            @click="mostrarInfoBoe = true"
+            class="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-2xl border border-indigo-200
+                   shadow-sm text-indigo-600 text-xs font-black uppercase tracking-wider
+                   hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
             </svg>
-            <span class="font-black text-xl text-[#1F2937]">{{ totalCentros }}</span>
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">centros</span>
-          </div>
-          <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            Catálogo FP
+          </button>
+
+          <!-- Botón Activar Guía -->
+          <button
+            @click="modoGuia = true; pasoGuia = 1"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-2xl border border-blue-100
+                   shadow-sm text-blue-500 text-xs font-black uppercase tracking-wider
+                   hover:bg-blue-100 hover:border-blue-200 transition-all"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <span class="font-black text-xl text-[#1F2937]">{{ todasLasFamilias.length }}</span>
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">familias</span>
-          </div>
-          <div v-if="busqueda || filtroFamilia || filtroCentro"
-               class="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-200 shadow-sm">
-            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-            </svg>
-            <span class="font-black text-xl text-amber-700">{{ totalFiltradas }}</span>
-            <span class="text-xs font-semibold text-amber-600 uppercase tracking-wider">mostrando</span>
-          </div>
+            Activar Guía
+          </button>
         </div>
       </header>
 
       <!-- ══════════════════ FILTROS ══════════════════ -->
-      <div v-if="!cargando && !errorCarga"
+      <div ref="refFiltros"
+           v-if="!cargando && !errorCarga"
            class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm p-5 mb-6
-                  flex flex-col md:flex-row gap-3">
+                  flex flex-col md:flex-row gap-3"
+           :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'filtros' }">
         <!-- Buscador texto -->
-        <div class="relative flex-1">
+        <div ref="refBusqueda" class="relative flex-1">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -798,7 +1020,8 @@ function onEmpresaEliminada(data) {
       </div>
 
       <!-- ══════════════ ACORDEÓN PRINCIPAL ═══════════ -->
-      <div v-else class="space-y-4">
+      <div ref="refCentros" v-else class="space-y-4"
+           :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'acordeon' }">
         <div
           v-for="centro in centrosOrdenados"
           :key="centro"
@@ -1003,22 +1226,58 @@ function onEmpresaEliminada(data) {
                             <Transition name="dropdown-fade">
                               <div v-if="estadoDropdownAbierto === empresa.id"
                                 class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[220px]">
-                                <button
-                                  v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
-                                  @click="guardarEstadoContacto(empresa, opcion)"
-                                  :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
-                                  class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
-                                >
-                                  <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
-                                  {{ opcion }}
-                                </button>
-                                <button
-                                  @click="guardarEstadoContacto(empresa, '')"
-                                  class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
-                                >
-                                  <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
-                                  Sin estado
-                                </button>
+
+                                <!-- Modo visualización: estado actual + botón editar -->
+                                <template v-if="estadoEditandoId !== empresa.id">
+                                  <div class="px-4 py-3 border-b border-gray-100">
+                                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Estado actual</p>
+                                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border"
+                                         :class="empresa.estado_contacto
+                                           ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
+                                           : 'bg-gray-100 text-gray-400 border-gray-200'">
+                                      <span v-if="empresa.estado_contacto"
+                                            :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                                            class="w-1.5 h-1.5 rounded-full shrink-0" />
+                                      {{ empresa.estado_contacto || 'Sin estado' }}
+                                    </div>
+                                  </div>
+                                  <button
+                                    @click="pedirEditarEstado(empresa)"
+                                    class="w-full flex items-center gap-2 px-4 py-3 text-left
+                                           text-[11px] font-black uppercase tracking-widest text-[#1F2937]
+                                           hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-3.5 h-3.5 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    Editar estado
+                                  </button>
+                                </template>
+
+                                <!-- Modo edición: lista de opciones -->
+                                <template v-else>
+                                  <div class="px-4 py-2 border-b border-gray-100">
+                                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Selecciona nuevo estado</p>
+                                  </div>
+                                  <button
+                                    v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
+                                    @click="guardarEstadoContacto(empresa, opcion)"
+                                    :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
+                                    class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                                  >
+                                    <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
+                                    {{ opcion }}
+                                  </button>
+                                  <button
+                                    @click="guardarEstadoContacto(empresa, '')"
+                                    class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                                  >
+                                    <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                                    Sin estado
+                                  </button>
+                                </template>
+
                               </div>
                             </Transition>
                           </div>
@@ -1185,22 +1444,58 @@ function onEmpresaEliminada(data) {
                                   <Transition name="dropdown-fade">
                                     <div v-if="estadoDropdownAbierto === `det-${empresa.id}`"
                                       class="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-[220px]">
-                                      <button
-                                        v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
-                                        @click="guardarEstadoContacto(empresa, opcion)"
-                                        :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
-                                        class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
-                                      >
-                                        <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
-                                        {{ opcion }}
-                                      </button>
-                                      <button
-                                        @click="guardarEstadoContacto(empresa, '')"
-                                        class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
-                                      >
-                                        <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
-                                        Sin estado
-                                      </button>
+
+                                      <!-- Modo visualización -->
+                                      <template v-if="estadoEditandoId !== empresa.id">
+                                        <div class="px-4 py-3 border-b border-gray-100">
+                                          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Estado actual</p>
+                                          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border"
+                                               :class="empresa.estado_contacto
+                                                 ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
+                                                 : 'bg-gray-100 text-gray-400 border-gray-200'">
+                                            <span v-if="empresa.estado_contacto"
+                                                  :class="[estadoBadge(empresa.estado_contacto).dot, estadoBadge(empresa.estado_contacto).pulse ? 'animate-pulse' : '']"
+                                                  class="w-1.5 h-1.5 rounded-full shrink-0" />
+                                            {{ empresa.estado_contacto || 'Sin estado' }}
+                                          </div>
+                                        </div>
+                                        <button
+                                          @click="pedirEditarEstado(empresa)"
+                                          class="w-full flex items-center gap-2 px-4 py-3 text-left
+                                                 text-[11px] font-black uppercase tracking-widest text-[#1F2937]
+                                                 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <svg class="w-3.5 h-3.5 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                          </svg>
+                                          Editar estado
+                                        </button>
+                                      </template>
+
+                                      <!-- Modo edición -->
+                                      <template v-else>
+                                        <div class="px-4 py-2 border-b border-gray-100">
+                                          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Selecciona nuevo estado</p>
+                                        </div>
+                                        <button
+                                          v-for="opcion in ESTADOS_OPCIONES" :key="opcion"
+                                          @click="guardarEstadoContacto(empresa, opcion)"
+                                          :class="[estadoBadge(opcion).bg, estadoBadge(opcion).text, 'hover:opacity-80']"
+                                          class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest border-b border-white/40 last:border-0 transition-opacity"
+                                        >
+                                          <span :class="estadoBadge(opcion).dot" class="w-2 h-2 rounded-full shrink-0"></span>
+                                          {{ opcion }}
+                                        </button>
+                                        <button
+                                          @click="guardarEstadoContacto(empresa, '')"
+                                          class="w-full text-left px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                                        >
+                                          <span class="w-2 h-2 rounded-full shrink-0 bg-gray-300"></span>
+                                          Sin estado
+                                        </button>
+                                      </template>
+
                                     </div>
                                   </Transition>
                                 </div>
@@ -1812,6 +2107,52 @@ function onEmpresaEliminada(data) {
       @empresa-actualizada="onEmpresaActualizada"
     />
 
+    <!-- ════════════ MODAL: CONFIRMAR EDICIÓN DE ESTADO ════ -->
+    <Transition name="modal-fade">
+      <div v-if="mostrarConfirmEstado"
+           class="fixed inset-0 z-[9100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           @click.self="cancelarConfirmEstado">
+        <div class="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-7 border border-gray-100">
+
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-black text-base text-[#1F2937]">Modificar estado de contacto</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Esta acción quedará registrada en la base de datos</p>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 leading-snug">
+              ¿Seguro que quieres modificar el estado de contacto de
+              <span class="font-black">"{{ empresaParaEstado?.nombre_comercial }}"</span>?
+            </p>
+          </div>
+
+          <div class="flex gap-3">
+            <button @click="cancelarConfirmEstado"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200
+                     text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all">
+              No, cancelar
+            </button>
+            <button @click="confirmarEditarEstado"
+              class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white
+                     text-sm font-black hover:bg-[#009950] transition-all shadow-sm">
+              Sí, modificar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ════════════════ MODAL: INFO catálogo fp ════════════════════ -->
+    <CatalogoBoeModal v-model:show="mostrarInfoBoe" />
+
     <!-- ════════════════ SNACKBAR ════════════════ -->
     <Transition name="snack">
       <div
@@ -1864,6 +2205,21 @@ function onEmpresaEliminada(data) {
 .snack-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .snack-enter-from,
 .snack-leave-to     { opacity: 0; transform: translateY(12px) scale(0.95); }
+
+/* Tour spotlight — blur en secciones inactivas */
+.tour-seccion-blur {
+  filter: blur(2px);
+  opacity: 0.4;
+  pointer-events: none;
+  transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+/* Tour — elemento activo resaltado */
+.tour-active {
+  outline: 2px solid #00A859;
+  outline-offset: 4px;
+  border-radius: 1rem;
+}
 
 /* Highlight de búsqueda de empresa */
 @keyframes centro-pulse {

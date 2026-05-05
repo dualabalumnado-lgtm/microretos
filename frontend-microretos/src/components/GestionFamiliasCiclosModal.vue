@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
@@ -62,6 +62,11 @@ const confirmNombreFamilia = ref('')
 const confirmNombreCiclo   = ref('')
 const elimLoading          = ref(false)
 const elimError            = ref('')
+
+const totalFamilias = computed(() => familias.value.length)
+const totalCiclos   = computed(() =>
+  familias.value.reduce((sum, f) => sum + (f.ciclosLoaded ? f.ciclos.length : 0), 0)
+)
 
 const GRADOS = [
   { value: 'Ciclo Formativo de Grado Básico',    siglas: 'FPB' },
@@ -352,6 +357,22 @@ async function guardarNuevoCiclo(familiaId) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
               </button>
+            </div>
+
+            <!-- ══ Contadores ══ -->
+            <div v-if="!cargando && totalFamilias > 0" class="flex items-center gap-2 mb-5 -mt-2">
+              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00A859]/8 border border-[#00A859]/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] shrink-0" />
+                <span class="text-[11px] font-black text-[#00A859]">{{ totalFamilias }}</span>
+                <span class="text-[11px] text-[#00A859]/70">familias</span>
+              </div>
+              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                <span class="text-[11px] font-black text-gray-600">{{ totalCiclos }}</span>
+                <span class="text-[11px] text-gray-400">ciclos</span>
+                <span v-if="!familias.every(f => f.ciclosLoaded)"
+                      class="text-[9px] text-gray-300 ml-0.5">(parcial)</span>
+              </div>
             </div>
 
             <!-- ══ Cargando ══ -->
