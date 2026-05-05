@@ -1,8 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '../api.js'
 import MicroretoModal from '../components/MicroretoModal.vue'
+import BienvenidaModal from '../components/BienvenidaModal.vue'
+import { useUIState } from '../composables/useUIState.js'
+
+const { tourActivo } = useUIState()
 
 const route  = useRoute()
 const router = useRouter()
@@ -235,6 +239,8 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => { tourActivo.value = false })
+
 // ─── Guardar sesión ───────────────────────────────────────────────────────────
 async function guardarSesion() {
   if (!form.value.microreto_titulo || !form.value.fecha) return
@@ -305,35 +311,96 @@ function limpiarFormulario() {
 }
 
 // ─── Modal de bienvenida "¿Qué necesitas?" ───────────────────────────────────
-const guiaBienvenida   = ref(true)
-const modoGuia         = ref(false)
-const pasoGuia         = ref(1)
-const TOTAL_PASOS_GUIA = 3
+const guiaBienvenida = ref(true)
+const modoGuia       = ref(false)
+const pasoGuia       = ref(1)
 
-const guiaPasos = [
-  {
-    titulo: 'Selecciona un microreto',
-    texto:  'Busca y elige el microreto que vas a trabajar con tu grupo. Es el punto de partida de la sesión.',
-  },
-  {
-    titulo: 'Rellena los datos de la sesión',
-    texto:  'Indica la fecha, el centro, el ciclo, el grupo y cualquier nota relevante sobre cómo fue la sesión.',
-  },
-  {
-    titulo: 'Guarda la sesión',
-    texto:  'Pulsa "Registrar sesión" para guardarla. Aparecerá en el panel derecho y quedará disponible para crear microproyectos StartUp Day.',
-  },
+const guiaPasosData = [
+  { ref: 'refMicroreto',     seccion: 'microreto', texto: 'Busca y elige el microreto que vas a trabajar con tu grupo. Este es el punto de partida.' },
+  { ref: 'refCampoFecha',    seccion: 'datos',     texto: 'Indica la fecha en la que se realizó la sesión.' },
+  { ref: 'refCampoCentro',   seccion: 'datos',     texto: 'Indica el centro educativo.' },
+  { ref: 'refCampoAlumnado', seccion: 'datos',     texto: 'Indica la información del alumnado: curso, grupo y número de alumnos.' },
+  { ref: 'refCampoNotas',    seccion: 'datos',     texto: 'Indica cualquier nota relevante sobre la sesión.' },
+  { ref: 'refBtnGuardar',    seccion: 'datos',     texto: 'Pulsa guardar sesión para registrar la información.' },
+  { ref: 'refSesiones',      seccion: 'sesiones',  texto: 'Quedará disponible para crear el microproyecto y comenzar el taller de ideas, o consultar esta info más adelante.' },
+  { ref: 'refBtnGuia',       seccion: null,        texto: 'Pincha aquí para volver a activar la guía cuando quieras.' },
 ]
+
+const TOTAL_PASOS_GUIA = guiaPasosData.length
+
+// Template refs para el tour
+const refMicroreto     = ref(null)
+const refCampoFecha    = ref(null)
+const refCampoCentro   = ref(null)
+const refCampoAlumnado = ref(null)
+const refCampoNotas    = ref(null)
+const refBtnGuardar    = ref(null)
+const refSesiones      = ref(null)
+const refBtnGuia       = ref(null)
+
+const tourRefs = { refMicroreto, refCampoFecha, refCampoCentro, refCampoAlumnado, refCampoNotas, refBtnGuardar, refSesiones, refBtnGuia }
+
+const tourTargetActivo = computed(() => {
+  if (!modoGuia.value) return null
+  return guiaPasosData[pasoGuia.value - 1]?.ref ?? null
+})
+
+const seccionActiva = computed(() => {
+  if (!modoGuia.value) return null
+  return guiaPasosData[pasoGuia.value - 1]?.seccion ?? null
+})
+
+const bocadilloPos = ref({ top: 0, left: 0, arrowLeft: 130, dir: 'top' })
+
+function recalcularBocadillo() {
+  const paso = guiaPasosData[pasoGuia.value - 1]
+  if (!paso) return
+  const el = tourRefs[paso.ref]?.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const TOOLTIP_W = 272
+  const TOOLTIP_H = 155
+  const MARGIN    = 12
+  const WIN_W = window.innerWidth
+  const WIN_H = window.innerHeight
+
+  // Usar sólo la parte visible del elemento en el viewport
+  const visibleTop    = Math.max(0, rect.top)
+  const visibleBottom = Math.min(WIN_H, rect.bottom)
+  const centerX       = rect.left + rect.width / 2
+
+  let tooltipLeft = centerX - TOOLTIP_W / 2
+  tooltipLeft = Math.max(10, Math.min(tooltipLeft, WIN_W - TOOLTIP_W - 10))
+  const arrowLeft = Math.max(18, Math.min(centerX - tooltipLeft, TOOLTIP_W - 18))
+
+  let dir, tooltipTop
+  if (WIN_H - visibleBottom > TOOLTIP_H + MARGIN) {
+    // Hay espacio debajo de la parte visible → bocadillo abajo
+    dir = 'top'
+    tooltipTop = visibleBottom + MARGIN
+  } else if (visibleTop > TOOLTIP_H + MARGIN) {
+    // Hay espacio arriba de la parte visible → bocadillo arriba
+    dir = 'bottom'
+    tooltipTop = visibleTop - MARGIN - TOOLTIP_H
+  } else {
+    // Fallback: posicionar en el 60% del viewport
+    dir = 'top'
+    tooltipTop = WIN_H * 0.6
+  }
+  // Clamp final para garantizar que siempre queda dentro del viewport
+  tooltipTop = Math.max(10, Math.min(tooltipTop, WIN_H - TOOLTIP_H - 10))
+
+  bocadilloPos.value = { top: tooltipTop, left: tooltipLeft, arrowLeft, dir }
+}
 
 function seleccionarOpcionBienvenida(opcion) {
   guiaBienvenida.value = false
   if (opcion === 'sesiones') {
     router.push({ name: 'sesiones-registradas' })
   } else if (opcion === 'guia') {
-    modoGuia.value  = true
-    pasoGuia.value  = 1
+    modoGuia.value = true
+    pasoGuia.value = 1
   }
-  // 'crear' → se queda en la vista normal
 }
 
 function avanzarGuia() {
@@ -347,6 +414,34 @@ function avanzarGuia() {
 function saltarGuia() {
   modoGuia.value = false
 }
+
+function scrollYRecalcular() {
+  const paso = guiaPasosData[pasoGuia.value - 1]
+  const el = tourRefs[paso?.ref]?.value
+  if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
+  // doble rAF: garantiza que el navegador ha pintado tras el scroll antes de medir
+  requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+}
+
+watch(pasoGuia, async () => {
+  await nextTick()
+  scrollYRecalcular()
+})
+
+watch(modoGuia, async (v) => {
+  tourActivo.value = v
+  if (v) {
+    await nextTick()
+    scrollYRecalcular()
+  }
+})
+
+// Mostrar bienvenida de nuevo cuando se vuelve a navegar al dashboard
+onBeforeRouteUpdate(() => {
+  guiaBienvenida.value = true
+  modoGuia.value = false
+  pasoGuia.value = 1
+})
 
 // ─── Modal ficha de microreto ─────────────────────────────────────────────────
 const microretoModalId = ref(null)
@@ -416,134 +511,69 @@ function formatFecha(isoDate) {
   <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
 
     <!-- ══════════ MODAL BIENVENIDA "¿QUÉ NECESITAS?" ══════════════════════════ -->
+    <BienvenidaModal :show="guiaBienvenida" @seleccionar="seleccionarOpcionBienvenida" />
+
+    <!-- ══════════ TOUR BOCADILLO - OVERLAY + TOOLTIP ════════════════════════ -->
     <Transition name="sp-fade">
-      <div v-if="guiaBienvenida"
-           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="relative bg-[#1a2332] border border-white/10 rounded-[2rem]
-                    shadow-2xl max-w-md w-full p-8 text-white">
+      <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
+        <!-- Click-catcher transparente para cerrar con clic fuera -->
+        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
 
-          <!-- Cabecera -->
-          <div class="flex items-center gap-3 mb-6">
-            <div class="w-12 h-12 rounded-2xl bg-[#00A859]/15 border border-[#00A859]/30
-                        flex items-center justify-center shrink-0">
-              <svg class="w-6 h-6 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
-                     M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-              </svg>
+        <!-- Bocadillo flotante posicionado sobre el elemento activo -->
+        <div class="absolute pointer-events-auto"
+             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: '272px', zIndex: 9992 }">
+
+          <!-- Flecha apuntando arriba (bocadillo debajo del elemento) -->
+          <div v-if="bocadilloPos.dir === 'top'"
+               class="absolute -top-[10px] w-0 h-0"
+               :style="{
+                 left: bocadilloPos.arrowLeft + 'px',
+                 transform: 'translateX(-50%)',
+                 borderLeft: '9px solid transparent',
+                 borderRight: '9px solid transparent',
+                 borderBottom: '10px solid #1a2332'
+               }" />
+
+          <!-- Contenido -->
+          <div class="bg-[#1a2332] border border-white/15 rounded-2xl shadow-2xl p-4 text-white">
+            <!-- Progreso -->
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex gap-1 items-center">
+                <span v-for="i in TOTAL_PASOS_GUIA" :key="i"
+                      class="h-[3px] rounded-full transition-all duration-300"
+                      :class="i <= pasoGuia ? 'bg-[#00A859] w-5' : 'bg-white/20 w-3'" />
+              </div>
+              <span class="text-[9px] font-bold text-white/40">{{ pasoGuia }}/{{ TOTAL_PASOS_GUIA }}</span>
             </div>
-            <div>
-              <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-0.5">Dashboard docente</p>
-              <h2 class="text-xl font-black tracking-tight">¿Qué necesitas?</h2>
+
+            <p class="text-[11px] text-white/85 leading-relaxed mb-3">{{ guiaPasosData[pasoGuia - 1].texto }}</p>
+
+            <div class="flex items-center gap-2">
+              <button @click="avanzarGuia"
+                      class="flex-1 py-1.5 rounded-xl bg-[#00A859] text-white
+                             text-[9px] font-black uppercase tracking-widest
+                             hover:bg-[#00A859]/90 transition-all">
+                {{ pasoGuia < TOTAL_PASOS_GUIA ? 'Siguiente →' : 'Finalizar' }}
+              </button>
+              <button @click="saltarGuia"
+                      class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10
+                             text-white/40 text-[9px] font-black uppercase tracking-widest
+                             hover:text-white/60 transition-all">
+                Saltar
+              </button>
             </div>
           </div>
 
-          <!-- Opciones -->
-          <div class="space-y-3 mb-6">
-
-            <!-- a) Crear sesión -->
-            <button @click="seleccionarOpcionBienvenida('crear')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-[#00A859]/10 hover:border-[#00A859]/30
-                           transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-[#00A859]/15 border border-[#00A859]/25
-                          flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-[#00A859]/25 transition-colors">
-                <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-                </svg>
-              </div>
-              <div>
-                <p class="font-black text-white text-sm mb-0.5">Crear una sesión</p>
-                <p class="text-xs text-white/50 leading-relaxed">Registra una nueva sesión de trabajo con un microreto.</p>
-              </div>
-            </button>
-
-            <!-- b) Ver sesiones creadas -->
-            <button @click="seleccionarOpcionBienvenida('sesiones')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-[#99CC33]/10 hover:border-[#99CC33]/30
-                           transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-[#99CC33]/15 border border-[#99CC33]/25
-                          flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-[#99CC33]/25 transition-colors">
-                <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                </svg>
-              </div>
-              <div>
-                <p class="font-black text-white text-sm mb-0.5">Ver sesiones creadas</p>
-                <p class="text-xs text-white/50 leading-relaxed">Consulta el historial de sesiones ya registradas.</p>
-              </div>
-            </button>
-
-            <!-- c) Vista general con guía -->
-            <button @click="seleccionarOpcionBienvenida('guia')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/30
-                           transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25
-                          flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-blue-500/25 transition-colors">
-                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="font-black text-white text-sm mb-0.5">Vista general <span class="text-blue-400 font-normal text-xs ml-1">+ guía</span></p>
-                <p class="text-xs text-white/50 leading-relaxed">Explora el dashboard con una guía paso a paso.</p>
-              </div>
-            </button>
-
-          </div>
-
-          <button @click="seleccionarOpcionBienvenida('crear')"
-                  class="w-full text-center text-[10px] font-bold text-white/25
-                         hover:text-white/50 transition-colors py-1">
-            Saltar
-          </button>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- ══════════ OVERLAY GUÍA PASO A PASO ══════════════════════════════════ -->
-    <Transition name="sp-fade">
-      <div v-if="modoGuia"
-           class="fixed inset-0 z-[9990] pointer-events-none">
-        <!-- Capa oscura semitransparente -->
-        <div class="absolute inset-0 bg-black/50 pointer-events-auto" @click="saltarGuia" />
-
-        <!-- Tooltip de guía flotante (esquina inferior derecha) -->
-        <div class="absolute bottom-8 right-8 max-w-xs pointer-events-auto
-                    bg-[#1a2332] border border-white/15 rounded-[1.5rem] shadow-2xl p-5 text-white">
-          <!-- Progreso -->
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex gap-1">
-              <span v-for="i in TOTAL_PASOS_GUIA" :key="i"
-                    :class="['w-5 h-1 rounded-full transition-colors', i <= pasoGuia ? 'bg-[#00A859]' : 'bg-white/20']" />
-            </div>
-            <span class="text-[10px] font-bold text-white/40">{{ pasoGuia }}/{{ TOTAL_PASOS_GUIA }}</span>
-          </div>
-
-          <h3 class="font-black text-sm text-white mb-1.5">{{ guiaPasos[pasoGuia - 1].titulo }}</h3>
-          <p class="text-xs text-white/60 leading-relaxed mb-4">{{ guiaPasos[pasoGuia - 1].texto }}</p>
-
-          <div class="flex items-center gap-2">
-            <button @click="avanzarGuia"
-                    class="flex-1 py-2 rounded-xl bg-[#00A859] text-white
-                           text-[10px] font-black uppercase tracking-widest
-                           hover:bg-[#00A859]/90 transition-all">
-              {{ pasoGuia < TOTAL_PASOS_GUIA ? 'Siguiente →' : 'Finalizar' }}
-            </button>
-            <button @click="saltarGuia"
-                    class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/40
-                           text-[10px] font-black uppercase tracking-widest
-                           hover:text-white/60 transition-all">
-              Saltar
-            </button>
-          </div>
+          <!-- Flecha apuntando abajo (bocadillo encima del elemento) -->
+          <div v-if="bocadilloPos.dir === 'bottom'"
+               class="absolute -bottom-[10px] w-0 h-0"
+               :style="{
+                 left: bocadilloPos.arrowLeft + 'px',
+                 transform: 'translateX(-50%)',
+                 borderLeft: '9px solid transparent',
+                 borderRight: '9px solid transparent',
+                 borderTop: '10px solid #1a2332'
+               }" />
         </div>
       </div>
     </Transition>
@@ -570,7 +600,7 @@ function formatFecha(isoDate) {
           </div>
 
           <!-- Stats chips -->
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-3 items-center">
             <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
               <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -580,6 +610,19 @@ function formatFecha(isoDate) {
               <span class="font-black text-xl text-[#1F2937]">{{ sesiones.length }}</span>
               <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">sesiones</span>
             </div>
+
+            <!-- Botón activar guía -->
+            <button ref="refBtnGuia"
+                    @click="modoGuia = true; pasoGuia = 1"
+                    class="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-2xl border border-blue-100
+                           shadow-sm text-blue-500 text-xs font-black uppercase tracking-wider
+                           hover:bg-blue-100 hover:border-blue-200 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Activar Guía
+            </button>
             <div v-if="microretoSeleccionado"
                  class="flex items-center gap-2 px-4 py-2 bg-[#00A859]/5 rounded-2xl border border-[#00A859]/20 shadow-sm">
               <span class="w-2 h-2 rounded-full bg-[#00A859]" />
@@ -597,7 +640,12 @@ function formatFecha(isoDate) {
         <div class="lg:col-span-3 space-y-4">
 
           <!-- ══ SELECTOR DE MICRORETO ══════════════════════════════════════ -->
-          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div ref="refMicroreto"
+               class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden"
+               :class="{
+                 'tour-active':      tourTargetActivo === 'refMicroreto',
+                 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'microreto'
+               }">
             <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
                 Microreto a trabajar
@@ -916,7 +964,8 @@ function formatFecha(isoDate) {
           </div>
 
           <!-- ══ DATOS DE LA SESIÓN ══════════════════════════════════════════ -->
-          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden"
+               :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'datos' }">
             <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
                 Datos de la sesión
@@ -933,12 +982,14 @@ function formatFecha(isoDate) {
             </div>
             <div class="px-6 py-5 space-y-4">
 
-              <div>
+              <div ref="refCampoFecha" :class="{ 'tour-active': tourTargetActivo === 'refCampoFecha' }"
+                   class="rounded-xl transition-all">
                 <label class="field-label">Fecha de trabajo <span class="text-red-400">*</span></label>
                 <input v-model="form.fecha" type="date" class="field-input" />
               </div>
 
-              <div>
+              <div ref="refCampoCentro" :class="{ 'tour-active': tourTargetActivo === 'refCampoCentro' }"
+                   class="rounded-xl transition-all">
                 <label class="field-label flex items-center gap-2">
                   Centro educativo
                   <span v-if="autocompletados.centro_educativo"
@@ -970,50 +1021,53 @@ function formatFecha(isoDate) {
                 </datalist>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="field-label flex items-center gap-2">
-                    Curso
-                    <span v-if="autocompletados.curso"
-                          class="text-[8px] font-black bg-[#00A859]/10 text-[#00A859] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
-                      Auto
-                    </span>
-                  </label>
-                  <div class="flex gap-2 mt-1">
-                    <button v-for="c in ['1º', '2º']" :key="c"
-                            @click="form.curso = c; autocompletados.curso = false"
-                            class="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest
-                                   border transition-all"
-                            :class="form.curso === c
-                              ? 'bg-[#00A859] border-[#00A859] text-white shadow-sm'
-                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#00A859]/40 hover:text-[#00A859]'">
-                      {{ c }}
-                    </button>
+              <div ref="refCampoAlumnado" class="space-y-4 rounded-xl transition-all"
+                   :class="{ 'tour-active': tourTargetActivo === 'refCampoAlumnado' }">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="field-label flex items-center gap-2">
+                      Curso
+                      <span v-if="autocompletados.curso"
+                            class="text-[8px] font-black bg-[#00A859]/10 text-[#00A859] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                        Auto
+                      </span>
+                    </label>
+                    <div class="flex gap-2 mt-1">
+                      <button v-for="c in ['1º', '2º']" :key="c"
+                              @click="form.curso = c; autocompletados.curso = false"
+                              class="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest
+                                     border transition-all"
+                              :class="form.curso === c
+                                ? 'bg-[#00A859] border-[#00A859] text-white shadow-sm'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#00A859]/40 hover:text-[#00A859]'">
+                        {{ c }}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Grupo</label>
+                    <div class="flex gap-1.5 mt-1 flex-wrap">
+                      <button v-for="g in ['A', 'B', 'C', 'D']" :key="g"
+                              @click="form.grupo = g"
+                              class="flex-1 min-w-[2rem] py-2 rounded-xl text-xs font-black uppercase
+                                     border transition-all"
+                              :class="form.grupo === g
+                                ? 'bg-[#99CC33] border-[#99CC33] text-white shadow-sm'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#99CC33]/40 hover:text-[#99CC33]'">
+                        {{ g }}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <label class="field-label">Grupo</label>
-                  <div class="flex gap-1.5 mt-1 flex-wrap">
-                    <button v-for="g in ['A', 'B', 'C', 'D']" :key="g"
-                            @click="form.grupo = g"
-                            class="flex-1 min-w-[2rem] py-2 rounded-xl text-xs font-black uppercase
-                                   border transition-all"
-                            :class="form.grupo === g
-                              ? 'bg-[#99CC33] border-[#99CC33] text-white shadow-sm'
-                              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-[#99CC33]/40 hover:text-[#99CC33]'">
-                      {{ g }}
-                    </button>
-                  </div>
+                  <label class="field-label">Número de alumnos</label>
+                  <input v-model="form.num_alumnos" type="number" min="1" max="99"
+                         placeholder="Ej. 24" class="field-input w-32" />
                 </div>
               </div>
 
-              <div>
-                <label class="field-label">Número de alumnos</label>
-                <input v-model="form.num_alumnos" type="number" min="1" max="99"
-                       placeholder="Ej. 24" class="field-input w-32" />
-              </div>
-
-              <div>
+              <div ref="refCampoNotas" class="rounded-xl transition-all"
+                   :class="{ 'tour-active': tourTargetActivo === 'refCampoNotas' }">
                 <label class="field-label">Notas adicionales</label>
                 <textarea v-model="form.notas" rows="3"
                           placeholder="Observaciones, adaptaciones realizadas, valoración..."
@@ -1022,7 +1076,9 @@ function formatFecha(isoDate) {
 
             </div>
 
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
+            <div ref="refBtnGuardar"
+                 class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4 rounded-b-[1.5rem] transition-all"
+                 :class="{ 'tour-active': tourTargetActivo === 'refBtnGuardar' }">
               <p class="text-[10px] text-gray-400 font-medium">
                 La sesión se guarda en la base de datos.
               </p>
@@ -1053,8 +1109,11 @@ function formatFecha(isoDate) {
         </div>
 
         <!-- ─── COLUMNA DERECHA: Historial ──────────────────────────────── -->
-        <div class="lg:col-span-2">
-          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6">
+        <div class="lg:col-span-2 transition-all"
+             :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'sesiones' }">
+          <div ref="refSesiones"
+               class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6"
+               :class="{ 'tour-active': tourTargetActivo === 'refSesiones' }">
 
             <!-- Cabecera -->
             <div class="px-5 py-4 border-b border-gray-50">
@@ -1067,22 +1126,30 @@ function formatFecha(isoDate) {
                   {{ sesiones.length }}
                 </span>
               </div>
-              <!-- Botón ver todas -->
-              <button v-if="sesiones.length > 0"
-                      @click="router.push('/dashboard/sesiones')"
-                      class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-                             bg-[#00A859]/8 border border-[#00A859]/20 text-[#00A859]
-                             text-[9px] font-black uppercase tracking-widest
-                             hover:bg-[#00A859]/15 transition-all">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                </svg>
-                Ver todas las sesiones
-                <svg class="w-3 h-3 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </button>
+              <!-- Botones de acción siempre visibles -->
+              <div class="grid grid-cols-2 gap-2">
+                <button @click="router.push('/dashboard/sesiones')"
+                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                               bg-[#00A859]/8 border text-[#00A859]
+                               text-[9px] font-black uppercase tracking-widest
+                               hover:bg-[#00A859]/15 transition-all">
+                  <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                  </svg>
+                  Ver sesiones
+                </button>
+                <button @click="router.push({ name: 'startup-day-crear' })"
+                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                               bg-[#99CC33]/10 border text-[#5a7a00]
+                               text-[9px] font-black uppercase tracking-widest
+                               hover:bg-[#99CC33]/20 transition-all">
+                  <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                  Nuevo proyecto
+                </button>
+              </div>
             </div>
 
             <!-- Filtros compactos -->
@@ -1189,28 +1256,6 @@ function formatFecha(isoDate) {
                     </div>
                   </div>
                   <div class="flex flex-col items-end gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                    <button v-if="s.microreto_id"
-                            @click.stop="router.push({ name: 'startup-day-crear', query: { microreto_id: s.microreto_id, sesion_id: s.id } })"
-                            class="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[#99CC33]/15 text-[#5a7a00]
-                                   text-[8px] font-black uppercase tracking-widest hover:bg-[#99CC33]/25 transition-all"
-                            title="Crear microproyecto StartupDay">
-                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                      </svg>
-                      Proyecto
-                    </button>
-                    <button v-if="s.microreto_id"
-                            @click.stop="abrirMicroretoModal(s.microreto_id)"
-                            class="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-[#00A859]/10 text-[#00A859]
-                                   text-[8px] font-black uppercase tracking-widest hover:bg-[#00A859]/20 transition-all"
-                            title="Ver ficha del microreto">
-                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
-                                 a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                      </svg>
-                      Ficha
-                    </button>
                     <button @click.stop="eliminarSesion(s.id)"
                             class="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
                             title="Eliminar">
@@ -1430,6 +1475,25 @@ select.field-input { cursor: pointer; }
 .tag-green { background: rgba(0,168,89,0.1); color: #00A859; }
 .tag-lime  { background: rgba(153,204,51,0.12); color: #5a7a00; }
 .tag-amber { background: rgba(251,191,36,0.12); color: #92400e; }
+
+/* Tour: sección activa */
+.tour-active {
+  box-shadow: 0 0 0 3px #00A859, 0 0 0 8px rgba(0, 168, 89, 0.2), 0 4px 20px rgba(0,0,0,0.1) !important;
+  border-radius: 0.75rem;
+  transition: box-shadow 0.25s ease;
+}
+
+/* Tour: secciones inactivas se desvanecen y desenfocadas */
+.tour-seccion-blur {
+  filter: blur(2px);
+  opacity: 0.4;
+  pointer-events: none;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+/* sp-fade transition (overlay y bocadillo) */
+.sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
+.sp-fade-enter-from, .sp-fade-leave-to { opacity: 0; }
 
 /* Modal animation */
 .modal-fade-enter-active,
