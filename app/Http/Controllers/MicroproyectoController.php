@@ -73,18 +73,31 @@ class MicroproyectoController extends Controller
 
     public function showByToken($token)
     {
-        $proyecto = Microproyecto::where('token_empresa', $token)
+        $proyecto = Microproyecto::with('recursos')
+            ->where('token_empresa', $token)
             ->where('estado', 'publicado')
             ->firstOrFail();
 
+        $formato = fn($r) => [
+            'url'           => $r->url,
+            'public_id'     => $r->public_id,
+            'resource_type' => $r->resource_type,
+            'filename'      => $r->filename,
+            'label'         => $r->label ?? '',
+        ];
+
         return response()->json([
-            'uuid'            => $proyecto->uuid,
-            'titulo'          => $proyecto->titulo,
-            'datos_empresa'   => $proyecto->datos_empresa,
-            'diseno_reto'     => $proyecto->diseno_reto,
-            'objetivos'       => $proyecto->objetivos,
-            'equipo'          => $proyecto->equipo,
-            'empresa_validado'=> $proyecto->empresa_validado,
+            'uuid'               => $proyecto->uuid,
+            'titulo'             => $proyecto->titulo,
+            'datos_empresa'      => $proyecto->datos_empresa,
+            'diseno_reto'        => $proyecto->diseno_reto,
+            'objetivos'          => $proyecto->objetivos,
+            'equipo'             => $proyecto->equipo,
+            'recursos'           => [
+                'videos'     => $proyecto->recursos->where('tipo', 'video')->map($formato)->values(),
+                'documentos' => $proyecto->recursos->where('tipo', 'documento')->map($formato)->values(),
+            ],
+            'empresa_validado'   => $proyecto->empresa_validado,
             'validacion_empresa' => $proyecto->validacion_empresa,
         ]);
     }

@@ -96,6 +96,90 @@ const form = ref({
   estado: 'borrador',
 });
 
+// ── Estado local de recursos (no se guarda en BD — vive en Cloudinary) ────────
+const videosLocales     = ref([])
+const documentosLocales = ref([])
+
+// ── Helpers recursos (Cloudinary) ────────────────────────────────────────────
+const labelVideo     = ref('')
+const labelDocumento = ref('')
+const subiendoVideo  = ref(false)
+const subiendoDoc    = ref(false)
+const errorSubida    = ref('')
+
+// Subida genérica — etiqueta el archivo con el UUID del microproyecto en Cloudinary
+async function subirArchivo(tipo, event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  if (!uuid.value) {
+    errorSubida.value = 'Guarda el proyecto al menos una vez antes de adjuntar archivos.'
+    return
+  }
+
+  const esvideo = tipo === 'video'
+  if (esvideo) subiendoVideo.value = true
+  else         subiendoDoc.value   = true
+  errorSubida.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('microproyecto_uuid', uuid.value)
+    formData.append('tipo', tipo)
+    const etiqueta = esvideo ? labelVideo.value : labelDocumento.value
+    if (etiqueta) formData.append('label', etiqueta)
+
+    const res = await api.post('/upload/recurso', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const entrada = {
+      label:         res.data.label || res.data.filename,
+      url:           res.data.url,
+      public_id:     res.data.public_id,
+      resource_type: res.data.resource_type,
+      filename:      res.data.filename,
+    }
+    if (esvideo) {
+      videosLocales.value.push(entrada)
+      labelVideo.value = ''
+    } else {
+      documentosLocales.value.push(entrada)
+      labelDocumento.value = ''
+    }
+  } catch (e) {
+    errorSubida.value = e.response?.data?.message || 'Error al subir el archivo a Cloudinary.'
+  } finally {
+    if (esvideo) subiendoVideo.value = false
+    else         subiendoDoc.value   = false
+    if (event.target) event.target.value = ''
+  }
+}
+
+async function removeDocumento(i) {
+  const doc = documentosLocales.value[i]
+  documentosLocales.value.splice(i, 1)
+  if (doc?.public_id) {
+    try {
+      await api.delete('/upload/recurso', {
+        data: { public_id: doc.public_id, resource_type: doc.resource_type || 'raw' },
+      })
+    } catch { /* si falla el borrado remoto, no bloqueamos al usuario */ }
+  }
+}
+
+async function removeVideo(i) {
+  const vid = videosLocales.value[i]
+  videosLocales.value.splice(i, 1)
+  if (vid?.public_id) {
+    try {
+      await api.delete('/upload/recurso', {
+        data: { public_id: vid.public_id, resource_type: vid.resource_type || 'video' },
+      })
+    } catch { /* idem */ }
+  }
+}
+
 // ── Helpers equipo ────────────────────────────────────────────────────────────
 const nuevoAlumno = ref({ nombre: '', rol: '' });
 function addAlumno() {
@@ -265,8 +349,11 @@ async function cargarProyecto() {
   if (!uuid.value) return;
   cargando.value = true;
   try {
-    const res = await api.get(`/startup/proyectos/${uuid.value}`);
-    const p   = res.data;
+    const [proyRes, recRes] = await Promise.all([
+      api.get(`/startup/proyectos/${uuid.value}`),
+      api.get('/upload/recursos', { params: { microproyecto: uuid.value } }),
+    ]);
+    const p = proyRes.data;
     paso.value = p.paso_actual || 1;
     Object.assign(form.value, {
       titulo: p.titulo || '', empresa_id: p.empresa_id || '',
@@ -285,6 +372,9 @@ async function cargarProyecto() {
       ...(p.objetivos        && { objetivos: p.objetivos }),
       ...(p.kpis             && { kpis: p.kpis }),
     });
+    // Recursos viven en Cloudinary — se cargan aparte
+    videosLocales.value     = recRes.data.videos    || [];
+    documentosLocales.value = recRes.data.documentos || [];
   } finally {
     cargando.value = false;
   }
@@ -354,7 +444,7 @@ const pasos = [
        style="transition: opacity 0.4s ease, transform 0.4s ease">
 
     <!-- Fondo decorativo -->
-    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px]
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-175 h-100
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
 
     <!-- Barra de progreso superior -->
@@ -380,7 +470,7 @@ const pasos = [
 
         <!-- Barra progreso -->
         <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
-          <div class="h-full bg-gradient-to-r from-[#00A859] to-[#99CC33] rounded-full transition-all duration-500"
+          <div class="h-full bg-linear-to-r from-[#00A859] to-[#99CC33] rounded-full transition-all duration-500"
                :style="{ width: progreso + '%' }"/>
         </div>
 
@@ -389,7 +479,7 @@ const pasos = [
           <button v-for="p in pasos" :key="p.num"
                   @click="p.num < paso && (paso = p.num)"
                   :class="[
-                    'flex-1 min-w-[52px] py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
+                    'flex-1 min-w-13 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                     p.num === paso
                       ? 'bg-[#00A859]/10 text-[#00A859] border border-[#00A859]/30'
                       : p.num < paso
@@ -452,7 +542,7 @@ const pasos = [
 
           <!-- Sin sesiones (solo en creación) -->
           <div v-if="!uuid && !sesiones.length"
-               class="bg-amber-50 border border-amber-200 rounded-[2rem] p-6 flex items-start gap-4">
+               class="bg-amber-50 border border-amber-200 rounded-4xl p-6 flex items-start gap-4">
             <svg class="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -474,7 +564,7 @@ const pasos = [
 
             <!-- Modo edición: sesión vinculada (read-only) -->
             <div v-if="uuid && sesionSeleccionada"
-                 class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 mb-4">
+                 class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 mb-4">
               <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Sesión de trabajo vinculada</p>
               <div class="rounded-2xl border border-[#99CC33]/30 bg-[#99CC33]/5 p-4">
                 <p class="text-sm font-black text-[#1F2937]">{{ sesionSeleccionada.microreto_titulo }}</p>
@@ -489,7 +579,7 @@ const pasos = [
 
             <!-- Modo edición sin sesión (proyecto legacy) -->
             <div v-else-if="uuid && !sesionSeleccionada && form.microreto_id"
-                 class="bg-amber-50 border border-amber-100 rounded-[2rem] p-5 mb-4 flex items-start gap-3">
+                 class="bg-amber-50 border border-amber-100 rounded-4xl p-5 mb-4 flex items-start gap-3">
               <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -502,7 +592,7 @@ const pasos = [
 
             <!-- Modo creación: selector de sesión -->
             <div v-else-if="!uuid"
-                 class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-3 mb-4">
+                 class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-3 mb-4">
               <div class="flex items-start gap-3 pb-3 border-b border-gray-100">
                 <div class="w-8 h-8 rounded-xl bg-[#99CC33]/15 border border-[#99CC33]/30
                             flex items-center justify-center shrink-0">
@@ -587,7 +677,7 @@ const pasos = [
             </div>
 
             <!-- Resto de campos básicos -->
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-5"
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-5"
                  :class="(!uuid && !sesionSeleccionada) ? 'opacity-50 pointer-events-none select-none' : ''">
               <div>
                 <label class="field-label">Título del microproyecto *</label>
@@ -684,7 +774,7 @@ const pasos = [
             <p class="text-gray-500 text-sm mt-1">Confirma o completa la información de la empresa colaboradora.</p>
           </div>
 
-          <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+          <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
             <div class="grid sm:grid-cols-2 gap-4">
               <div><label class="field-label">Nombre / Razón social</label><input v-model="form.datos_empresa.nombre" type="text" class="field-input" /></div>
               <div><label class="field-label">CIF</label><input v-model="form.datos_empresa.cif" type="text" class="field-input" /></div>
@@ -719,7 +809,7 @@ const pasos = [
           </div>
 
           <div class="space-y-4">
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Centro educativo</p>
               <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="field-label">Nombre del centro</label><input v-model="form.datos_centro.nombre" type="text" class="field-input" /></div>
@@ -729,7 +819,7 @@ const pasos = [
               </div>
             </div>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Equipo de alumnado</p>
               <div class="flex gap-2">
                 <input v-model="nuevoAlumno.nombre" type="text" placeholder="Nombre del alumno/a"
@@ -799,7 +889,7 @@ const pasos = [
               </div>
             </Transition>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Módulos formativos</p>
               <div v-if="!modulos.length" class="text-center py-8 text-gray-400 text-sm">
                 {{ form.ciclo_id ? 'Cargando módulos…' : 'Selecciona un ciclo en el paso 1 para ver los módulos' }}
@@ -818,7 +908,7 @@ const pasos = [
               </div>
             </div>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6">
               <div class="flex items-start justify-between gap-3 mb-3">
                 <label class="field-label">Resultados de Aprendizaje y Criterios de Evaluación</label>
                 <!-- Badge autocompletado -->
@@ -883,7 +973,7 @@ const pasos = [
           </div>
 
           <div class="space-y-4">
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Fundamentación</p>
               <div><label class="field-label">Contexto del proyecto</label>
                 <textarea v-model="form.fundamentacion.contexto" rows="3" class="field-input resize-none"
@@ -896,7 +986,7 @@ const pasos = [
                           placeholder="¿Qué tiene de innovador este microproyecto?" /></div>
             </div>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Diseño del reto</p>
               <div><label class="field-label">Descripción del reto *</label>
                 <textarea v-model="form.diseno_reto.descripcion" rows="3" class="field-input resize-none" required
@@ -930,7 +1020,7 @@ const pasos = [
           </div>
 
           <div class="space-y-4">
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Fases del proyecto</p>
               <div class="space-y-2">
                 <div class="flex gap-2">
@@ -961,7 +1051,7 @@ const pasos = [
               <p v-else class="text-xs text-gray-400 italic">Todavía no hay fases definidas</p>
             </div>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <div><label class="field-label">Metodología</label>
                 <textarea v-model="form.diseno_microproyecto.metodologia" rows="3" class="field-input resize-none"
                           placeholder="Describe cómo se organizará el trabajo del equipo…" /></div>
@@ -991,7 +1081,7 @@ const pasos = [
           </div>
 
           <div class="space-y-4">
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-3">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-3">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Objetivos</p>
               <div class="flex gap-2">
                 <input v-model="nuevoObjetivo" type="text" placeholder="Añadir objetivo…"
@@ -1011,7 +1101,7 @@ const pasos = [
               <p v-else class="text-xs text-gray-400 italic">Añade al menos un objetivo</p>
             </div>
 
-            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-3">
+            <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-3">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Indicadores de éxito (KPIs)</p>
               <div class="flex gap-2">
                 <input v-model="nuevoKpi" type="text" placeholder="Añadir KPI o indicador…"
@@ -1049,7 +1139,7 @@ const pasos = [
           </div>
 
           <!-- Resumen -->
-          <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 mb-4">
+          <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 mb-4">
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Resumen del microproyecto</p>
             <div class="grid sm:grid-cols-2 gap-4 text-sm">
               <div class="p-3 bg-gray-50 rounded-2xl">
@@ -1079,7 +1169,135 @@ const pasos = [
             </div>
           </div>
 
-          <div class="bg-[#00A859]/8 border border-[#00A859]/20 rounded-[2rem] p-5 mb-5">
+          <!-- Recursos: vídeos y documentos para la empresa (almacenados en Cloudinary) -->
+          <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 mb-4">
+            <div class="flex items-center gap-3 mb-1">
+              <div class="w-8 h-8 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20
+                          flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859]">Recursos para la empresa</p>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Los archivos se suben a <strong>Cloudinary</strong>. La empresa los verá al abrir el enlace de validación.
+                </p>
+              </div>
+            </div>
+
+            <!-- Error de subida global -->
+            <Transition enter-active-class="transition-all duration-200" enter-from-class="opacity-0 -translate-y-1">
+              <p v-if="errorSubida" class="mt-3 text-xs text-red-500 font-medium">{{ errorSubida }}</p>
+            </Transition>
+
+            <div class="mt-5 space-y-5">
+
+              <!-- ── VÍDEOS ─────────────────────────────────────────── -->
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-3">Vídeos</p>
+
+                <!-- Lista -->
+                <div v-if="videosLocales.length" class="space-y-2 mb-3">
+                  <div v-for="(v, i) in videosLocales" :key="i"
+                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                    <div class="w-7 h-7 rounded-lg bg-blue-50 shrink-0 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-bold text-gray-700 truncate">{{ v.label || v.filename }}</p>
+                      <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ v.filename }}</p>
+                    </div>
+                    <button @click="removeVideo(i)"
+                            class="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-colors shrink-0">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Uploader -->
+                <div class="flex gap-2 items-center">
+                  <input v-model="labelVideo" type="text" placeholder="Nombre del vídeo (opcional)"
+                         class="w-44 shrink-0 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs
+                                text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#00A859] transition-colors"/>
+                  <label class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                                border-2 border-dashed border-gray-200 bg-gray-50
+                                cursor-pointer hover:border-[#00A859]/40 hover:bg-[#00A859]/5 transition-all"
+                         :class="subiendoVideo ? 'opacity-50 pointer-events-none' : ''">
+                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <span class="text-xs text-gray-400 font-medium">
+                      {{ subiendoVideo ? 'Subiendo vídeo...' : 'Seleccionar vídeo (MP4, MOV, AVI, WebM...)' }}
+                    </span>
+                    <input type="file" accept="video/*"
+                           class="sr-only" @change="subirArchivo('video', $event)" :disabled="subiendoVideo"/>
+                  </label>
+                </div>
+              </div>
+
+              <!-- ── DOCUMENTOS ─────────────────────────────────────── -->
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-3">Documentos</p>
+
+                <!-- Lista -->
+                <div v-if="documentosLocales.length" class="space-y-2 mb-3">
+                  <div v-for="(d, i) in documentosLocales" :key="i"
+                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                    <div class="w-7 h-7 rounded-lg bg-[#00A859]/10 shrink-0 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-bold text-gray-700 truncate">{{ d.label || d.filename }}</p>
+                      <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ d.filename }}</p>
+                    </div>
+                    <button @click="removeDocumento(i)"
+                            class="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-colors shrink-0">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Uploader -->
+                <div class="flex gap-2 items-center">
+                  <input v-model="labelDocumento" type="text" placeholder="Nombre del documento (opcional)"
+                         class="w-44 shrink-0 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs
+                                text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#00A859] transition-colors"/>
+                  <label class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                                border-2 border-dashed border-gray-200 bg-gray-50
+                                cursor-pointer hover:border-[#00A859]/40 hover:bg-[#00A859]/5 transition-all"
+                         :class="subiendoDoc ? 'opacity-50 pointer-events-none' : ''">
+                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <span class="text-xs text-gray-400 font-medium">
+                      {{ subiendoDoc ? 'Subiendo documento...' : 'Seleccionar archivo (PDF, Word, Excel, imagen...)' }}
+                    </span>
+                    <input type="file"
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip"
+                           class="sr-only" @change="subirArchivo('documento', $event)" :disabled="subiendoDoc"/>
+                  </label>
+                </div>
+                <p class="text-[9px] text-gray-300 mt-1.5 pl-1">Máx. 20 MB por archivo · Los archivos se alojan en Cloudinary. La BD no almacena ningún fichero.</p>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="bg-[#00A859]/8 border border-[#00A859]/20 rounded-4xl p-5 mb-5">
             <div class="flex items-start gap-3">
               <svg class="w-5 h-5 text-[#00A859] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

@@ -11,6 +11,7 @@ import StartupDayProyectos from '../views/StartupDayProyectos.vue'
 import StartupDayWizard from '../views/StartupDayWizard.vue'
 import StartupDayDetalle from '../views/StartupDayDetalle.vue'
 import StartupDayLanding from '../views/StartupDayLanding.vue'
+import EmpresasView from '../views/EmpresasView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -42,6 +43,12 @@ const router = createRouter({
       path: '/base-datos',
       name: 'base-datos',
       component: BaseDatosDashboard,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/empresas',
+      name: 'empresas',
+      component: EmpresasView,
       meta: { requiresAuth: true }
     },
     {
