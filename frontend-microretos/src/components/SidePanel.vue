@@ -21,6 +21,7 @@ const destinoTrasLogin = ref('/microretos')
 const microretos_abierto   = ref(true)
 const startup_abierto      = ref(true)
 const herramientas_abierto = ref(false)
+const empresas_abierto     = ref(false)
 
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
@@ -277,6 +278,60 @@ defineExpose({ isOpen, toggle, close })
                 <span>Microproyectos</span>
               </button>
               <div class="sp-tooltip">Crea y gestiona microproyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
+            </div>
+
+          </div>
+        </Transition>
+
+        <div class="my-4 border-t border-white/10" />
+
+        <!-- ═══════════════ EMPRESAS (colapsable) ════════════════════ -->
+        <div class="group/tip relative">
+          <button
+            @click="empresas_abierto = !empresas_abierto"
+            class="w-full flex items-center gap-2 px-3 mb-1
+                   text-[9px] font-black uppercase tracking-[0.2em]
+                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
+          >
+            <span class="flex-1 text-left flex items-center gap-1.5">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                           bg-blue-400/20 text-blue-400 text-[8px] font-black shrink-0">E</span>
+              Empresas
+              <!-- Candado: indica que requiere contraseña especial -->
+              <svg class="w-3 h-3 text-white/30 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+            </span>
+            <svg
+              class="w-3 h-3 transition-transform duration-200"
+              :class="empresas_abierto ? 'rotate-180' : ''"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="sp-tooltip">Módulo Empresas — Contacto directo y envío de enlaces de validación (requiere contraseña especial)<div class="sp-tooltip-arrow"/></div>
+        </div>
+
+        <Transition name="sp-collapse">
+          <div v-if="empresas_abierto" class="space-y-0.5">
+
+            <!-- Directorio empresas -->
+            <div class="group/tip relative">
+              <button
+                @click="irA('/empresas')"
+                class="nav-item w-full text-left"
+                :class="isActive('/empresas') ? 'nav-item--active' : 'nav-item--idle'"
+              >
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span>Directorio empresas</span>
+              </button>
+              <div class="sp-tooltip">Consulta y contacta con las empresas de la base de datos<div class="sp-tooltip-arrow"/></div>
             </div>
 
           </div>

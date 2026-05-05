@@ -4,12 +4,15 @@ import { useRoute } from 'vue-router';
 import api from '../api.js';
 
 const route = useRoute();
-const proyecto = ref(null);
-const cargando = ref(true);
-const error    = ref(false);
-const enviado  = ref(false);
-const enviando = ref(false);
-const isLoaded = ref(false);
+const proyecto  = ref(null);
+const cargando  = ref(true);
+const error     = ref(false);
+const enviado   = ref(false);
+const enviando  = ref(false);
+const isLoaded  = ref(false);
+
+// La guía puede ocultarse una vez que el usuario la ha leído
+const guiaVisible = ref(true);
 
 const respuestas = ref({
   reto_comprensible:   '',
@@ -50,6 +53,11 @@ const preguntas = [
   { key: 'equipo_adecuado',     label: '¿El perfil del equipo de alumnos os parece adecuado para este reto?' },
   { key: 'viabilidad',          label: '¿Consideráis que el proyecto es viable en el contexto de vuestra empresa?' },
 ];
+
+function youtubeId(url) {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?/\s]+)/);
+  return m ? m[1] : null;
+}
 </script>
 
 <template>
@@ -60,16 +68,22 @@ const preguntas = [
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
 
     <!-- Header -->
-    <header class="relative z-10 border-b border-gray-100 bg-white/80 backdrop-blur px-6 py-4 flex items-center gap-3 shadow-sm">
-      <div class="w-9 h-9 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20 flex items-center justify-center shrink-0">
-        <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 2L2 7l10 5 10-5-10-5zm0 10l-10-5m10 5l10-5m-10 5v10"/>
-        </svg>
+    <header class="relative z-10 border-b border-gray-100 bg-white/80 backdrop-blur px-6 py-4 flex items-center justify-between gap-3 shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 2L2 7l10 5 10-5-10-5zm0 10l-10-5m10 5l10-5m-10 5v10"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">DuaLab</p>
+          <p class="text-xs text-gray-400">Portal de validación empresa</p>
+        </div>
       </div>
-      <div>
-        <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">DuaLab</p>
-        <p class="text-xs text-gray-400">Portal de validación empresa</p>
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#00A859]/8 border border-[#00A859]/15">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] animate-pulse"/>
+        <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]">Microproyecto activo</span>
       </div>
     </header>
 
@@ -105,10 +119,15 @@ const preguntas = [
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
             </svg>
           </div>
-          <h2 class="text-xl font-black text-[#121212] mb-2">Validación enviada</h2>
+          <h2 class="text-xl font-black text-[#121212] mb-2">¡Validación enviada!</h2>
           <p class="text-gray-400 text-sm max-w-sm mx-auto">
-            Gracias por revisar el microproyecto. El equipo docente recibirá vuestro feedback.
+            Muchas gracias por revisar el microproyecto. El equipo docente recibirá vuestra valoración
+            y os trasladará los próximos pasos.
           </p>
+          <div class="mt-6 flex items-center justify-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#00A859]"/>
+            <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">DuaLab · Gracias por colaborar</span>
+          </div>
         </div>
 
         <!-- Contenido -->
@@ -120,6 +139,125 @@ const preguntas = [
             <span class="w-2 h-2 rounded-full bg-[#00A859]" />
             <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day · Microproyecto</span>
           </div>
+
+          <!-- ════════════════════════════════════════════════════════
+               GUÍA EXPLICATIVA PARA EL EMPRESARIO (5.4)
+          ═══════════════════════════════════════════════════════════ -->
+          <Transition name="slide-guide">
+            <div v-if="guiaVisible"
+                 class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5">
+
+              <!-- Encabezado guía -->
+              <div class="flex items-start justify-between gap-3 mb-5">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20
+                              flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Bienvenido/a</p>
+                    <h2 class="text-base font-black text-[#121212]">¿Qué es este portal y qué se espera de vosotros?</h2>
+                  </div>
+                </div>
+                <button @click="guiaVisible = false"
+                        class="shrink-0 text-gray-300 hover:text-gray-500 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Qué es DuaLab -->
+              <div class="p-4 rounded-2xl bg-[#00A859]/5 border border-[#00A859]/10 mb-4">
+                <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-2">¿Qué es DuaLab?</p>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                  <strong class="text-[#121212]">DuaLab</strong> es la plataforma que conecta centros de Formación Profesional
+                  con empresas del tejido productivo para que el alumnado trabaje en
+                  <strong class="text-[#121212]">retos reales</strong>.
+                  Vuestro papel como empresa es fundamental: vuestra experiencia ayuda al equipo
+                  a comprobar si su propuesta tiene valor y viabilidad real.
+                </p>
+              </div>
+
+              <!-- Qué es un microproyecto -->
+              <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 mb-4">
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">¿Qué es un microproyecto?</p>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                  Un microproyecto es una propuesta de trabajo del alumnado en torno a un reto
+                  relacionado con vuestra empresa. No es un encargo real ni un compromiso contractual —
+                  es un ejercicio de aprendizaje donde los alumnos y alumnas practican cómo
+                  <strong class="text-[#121212]">detectar problemas, diseñar soluciones y presentar resultados</strong>
+                  a una empresa real.
+                </p>
+              </div>
+
+              <!-- Pasos -->
+              <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">¿Qué tenéis que hacer?</p>
+              <div class="space-y-2 mb-5">
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div class="w-6 h-6 rounded-full bg-[#00A859] text-white text-[10px] font-black
+                              flex items-center justify-center shrink-0 mt-0.5">1</div>
+                  <div>
+                    <p class="text-xs font-bold text-[#1F2937]">Leed la propuesta del equipo</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Revisar el título del reto, los objetivos y la composición del equipo que lo ha desarrollado.</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div class="w-6 h-6 rounded-full bg-[#00A859] text-white text-[10px] font-black
+                              flex items-center justify-center shrink-0 mt-0.5">2</div>
+                  <div>
+                    <p class="text-xs font-bold text-[#1F2937]">Explorad los recursos adjuntos</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">El equipo docente puede haber adjuntado vídeos o documentos para daros más contexto sobre el trabajo realizado.</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div class="w-6 h-6 rounded-full bg-[#00A859] text-white text-[10px] font-black
+                              flex items-center justify-center shrink-0 mt-0.5">3</div>
+                  <div>
+                    <p class="text-xs font-bold text-[#1F2937]">Responded las preguntas de valoración</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Son solo 4 preguntas breves con respuesta Sí / No / Parcialmente. Podéis añadir comentarios adicionales si lo consideráis.</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div class="w-6 h-6 rounded-full bg-[#99CC33] text-white text-[10px] font-black
+                              flex items-center justify-center shrink-0 mt-0.5">✓</div>
+                  <div>
+                    <p class="text-xs font-bold text-[#1F2937]">Enviad la valoración</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">El equipo docente recibirá vuestro feedback y os trasladará los próximos pasos. ¡Gracias por vuestra participación!</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tiempo estimado + cerrar -->
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <span class="text-[10px] text-gray-400">Tiempo estimado: <strong class="text-gray-600">3-5 minutos</strong></span>
+                </div>
+                <button @click="guiaVisible = false"
+                        class="text-xs font-bold text-[#00A859] hover:text-[#009950] transition-colors">
+                  Entendido, ir al microproyecto →
+                </button>
+              </div>
+            </div>
+          </Transition>
+
+          <!-- Botón para mostrar guía si se ocultó -->
+          <button v-if="!guiaVisible" @click="guiaVisible = true"
+                  class="mb-4 text-[10px] font-bold text-gray-400 hover:text-[#00A859] transition-colors
+                         flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Ver guía de instrucciones
+          </button>
 
           <!-- Ya validado -->
           <div v-if="proyecto.empresa_validado"
@@ -165,11 +303,83 @@ const preguntas = [
             </div>
           </div>
 
+          <!-- ════ RECURSOS: vídeos y documentos ════ -->
+          <div v-if="proyecto.recursos && (proyecto.recursos.videos?.length || proyecto.recursos.documentos?.length)"
+               class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5">
+
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-8 h-8 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20
+                          flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859]">Recursos del proyecto</p>
+                <p class="text-xs text-gray-400 mt-0.5">Material adicional preparado por el equipo docente</p>
+              </div>
+            </div>
+
+            <!-- Vídeos -->
+            <div v-if="proyecto.recursos.videos?.length" class="mb-4">
+              <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-3">Vídeos</p>
+              <div class="space-y-3">
+                <div v-for="v in proyecto.recursos.videos" :key="v.url">
+                  <!-- Embed YouTube -->
+                  <template v-if="youtubeId(v.url)">
+                    <p v-if="v.label" class="text-xs font-bold text-gray-600 mb-1.5">{{ v.label }}</p>
+                    <div class="rounded-xl overflow-hidden border border-gray-100 aspect-video">
+                      <iframe
+                        :src="`https://www.youtube.com/embed/${youtubeId(v.url)}`"
+                        class="w-full h-full"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen
+                      />
+                    </div>
+                  </template>
+                  <!-- Vídeo directo (Cloudinary) — reproducción nativa -->
+                  <template v-else>
+                    <p v-if="v.label" class="text-xs font-bold text-gray-600 mb-1.5">{{ v.label }}</p>
+                    <video :src="v.url" controls preload="metadata"
+                           class="w-full rounded-xl border border-gray-100 bg-black max-h-72" />
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documentos -->
+            <div v-if="proyecto.recursos.documentos?.length">
+              <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-3">Documentos</p>
+              <div class="space-y-2">
+                <a v-for="d in proyecto.recursos.documentos" :key="d.url"
+                   :href="d.url" target="_blank" rel="noopener"
+                   class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100
+                          hover:border-[#00A859]/30 hover:bg-[#00A859]/5 transition-all">
+                  <div class="w-8 h-8 rounded-lg bg-[#00A859]/10 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-xs font-bold text-gray-700 truncate">{{ d.label || 'Ver documento' }}</p>
+                    <p class="text-[9px] text-gray-400 truncate">{{ d.url }}</p>
+                  </div>
+                  <svg class="w-3.5 h-3.5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+
           <!-- Formulario validación (solo si no está ya validado) -->
           <form v-if="!proyecto.empresa_validado" @submit.prevent="enviarValidacion"
                 class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 space-y-6">
 
-            <div class="pb-2 border-b border-gray-100">
+            <div class="pb-4 border-b border-gray-100">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859] mb-1">Validación empresa</p>
               <p class="text-sm text-gray-400">Por favor, responded las siguientes preguntas sobre el microproyecto.</p>
             </div>
@@ -197,7 +407,7 @@ const preguntas = [
               </label>
               <textarea
                 v-model="comentarios" rows="4" maxlength="2000"
-                placeholder="Sugerencias, dudas o cualquier observación..."
+                placeholder="Sugerencias, dudas o cualquier observación que queráis compartir con el equipo..."
                 class="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm
                        text-[#1F2937] placeholder-gray-400 shadow-sm
                        focus:outline-none focus:border-[#00A859] transition-colors resize-none"
@@ -211,10 +421,35 @@ const preguntas = [
                            transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
               {{ enviando ? 'Enviando...' : 'Enviar validación' }}
             </button>
+
+            <p class="text-center text-[10px] text-gray-400">
+              Tu valoración llegará directamente al equipo docente.
+              No hay respuestas correctas o incorrectas — lo que más ayuda es vuestra opinión sincera.
+            </p>
           </form>
 
         </template>
       </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="relative z-10 border-t border-gray-100 bg-white/60 px-6 py-4 text-center">
+      <p class="text-[10px] text-gray-300">
+        Dua<span class="text-[#00A859] font-bold">Lab</span> · Plataforma de microretos para FP Dual
+      </p>
+    </footer>
   </div>
 </template>
+
+<style scoped>
+.slide-guide-enter-active { transition: all 0.3s ease; overflow: hidden; }
+.slide-guide-leave-active  { transition: all 0.25s ease; overflow: hidden; }
+.slide-guide-enter-from, .slide-guide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-8px);
+}
+.slide-guide-enter-to, .slide-guide-leave-from {
+  max-height: 2000px;
+}
+</style>
