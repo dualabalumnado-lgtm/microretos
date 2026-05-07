@@ -16,7 +16,7 @@ const filtroEstado = ref('todos');
 const isLoaded     = ref(false);
 
 // ── Modal bienvenida ────────────────────────────────────────────────────────
-const guiaBienvenida = ref(true);
+const guiaBienvenida = ref(false);
 
 // ── Tour guiado ─────────────────────────────────────────────────────────────
 const modoGuia = ref(false);
@@ -31,11 +31,11 @@ const refBtnGuia  = ref(null);
 const tourRefs = { refBusqueda, refFiltros, refGrid, refBtnNuevo, refBtnGuia };
 
 const guiaPasosData = [
-  { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar microproyectos por título, empresa o centro educativo.' },
-  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los microproyectos por estado: Todos, Borrador, Publicado o Archivado.' },
-  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los microproyectos registrados. Pulsa en una tarjeta para ver el detalle o editarla.' },
-  { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo microproyecto StartUp Day desde cero.' },
-  { ref: 'refBtnGuia',  seccion: null,        texto: 'Pincha aquí cuando quieras para volver a ver esta guía.' },
+  { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar microproyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
+  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los microproyectos por estado: Todos, Borrador (aún en edición), Publicado (enlace enviado a la empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
+  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los microproyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo o seguir editándola.' },
+  { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo microproyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al microreto correspondiente.' },
+  { ref: 'refBtnGuia',  seccion: null,        texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
 ];
 
 const pasoActual    = computed(() => guiaPasosData[pasoGuia.value - 1]);
@@ -79,10 +79,19 @@ function scrollYRecalcular() {
   requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo));
 }
 
+function onScrollGuia() {
+  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo);
+}
+
 watch(pasoGuia, () => { if (modoGuia.value) nextTick(scrollYRecalcular); });
 watch(modoGuia, (val) => {
   tourActivo.value = val;
-  if (val) nextTick(scrollYRecalcular);
+  if (val) {
+    window.addEventListener('scroll', onScrollGuia, { passive: true });
+    nextTick(scrollYRecalcular);
+  } else {
+    window.removeEventListener('scroll', onScrollGuia);
+  }
 });
 
 function avanzarPaso() {
@@ -115,14 +124,21 @@ onMounted(async () => {
   } finally {
     cargando.value = false;
   }
+  await nextTick();
+  pasoGuia.value = 1;
+  modoGuia.value = true;
 });
 
-onUnmounted(() => { tourActivo.value = false; });
+onUnmounted(() => {
+  tourActivo.value = false;
+  window.removeEventListener('scroll', onScrollGuia);
+});
 
-onBeforeRouteUpdate(() => {
-  guiaBienvenida.value = true;
+onBeforeRouteUpdate(async () => {
   modoGuia.value = false;
   pasoGuia.value = 1;
+  await nextTick();
+  modoGuia.value = true;
 });
 
 const estadoLabel = { borrador: 'Borrador', publicado: 'Publicado', archivado: 'Archivado' };
@@ -162,8 +178,11 @@ async function eliminar(uuid) {
     <!-- ══ TOUR BOCADILLO ══════════════════════════════════════════════════════ -->
     <Transition name="sp-fade">
       <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
+        <!-- Backdrop bloqueante transparente — bloquea interacción sin oscurecer el elemento activo -->
+        <div class="absolute inset-0 pointer-events-auto" />
+
         <div class="absolute pointer-events-auto"
-             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px' }">
+             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px', zIndex: 9992 }">
 
           <!-- Flecha arriba (bocadillo debajo del elemento) -->
           <div v-if="bocadilloPos.dir === 'top'"
