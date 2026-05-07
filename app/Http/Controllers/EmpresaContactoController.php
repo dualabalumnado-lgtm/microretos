@@ -18,7 +18,7 @@ class EmpresaContactoController extends Controller
     {
         $request->validate(['password' => 'required|string']);
 
-        $pass = env('EMPRESAS_ACCESS_PASSWORD', 'viaoptima2025');
+        $pass = config('services.empresas.access_password');
 
         if ($request->password !== $pass) {
             return response()->json(['success' => false, 'message' => 'Contraseña incorrecta.'], 401);

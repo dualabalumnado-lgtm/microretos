@@ -24,7 +24,7 @@ class UploadController extends Controller
      */
     public function recurso(Request $request): JsonResponse
     {
-        $maxMb = (int) env('UPLOAD_MAX_SIZE_MB', 20);
+        $maxMb = config('services.cloudinary.upload_max_mb');
 
         $request->validate([
             'file'               => [
@@ -41,10 +41,10 @@ class UploadController extends Controller
 
         $proyecto = Microproyecto::where('uuid', $request->input('microproyecto_uuid'))->firstOrFail();
 
-        $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        $apiKey    = env('CLOUDINARY_API_KEY');
-        $apiSecret = env('CLOUDINARY_API_SECRET');
-        $folder    = env('CLOUDINARY_FOLDER', 'dualab/recursos');
+        $cloudName = config('services.cloudinary.cloud_name');
+        $apiKey    = config('services.cloudinary.api_key');
+        $apiSecret = config('services.cloudinary.api_secret');
+        $folder    = config('services.cloudinary.folder');
 
         if (!$cloudName || !$apiKey || !$apiSecret) {
             return response()->json([
@@ -163,9 +163,9 @@ class UploadController extends Controller
         MicroproyectoRecurso::where('public_id', $publicId)->delete();
 
         // Eliminar de Cloudinary
-        $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        $apiKey    = env('CLOUDINARY_API_KEY');
-        $apiSecret = env('CLOUDINARY_API_SECRET');
+        $cloudName = config('services.cloudinary.cloud_name');
+        $apiKey    = config('services.cloudinary.api_key');
+        $apiSecret = config('services.cloudinary.api_secret');
 
         if ($cloudName && $apiKey && $apiSecret) {
             $timestamp = time();
