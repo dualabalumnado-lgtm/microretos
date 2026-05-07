@@ -215,6 +215,118 @@ function toggleModulo(m) {
 }
 function moduloSeleccionado(id) { return form.value.modulos_seleccionados.some(m => m.id === id); }
 
+// ── RA/CE selection ───────────────────────────────────────────────────────────
+const modoRaCe         = ref('texto')  // 'manual' | 'ia' | 'texto'
+const catalogoRaCe     = ref([])       // [{ modulo, moduloId, ras: [{id,orden,descripcion,criterios:[...]}] }]
+const cargandoCatalogo = ref(false)
+const cargandoIaRaCe   = ref(false)
+const raExpandido      = ref({})       // { raId: bool }
+const raChecked        = ref({})       // { raId: bool }
+const ceChecked        = ref({})       // { ceId: bool }
+
+async function cargarCatalogoRaCe() {
+  const mods = form.value.modulos_seleccionados
+  if (!mods.length) { catalogoRaCe.value = []; return }
+  cargandoCatalogo.value = true
+  try {
+    const results = await Promise.all(mods.map(m => api.get(`/modulos/${m.id}/ra-ce`)))
+    catalogoRaCe.value = results.map((res, i) => ({
+      modulo:   mods[i].nombre,
+      moduloId: mods[i].id,
+      ras:      res.data.ra || [],
+    }))
+    raExpandido.value = {}; raChecked.value = {}; ceChecked.value = {}
+    catalogoRaCe.value.forEach(mod => {
+      mod.ras.forEach(ra => {
+        raExpandido.value[ra.id] = true
+        raChecked.value[ra.id]   = false
+        ra.criterios.forEach(ce => { ceChecked.value[ce.id] = false })
+      })
+    })
+  } finally {
+    cargandoCatalogo.value = false
+  }
+}
+
+function toggleRa(ra) {
+  const v = !raChecked.value[ra.id]
+  raChecked.value[ra.id] = v
+  ra.criterios.forEach(ce => { ceChecked.value[ce.id] = v })
+}
+
+function raEstado(ra) {
+  const n = ra.criterios.filter(ce => ceChecked.value[ce.id]).length
+  if (n === 0) return 'none'
+  if (n === ra.criterios.length) return 'all'
+  return 'some'
+}
+
+function aplicarSeleccionManual() {
+  const partes = []
+  catalogoRaCe.value.forEach(mod => {
+    mod.ras.forEach(ra => {
+      const ces = ra.criterios.filter(ce => ceChecked.value[ce.id])
+      if (ces.length) {
+        const cesStr = ces.map(c => `  • ${c.descripcion}`).join('\n')
+        partes.push(`[${mod.modulo}]\nRA: ${ra.descripcion}\nCE:\n${cesStr}`)
+      }
+    })
+  })
+  form.value.ra_ce = partes.join('\n\n')
+  modoRaCe.value = 'texto'
+}
+
+async function sugerirRaCeConIa() {
+  cargandoIaRaCe.value = true
+  try {
+    const res = await api.post('/startup/sugerir-ra-ce', {
+      modulo_ids:   form.value.modulos_seleccionados.map(m => m.id),
+      titulo:       form.value.titulo,
+      pregunta_reto: form.value.diseno_reto.pregunta_reto,
+      descripcion:  form.value.diseno_reto.descripcion,
+      contexto:     form.value.fundamentacion.contexto,
+    })
+    if (res.data.ra_ce_texto) {
+      form.value.ra_ce = res.data.ra_ce_texto
+      modoRaCe.value = 'texto'
+    }
+  } catch (e) {
+    console.error('Error sugiriendo RA/CE con IA', e)
+  } finally {
+    cargandoIaRaCe.value = false
+  }
+}
+
+watch(modoRaCe, (modo) => {
+  if (modo === 'manual' || modo === 'ia') cargarCatalogoRaCe()
+})
+
+const busquedaRaCe = ref('')
+
+const catalogoFiltrado = computed(() => {
+  const q = busquedaRaCe.value.trim().toLowerCase()
+  if (!q) return catalogoRaCe.value
+  return catalogoRaCe.value.map(mod => {
+    const ras = mod.ras.map(ra => {
+      const raMatch = ra.descripcion.toLowerCase().includes(q)
+      const criterios = raMatch
+        ? ra.criterios
+        : ra.criterios.filter(ce => ce.descripcion.toLowerCase().includes(q))
+      return criterios.length ? { ...ra, criterios } : null
+    }).filter(Boolean)
+    return ras.length ? { ...mod, ras } : null
+  }).filter(Boolean)
+})
+
+const totalCeSeleccionados = computed(() =>
+  Object.values(ceChecked.value).filter(Boolean).length
+)
+const totalRaSeleccionados = computed(() =>
+  catalogoRaCe.value.reduce((acc, mod) =>
+    acc + mod.ras.filter(ra => raEstado(ra) !== 'none').length, 0
+  )
+)
+
 // ── Catálogos ─────────────────────────────────────────────────────────────────
 async function cargarCatalogos() {
   const [rE, rC, rF, rM, rS] = await Promise.all([
@@ -909,9 +1021,9 @@ const pasos = [
             </div>
 
             <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6">
-              <div class="flex items-start justify-between gap-3 mb-3">
+              <!-- Cabecera -->
+              <div class="flex items-start justify-between gap-3 mb-4">
                 <label class="field-label">Resultados de Aprendizaje y Criterios de Evaluación</label>
-                <!-- Badge autocompletado -->
                 <Transition enter-active-class="transition-all duration-300"
                             enter-from-class="opacity-0 scale-75"
                             leave-active-class="transition-all duration-200"
@@ -926,21 +1038,21 @@ const pasos = [
                 </Transition>
               </div>
 
-              <!-- Callout RA/CE -->
+              <!-- Callout autocompletado -->
               <Transition enter-active-class="transition-all duration-300"
                           enter-from-class="opacity-0 -translate-y-2"
                           leave-active-class="transition-all duration-200"
                           leave-to-class="opacity-0 -translate-y-2">
                 <div v-if="raCeAutocompletado"
                      class="flex items-start gap-3 bg-amber-50 border border-amber-200
-                            rounded-2xl px-4 py-3 mb-3">
+                            rounded-2xl px-4 py-3 mb-4">
                   <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                   <p class="text-xs text-amber-700 leading-relaxed flex-1">
                     RA y CE generados a partir del microreto vinculado. Revisa que estén alineados con tu
-                    programación o añade/modifica los que consideres oportunos.
+                    programación o ajusta la selección.
                   </p>
                   <button @click="raCeAutocompletado = false"
                           class="shrink-0 text-amber-400 hover:text-amber-600 transition-colors mt-0.5">
@@ -951,8 +1063,226 @@ const pasos = [
                 </div>
               </Transition>
 
-              <textarea v-model="form.ra_ce" rows="6" class="field-input resize-none"
-                        placeholder="Describe los RA y CE que se trabajarán en este microproyecto…" />
+              <!-- Selector de modo -->
+              <div class="flex gap-2 mb-5 p-1 bg-gray-100 rounded-2xl">
+                <button v-for="modo in [
+                    { key: 'manual', label: 'Selección manual', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                    { key: 'ia',     label: 'Sugerir con IA',   icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+                    { key: 'texto',  label: 'Texto libre',      icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+                  ]" :key="modo.key" @click="modoRaCe = modo.key"
+                  :class="[
+                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all',
+                    modoRaCe === modo.key
+                      ? 'bg-white shadow text-[#00A859]'
+                      : 'text-gray-500 hover:text-gray-700'
+                  ]">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="modo.icon"/>
+                  </svg>
+                  <span class="hidden sm:inline">{{ modo.label }}</span>
+                </button>
+              </div>
+
+              <!-- ── MODO MANUAL ── -->
+              <div v-if="modoRaCe === 'manual'">
+
+                <!-- Cargando -->
+                <div v-if="cargandoCatalogo" class="flex flex-col items-center justify-center py-12 gap-3">
+                  <div class="w-8 h-8 rounded-full border-4 border-[#00A859]/20 border-t-[#00A859] animate-spin" />
+                  <p class="text-sm text-gray-400">Cargando catálogo…</p>
+                </div>
+
+                <!-- Sin módulos seleccionados -->
+                <div v-else-if="!catalogoRaCe.length"
+                     class="py-8 text-center text-sm text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                  Selecciona módulos en la sección superior para ver su catálogo de RA y CE.
+                </div>
+
+                <div v-else>
+                  <!-- Buscador -->
+                  <div class="relative mb-4">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                    </svg>
+                    <input v-model="busquedaRaCe" type="text"
+                           placeholder="Buscar resultado de aprendizaje o criterio de evaluación…"
+                           class="w-full pl-9 pr-8 py-2.5 text-sm bg-gray-50 border border-gray-200
+                                  rounded-2xl focus:outline-none focus:border-[#00A859]/50 focus:bg-white
+                                  transition-colors placeholder-gray-400" />
+                    <button v-if="busquedaRaCe" @click="busquedaRaCe = ''"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Barra de contadores -->
+                  <div class="flex flex-wrap items-center gap-3 px-4 py-2 mb-3 bg-indigo-50/60 border border-indigo-100 rounded-2xl">
+                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mr-1">Selección:</span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] shrink-0" />
+                      <span class="text-[11px] font-black text-[#00A859]">{{ totalRaSeleccionados }}</span>
+                      <span class="text-[11px] text-[#00A859]/70">RA</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                      <span class="text-[11px] font-black text-amber-600">{{ totalCeSeleccionados }}</span>
+                      <span class="text-[11px] text-amber-500/70">CE</span>
+                    </div>
+                  </div>
+
+                  <!-- Sin resultados de búsqueda -->
+                  <div v-if="!catalogoFiltrado.length"
+                       class="py-6 text-center text-sm text-gray-400 bg-gray-50 rounded-2xl">
+                    Sin resultados para "<span class="font-semibold">{{ busquedaRaCe }}</span>"
+                  </div>
+
+                  <!-- Lista de módulos al estilo CatalogoBoeModal -->
+                  <div v-else class="space-y-2">
+                    <div v-for="mod in catalogoFiltrado" :key="mod.moduloId"
+                         class="rounded-2xl border border-gray-100 overflow-hidden">
+
+                      <!-- Cabecera módulo -->
+                      <div class="flex items-center gap-2 px-4 py-3 bg-gray-50/80 border-b border-gray-100">
+                        <span class="text-[10px] font-black uppercase tracking-widest
+                                     bg-indigo-100/60 text-indigo-500 px-2 py-0.5 rounded-full shrink-0">MF</span>
+                        <span class="flex-1 text-xs font-bold text-gray-700">{{ mod.modulo }}</span>
+                        <span class="text-[10px] text-gray-400">{{ mod.ras.length }} RA</span>
+                      </div>
+
+                      <!-- Resultados de Aprendizaje -->
+                      <div class="divide-y divide-gray-50">
+                        <div v-for="ra in mod.ras" :key="ra.id"
+                             class="overflow-hidden"
+                             :class="raEstado(ra) !== 'none' ? 'bg-[#00A859]/4' : ''">
+
+                          <!-- Fila RA -->
+                          <div class="flex items-start gap-2.5 px-4 py-3">
+                            <!-- Checkbox RA -->
+                            <button @click="toggleRa(ra)"
+                                    class="mt-0.5 shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all"
+                                    :class="raEstado(ra) === 'all'
+                                      ? 'bg-[#00A859] border-[#00A859]'
+                                      : raEstado(ra) === 'some'
+                                        ? 'bg-[#00A859]/30 border-[#00A859]'
+                                        : 'bg-white border-gray-300 hover:border-[#00A859]/50'">
+                              <svg v-if="raEstado(ra) !== 'none'" class="w-2.5 h-2.5 text-white"
+                                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path v-if="raEstado(ra) === 'all'" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 12h14"/>
+                              </svg>
+                            </button>
+                            <!-- Badge RA + texto (igual que CatalogoBoeModal) -->
+                            <div class="flex items-center gap-1.5 shrink-0 mt-0.5">
+                              <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]
+                                           bg-[#00A859]/10 px-2 py-0.5 rounded-full">RA{{ ra.orden }}</span>
+                              <span class="text-[9px] text-gray-300">#{{ ra.id }}</span>
+                            </div>
+                            <p class="flex-1 text-[11px] font-semibold text-gray-700 leading-snug">{{ ra.descripcion }}</p>
+                            <!-- Expand toggle -->
+                            <button @click="raExpandido[ra.id] = !raExpandido[ra.id]"
+                                    class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors mt-0.5 ml-1">
+                              <svg class="w-3.5 h-3.5 transition-transform duration-200"
+                                   :class="raExpandido[ra.id] ? 'rotate-180' : ''"
+                                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                              </svg>
+                            </button>
+                          </div>
+
+                          <!-- Criterios de Evaluación (igual que CatalogoBoeModal) -->
+                          <div v-if="raExpandido[ra.id]"
+                               class="border-t border-[#00A859]/15 px-4 pb-3 pt-2.5 bg-white/60">
+                            <div class="flex items-center gap-1.5 mb-2">
+                              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                              <span class="text-[9px] font-black uppercase tracking-widest text-amber-600">
+                                Criterios de Evaluación
+                              </span>
+                            </div>
+                            <div class="space-y-1.5 pl-2">
+                              <label v-for="ce in ra.criterios" :key="ce.id"
+                                     class="flex items-start gap-2.5 cursor-pointer group">
+                                <div class="mt-0.5 shrink-0 w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all"
+                                     :class="ceChecked[ce.id]
+                                       ? 'bg-amber-400 border-amber-400'
+                                       : 'bg-white border-gray-300 group-hover:border-amber-300'">
+                                  <svg v-if="ceChecked[ce.id]" class="w-2 h-2 text-white"
+                                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                  </svg>
+                                </div>
+                                <input type="checkbox" v-model="ceChecked[ce.id]" class="sr-only" />
+                                <span class="text-[10px] text-gray-600 leading-snug">
+                                  <span class="font-bold text-amber-500 mr-1">{{ ce.orden }}.</span>{{ ce.descripcion }}
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Pie: botón aplicar -->
+                  <div class="mt-4 flex items-center justify-between gap-3">
+                    <p class="text-xs text-gray-400">
+                      <template v-if="totalCeSeleccionados > 0">
+                        {{ totalCeSeleccionados }} CE de {{ totalRaSeleccionados }} RA seleccionados
+                      </template>
+                      <template v-else>
+                        Marca los CE que se trabajarán en el microproyecto.
+                      </template>
+                    </p>
+                    <button @click="aplicarSeleccionManual"
+                            :disabled="totalCeSeleccionados === 0"
+                            class="px-5 py-3 bg-[#00A859] text-white rounded-2xl text-sm font-black tracking-wide
+                                   hover:bg-[#00A859]/90 disabled:opacity-40 transition-colors shrink-0">
+                      Aplicar selección →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── MODO IA ── -->
+              <div v-else-if="modoRaCe === 'ia'" class="space-y-4">
+                <div class="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 text-sm text-violet-700 leading-relaxed">
+                  La IA analizará el contexto del microproyecto y los módulos seleccionados para sugerir los RA y CE más relevantes del catálogo oficial.
+                </div>
+                <button @click="sugerirRaCeConIa"
+                        :disabled="cargandoIaRaCe || !form.modulos_seleccionados.length"
+                        class="w-full py-4 rounded-2xl text-sm font-black tracking-wide transition-all flex items-center justify-center gap-2
+                               bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40">
+                  <template v-if="cargandoIaRaCe">
+                    <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
+                    </svg>
+                    Analizando currículum…
+                  </template>
+                  <template v-else>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                    </svg>
+                    Sugerir RA y CE con IA
+                  </template>
+                </button>
+                <p v-if="!form.modulos_seleccionados.length" class="text-xs text-gray-400 text-center">
+                  Selecciona al menos un módulo para usar esta opción.
+                </p>
+              </div>
+
+              <!-- ── MODO TEXTO LIBRE ── -->
+              <div v-else>
+                <textarea v-model="form.ra_ce" rows="6" class="field-input resize-none"
+                          placeholder="Describe los RA y CE que se trabajarán en este microproyecto…" />
+              </div>
             </div>
           </div>
 

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api.js';
+import { useMicroproyectoPdfExport } from '../composables/useMicroproyectoPdfExport.js';
 
 const route  = useRoute();
 const router = useRouter();
@@ -42,6 +43,8 @@ async function copiarUrl() {
   urlCopiada.value = true;
   setTimeout(() => { urlCopiada.value = false; }, 2000);
 }
+
+const { descargarPDF } = useMicroproyectoPdfExport();
 
 async function archivar() {
   if (!confirm('¿Archivar este microproyecto?')) return;
@@ -107,6 +110,19 @@ async function archivar() {
           </div>
 
           <div class="flex gap-2 shrink-0">
+            <button
+              @click="descargarPDF(proyecto)"
+              class="px-4 py-2 bg-[#00A859] rounded-full text-xs font-black
+                     uppercase tracking-widest text-white shadow-sm
+                     hover:bg-[#009048] transition-all flex items-center gap-1.5"
+              title="Descargar ficha PDF"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                      d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
+              </svg>
+              PDF
+            </button>
             <button
               @click="router.push({ name: 'startup-day-editar', params: { uuid: proyecto.uuid } })"
               class="px-4 py-2 bg-white border border-gray-200 rounded-full text-xs font-black

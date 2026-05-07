@@ -135,6 +135,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/startup/proyectos/{uuid}',   [MicroproyectoController::class, 'update']);
     Route::delete('/startup/proyectos/{uuid}',[MicroproyectoController::class, 'destroy']);
 
+    // StartUp Day — IA: sugerencia de RA/CE
+    Route::middleware('throttle:10,1')
+        ->post('/startup/sugerir-ra-ce', [MicroproyectoController::class, 'sugerirRaCe']);
+
 });
 
 // -------- IMPORTACIONES (protegidas con auth) ---------
