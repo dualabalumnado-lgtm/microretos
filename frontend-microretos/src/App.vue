@@ -10,13 +10,15 @@ const router    = useRouter()
 const route     = useRoute()
 const authStore = useAuthStore()
 
-const isPublicRetoRoute = computed(() => route.path.startsWith('/reto/'))
+const isPublicRetoRoute = computed(() =>
+  route.path.startsWith('/reto/') || route.path.startsWith('/startup/landing/')
+)
 
 // ── Expiración de token (401 del servidor) ────────────────────────────────────
 const handleTokenExpired = () => {
   authStore.logout()
   const currentPath = router.currentRoute.value.fullPath
-  const isPublic = currentPath === '/' || currentPath.startsWith('/reto/')
+  const isPublic = currentPath === '/' || currentPath.startsWith('/reto/') || currentPath.startsWith('/startup/landing/')
   if (!isPublic) {
     router.push({ path: '/', query: { redirect: currentPath } })
   }
@@ -33,7 +35,7 @@ const handleIdle = () => {
   showIdleWarning.value = false
   authStore.logout()
   const currentPath = router.currentRoute.value.fullPath
-  const isPublic = currentPath === '/' || currentPath.startsWith('/reto/')
+  const isPublic = currentPath === '/' || currentPath.startsWith('/reto/') || currentPath.startsWith('/startup/landing/')
   if (!isPublic) {
     router.push({ path: '/', query: { redirect: currentPath } })
   }
