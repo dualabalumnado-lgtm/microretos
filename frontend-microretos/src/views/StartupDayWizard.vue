@@ -1040,10 +1040,10 @@ onUnmounted(() => { tourActivo.value = false; });
             <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Equipo de alumnado</p>
               <div class="flex gap-2">
-                <input v-model="nuevoAlumno.nombre" type="text" placeholder="Nombre del alumno/a"
+                <input v-model="nuevoAlumno.nombre" type="text" placeholder="Nombre o identificador del alumno/a"
                        class="field-input flex-1" @keyup.enter="addAlumno" />
                 <input v-model="nuevoAlumno.rol" type="text" placeholder="Rol / función"
-                       class="field-input w-36" @keyup.enter="addAlumno" />
+                       class="field-input !w-36" @keyup.enter="addAlumno" />
                 <button @click="addAlumno"
                         class="shrink-0 px-4 py-2.5 bg-[#00A859] text-white rounded-2xl
                                text-sm font-black hover:bg-[#00A859]/90 transition-all active:scale-95">+</button>
@@ -1463,7 +1463,7 @@ onUnmounted(() => { tourActivo.value = false; });
                   <input v-model="nuevaFase.nombre" type="text" placeholder="Nombre de la fase"
                          class="field-input flex-1" />
                   <input v-model="nuevaFase.duracion" type="text" placeholder="Duración"
-                         class="field-input w-28" />
+                         class="field-input !w-28" />
                   <button @click="addFase"
                           class="shrink-0 px-4 py-2.5 bg-[#00A859] text-white rounded-2xl
                                  text-sm font-black hover:bg-[#00A859]/90 transition-all active:scale-95">+</button>
