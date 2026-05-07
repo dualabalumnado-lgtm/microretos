@@ -121,6 +121,77 @@ class MicroproyectoController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    // --- IA: sugerencia de RA/CE ---
+
+    public function sugerirRaCe(Request $request)
+    {
+        $request->validate([
+            'modulo_ids'   => 'required|array|min:1',
+            'modulo_ids.*' => 'integer|exists:modulos,id',
+        ]);
+
+        $modulos = \App\Models\Modulo::with(['ras.criteriosEvaluacion'])
+            ->whereIn('id', $request->modulo_ids)
+            ->get();
+
+        if ($modulos->isEmpty()) {
+            return response()->json(['error' => 'No se encontraron módulos'], 404);
+        }
+
+        $curriculo = '';
+        foreach ($modulos as $modulo) {
+            $curriculo .= "[MÓDULO]: {$modulo->nombre}\n";
+            foreach ($modulo->ras as $ra) {
+                $curriculo .= "  RA: {$ra->ra}\n";
+                foreach ($ra->criteriosEvaluacion as $ce) {
+                    $curriculo .= "    CE: {$ce->ce}\n";
+                }
+            }
+            $curriculo .= "\n";
+        }
+
+        $contexto = '';
+        if ($request->filled('titulo'))        $contexto .= "Título: {$request->titulo}\n";
+        if ($request->filled('pregunta_reto')) $contexto .= "Reto: {$request->pregunta_reto}\n";
+        if ($request->filled('descripcion'))   $contexto .= "Descripción: {$request->descripcion}\n";
+        if ($request->filled('contexto'))      $contexto .= "Contexto empresa: {$request->contexto}\n";
+
+        if (!$contexto) $contexto = "Sin contexto adicional.\n";
+
+        $systemPrompt = "Eres un experto en currículum de Formación Profesional española. Selecciona los Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) más relevantes para el microproyecto descrito. Elige SOLO los que se trabajan directamente en el microproyecto. Usa los textos EXACTOS del catálogo.";
+
+        $userPrompt = "Microproyecto:\n{$contexto}\nCatálogo RA/CE de los módulos seleccionados:\n{$curriculo}\nDevuelve SOLO este JSON:\n{\"seleccion\":[{\"modulo\":\"Nombre exacto del módulo\",\"ra\":\"Texto exacto del RA\",\"ce\":[\"Texto exacto del CE\"]}]}";
+
+        $response = \Illuminate\Support\Facades\Http::withToken(config('services.openai.key'))
+            ->timeout(60)
+            ->post('https://api.openai.com/v1/chat/completions', [
+                'model'           => 'gpt-4o',
+                'messages'        => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user',   'content' => $userPrompt],
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'temperature'     => 0.2,
+            ]);
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Error al contactar con la IA'], 500);
+        }
+
+        $data      = json_decode($response->json()['choices'][0]['message']['content'], true);
+        $seleccion = $data['seleccion'] ?? [];
+
+        $texto = collect($seleccion)->map(function ($item) {
+            $ces = collect($item['ce'] ?? [])->map(fn($c) => "  • {$c}")->join("\n");
+            return "[{$item['modulo']}]\nRA: {$item['ra']}\nCE:\n{$ces}";
+        })->join("\n\n");
+
+        return response()->json([
+            'seleccion'   => $seleccion,
+            'ra_ce_texto' => $texto,
+        ]);
+    }
+
     // --- Helper ---
 
     private function formatProyecto(Microproyecto $p): array
