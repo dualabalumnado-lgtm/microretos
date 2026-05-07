@@ -237,9 +237,15 @@ onMounted(async () => {
       cargandoMicroreto.value = false
     }
   }
+  await nextTick()
+  pasoGuia.value = 1
+  modoGuia.value = true
 })
 
-onUnmounted(() => { tourActivo.value = false })
+onUnmounted(() => {
+  tourActivo.value = false
+  window.removeEventListener('scroll', onScrollGuia)
+})
 
 // ─── Guardar sesión ───────────────────────────────────────────────────────────
 async function guardarSesion() {
@@ -311,7 +317,7 @@ function limpiarFormulario() {
 }
 
 // ─── Modal de bienvenida "¿Qué necesitas?" ───────────────────────────────────
-const guiaBienvenida = ref(true)
+const guiaBienvenida = ref(false)
 const modoGuia       = ref(false)
 const pasoGuia       = ref(1)
 
@@ -419,8 +425,11 @@ function scrollYRecalcular() {
   const paso = guiaPasosData[pasoGuia.value - 1]
   const el = tourRefs[paso?.ref]?.value
   if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
-  // doble rAF: garantiza que el navegador ha pintado tras el scroll antes de medir
   requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+}
+
+function onScrollGuia() {
+  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo)
 }
 
 watch(pasoGuia, async () => {
@@ -431,16 +440,20 @@ watch(pasoGuia, async () => {
 watch(modoGuia, async (v) => {
   tourActivo.value = v
   if (v) {
+    window.addEventListener('scroll', onScrollGuia, { passive: true })
     await nextTick()
     scrollYRecalcular()
+  } else {
+    window.removeEventListener('scroll', onScrollGuia)
   }
 })
 
 // Mostrar bienvenida de nuevo cuando se vuelve a navegar al dashboard
-onBeforeRouteUpdate(() => {
-  guiaBienvenida.value = true
+onBeforeRouteUpdate(async () => {
   modoGuia.value = false
   pasoGuia.value = 1
+  await nextTick()
+  modoGuia.value = true
 })
 
 // ─── Modal ficha de microreto ─────────────────────────────────────────────────
@@ -516,8 +529,8 @@ function formatFecha(isoDate) {
     <!-- ══════════ TOUR BOCADILLO - OVERLAY + TOOLTIP ════════════════════════ -->
     <Transition name="sp-fade">
       <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
-        <!-- Click-catcher transparente para cerrar con clic fuera -->
-        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
+        <!-- Backdrop bloqueante transparente — bloquea interacción sin oscurecer el elemento activo -->
+        <div class="absolute inset-0 pointer-events-auto" />
 
         <!-- Bocadillo flotante posicionado sobre el elemento activo -->
         <div class="absolute pointer-events-auto"

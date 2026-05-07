@@ -435,6 +435,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', cerrarDropdownFuera);
   tourActivo.value = false;
+  window.removeEventListener('scroll', onScrollGuia);
 });
 
 watch(() => seleccion.value.empresaId, async (nuevoId) => {
@@ -835,11 +836,18 @@ async function scrollYRecalcular() {
   requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
 }
 
+function onScrollGuia() {
+  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo)
+}
+
 watch(modoGuia, async (v) => {
   tourActivo.value = v
   if (v) {
+    window.addEventListener('scroll', onScrollGuia, { passive: true })
     await nextTick()
     requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+  } else {
+    window.removeEventListener('scroll', onScrollGuia)
   }
 })
 
@@ -893,7 +901,7 @@ async function guardarEstadoGen(nuevoEstado) {
 
       <!-- ── PASO 2: modal explicativo centrado ── -->
       <template v-if="pasoActual === 2">
-        <div class="absolute inset-0 bg-black/50 pointer-events-auto" @click="saltarGuia" />
+        <div class="absolute inset-0 bg-black/50 pointer-events-auto" />
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index:9992">
           <div class="pointer-events-auto w-[380px] max-w-[calc(100vw-2rem)] bg-[#1a2332] border border-white/15 rounded-3xl shadow-2xl p-7 text-white" @click.stop>
             <!-- Cabecera -->
@@ -929,7 +937,8 @@ async function guardarEstadoGen(nuevoEstado) {
 
       <!-- ── PASO 1 & 3: bocadillo spotlight ── -->
       <template v-else>
-        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
+        <!-- Backdrop bloqueante transparente — bloquea interacción sin oscurecer el elemento activo -->
+        <div class="absolute inset-0 pointer-events-auto" />
 
         <div class="absolute pointer-events-auto"
              :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: '272px', zIndex: 9992 }">

@@ -597,10 +597,19 @@ function scrollYRecalcular() {
   requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
 }
 
+function onScrollGuia() {
+  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo)
+}
+
 watch(pasoGuia, () => { if (modoGuia.value) nextTick(scrollYRecalcular) })
 watch(modoGuia, (val) => {
   tourActivo.value = val
-  if (val) nextTick(scrollYRecalcular)
+  if (val) {
+    window.addEventListener('scroll', onScrollGuia, { passive: true })
+    nextTick(scrollYRecalcular)
+  } else {
+    window.removeEventListener('scroll', onScrollGuia)
+  }
 })
 
 function avanzarPaso() {
@@ -609,7 +618,10 @@ function avanzarPaso() {
 }
 function saltarGuia() { modoGuia.value = false; pasoGuia.value = 1 }
 
-onUnmounted(() => { tourActivo.value = false })
+onUnmounted(() => {
+  tourActivo.value = false
+  window.removeEventListener('scroll', onScrollGuia)
+})
 
 onBeforeRouteUpdate(async () => {
   modoGuia.value = false
@@ -659,7 +671,8 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
     <!-- ══════════ TOUR BOCADILLO ════════════════════════════ -->
     <Transition name="modal-fade">
       <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
-        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
+        <!-- Backdrop bloqueante transparente — bloquea interacción sin oscurecer el elemento activo -->
+        <div class="absolute inset-0 pointer-events-auto" />
 
         <div class="absolute pointer-events-auto"
              :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px', zIndex: 9992 }">

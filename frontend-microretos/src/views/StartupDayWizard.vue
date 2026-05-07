@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api.js';
+import { useUIState } from '../composables/useUIState.js';
 
 const route  = useRoute();
 const router = useRouter();
@@ -508,6 +509,8 @@ onMounted(async () => {
       }
     }
   }
+  await nextTick();
+  modoGuia.value = true;
 });
 
 // ── Guardar ───────────────────────────────────────────────────────────────────
@@ -548,6 +551,49 @@ const pasos = [
   { num: 5, label: 'El Reto' }, { num: 6, label: 'Proyecto' },
   { num: 7, label: 'Objetivos' },{ num: 8, label: 'Publicar' },
 ];
+
+// ── Tour guiado ───────────────────────────────────────────────────────────────
+const { tourActivo } = useUIState();
+const modoGuia = ref(false);
+
+const guiaWizard = [
+  {
+    titulo: 'Paso 1 · Datos básicos',
+    texto: 'Selecciona la sesión de trabajo que origina este microproyecto. La sesión proviene del Dashboard Docente y ya tiene un microreto asignado, por lo que autocompleta automáticamente empresa, centro y ciclo. Después escribe un título descriptivo y confirma familia, ciclo y curso del grupo de alumnado.',
+  },
+  {
+    titulo: 'Paso 2 · Datos de la empresa',
+    texto: 'Completa o corrige la ficha de la empresa colaboradora. Estos datos aparecerán en el dossier del microproyecto que verá la empresa. Revisa especialmente el email de contacto, que se usará para enviar el enlace de validación del proyecto.',
+  },
+  {
+    titulo: 'Paso 3 · Centro y equipo',
+    texto: 'Rellena los datos del centro educativo (nombre, municipio y docente responsable) y añade a los integrantes del equipo de alumnado. Para cada persona puedes indicar su nombre y el rol dentro del proyecto: diseño, programación, gestión, presentación…',
+  },
+  {
+    titulo: 'Paso 4 · Módulos y currículum',
+    texto: 'Selecciona los módulos formativos del ciclo que se trabajan en este microproyecto. Si el microreto vinculado ya tenía módulos asignados, aparecerán pre-seleccionados. Añade también los RA/CE (Resultados de Aprendizaje y Criterios de Evaluación) más relevantes para justificar el microproyecto ante la programación oficial.',
+  },
+  {
+    titulo: 'Paso 5 · El reto',
+    texto: 'Define el núcleo del microproyecto: la fundamentación (contexto de partida, justificación pedagógica e innovación) y el diseño del reto (descripción de la problemática, pregunta reto en formato "¿Cómo podríamos…?", restricciones que condicionan la solución y los entregables que el equipo debe producir). Cuanto más concreto, más fácil será la evaluación final.',
+  },
+  {
+    titulo: 'Paso 6 · Diseño del microproyecto',
+    texto: 'Planifica el desarrollo del trabajo: divide el proyecto en fases con nombre y duración estimada, describe la metodología que seguirá el equipo y esboza el cronograma con los hitos clave. Termina con un resumen ejecutivo de 3-4 líneas que la empresa verá al abrir el enlace de validación.',
+  },
+  {
+    titulo: 'Paso 7 · Objetivos y KPIs',
+    texto: 'Define los objetivos de aprendizaje del microproyecto (qué competencias desarrollará el alumnado) y los indicadores de éxito o KPIs (cómo medirá la empresa que el reto se ha resuelto correctamente). Los KPIs hacen el proyecto evaluable y aumentan el compromiso de la empresa con el resultado final.',
+  },
+  {
+    titulo: 'Paso 8 · Publicar',
+    texto: 'Revisa el resumen del microproyecto. Aquí también puedes adjuntar vídeos o documentos de presentación que la empresa verá al abrir el enlace de validación. Cuando todo esté listo, pulsa "Publicar" para generar ese enlace único. Si aún falta información, guárdalo como Borrador y termínalo más tarde.',
+  },
+];
+
+watch(paso, () => { modoGuia.value = true; });
+watch(modoGuia, (val) => { tourActivo.value = val; });
+onUnmounted(() => { tourActivo.value = false; });
 </script>
 
 <template>
@@ -578,6 +624,13 @@ const pasos = [
             <p class="text-xs font-bold text-gray-600 truncate">{{ form.titulo || 'Nuevo microproyecto' }}</p>
           </div>
           <span class="text-xs font-black text-gray-400 shrink-0">{{ progreso }}%</span>
+          <button @click="modoGuia = true"
+                  title="Ver guía de este paso"
+                  class="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 shrink-0
+                         flex items-center justify-center text-blue-500 text-xs font-black
+                         hover:bg-blue-500/20 transition-all">
+            ?
+          </button>
         </div>
 
         <!-- Barra progreso -->
@@ -603,6 +656,59 @@ const pasos = [
         </div>
       </div>
     </div>
+
+    <!-- ══ TOUR OVERLAY ══════════════════════════════════════════════════════ -->
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      leave-active-class="transition-all duration-150 ease-in"
+      leave-to-class="opacity-0 scale-95">
+      <div v-if="modoGuia" class="fixed inset-0 z-[9990] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/55 pointer-events-auto" />
+        <div class="relative pointer-events-auto w-full max-w-md bg-[#1a2332] border border-white/15
+                    rounded-3xl shadow-2xl p-7 text-white"
+             @click.stop>
+          <!-- Cabecera con progreso -->
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-2xl bg-[#00A859]/20 flex items-center justify-center
+                        text-[#00A859] font-black text-base shrink-0">
+              {{ paso }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[9px] font-black uppercase tracking-widest text-white/40 mb-1.5">
+                Guía · Paso {{ paso }} de {{ totalPasos }}
+              </p>
+              <div class="flex gap-1">
+                <span v-for="i in totalPasos" :key="i"
+                      class="h-[3px] rounded-full transition-all duration-300"
+                      :class="i <= paso ? 'bg-[#00A859] w-5' : 'bg-white/20 w-3'" />
+              </div>
+            </div>
+          </div>
+          <!-- Título del paso -->
+          <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-2">
+            {{ guiaWizard[paso - 1].titulo }}
+          </p>
+          <!-- Descripción -->
+          <p class="text-[13px] text-white/85 leading-relaxed mb-6">
+            {{ guiaWizard[paso - 1].texto }}
+          </p>
+          <!-- Botones -->
+          <div class="flex items-center gap-2">
+            <button @click="modoGuia = false"
+                    class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-[10px] font-black
+                           uppercase tracking-widest hover:bg-[#00A859]/90 transition-all">
+              Entendido ✓
+            </button>
+            <button @click="modoGuia = false"
+                    class="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40
+                           text-[10px] font-black uppercase tracking-widest hover:text-white/60 transition-all">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Contenido -->
     <div class="relative z-10 max-w-3xl mx-auto px-4 py-8">
