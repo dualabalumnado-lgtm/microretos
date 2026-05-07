@@ -17,12 +17,6 @@ const showLogin        = ref(false)
 const cargandoOut      = ref(false)
 const destinoTrasLogin = ref('/microretos')
 
-// ─── Secciones colapsables ────────────────────────────────
-const microretos_abierto   = ref(true)
-const startup_abierto      = ref(true)
-const herramientas_abierto = ref(false)
-const empresas_abierto     = ref(false)
-
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
 
@@ -150,149 +144,127 @@ defineExpose({ isOpen, toggle, close })
       <!-- ── Navegación ── -->
       <nav class="flex-1 px-3 py-5 space-y-1 overflow-visible">
 
-        <!-- ═══════════════ FASE 1: MICRORETOS (colapsable) ═══════════ -->
-        <div class="group/tip relative">
-          <button
-            @click="microretos_abierto = !microretos_abierto"
-            class="w-full flex items-center gap-2 px-3 mb-1
-                   text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
-          >
-            <span class="flex-1 text-left flex items-center gap-1.5">
-              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
-                           bg-[#00A859]/20 text-[#00A859] text-[8px] font-black shrink-0">1</span>
-              Microretos
-            </span>
-            <svg
-              class="w-3 h-3 transition-transform duration-200"
-              :class="microretos_abierto ? 'rotate-180' : ''"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
-          <div class="sp-tooltip">Fase 1 — Crea microretos con IA y compártelos con el alumnado<div class="sp-tooltip-arrow"/></div>
-        </div>
+        <!-- ═══ GRUPO: MICRORETOS + TALLER DE IDEAS ═══ -->
+        <div class="rounded-2xl border border-[#00A859]/20 bg-[#00A859]/5 px-2 pt-2 pb-2 space-y-1">
 
-        <Transition name="sp-collapse">
-          <div v-if="microretos_abierto" class="space-y-0.5">
-
-            <!-- Generador de microretos -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/microretos')"
-                class="nav-item w-full text-left"
-                :class="isActive('/microretos') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-                <span>Generador</span>
-              </button>
-              <div class="sp-tooltip">Genera microretos con IA a partir de una empresa y los criterios del ciclo<div class="sp-tooltip-arrow"/></div>
+          <!-- FASE 1: MICRORETOS -->
+          <div class="group/tip relative">
+            <div class="w-full flex items-center gap-2 px-3 mb-1
+                     text-[9px] font-black uppercase tracking-[0.2em]
+                     text-[#00A859]/70 select-none">
+              <span class="flex-1 text-left flex items-center gap-1.5">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                             bg-[#00A859]/20 text-[#00A859] text-[8px] font-black shrink-0">1</span>
+                Microretos
+              </span>
             </div>
+            <div class="sp-tooltip">Fase 1 — Crea microretos con IA y compártelos con el alumnado<div class="sp-tooltip-arrow"/></div>
+          </div>
 
-            <!-- Biblioteca de microretos -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/biblioteca')"
-                class="nav-item w-full text-left"
-                :class="isActive('/biblioteca') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 22v-15A2.5 2.5 0 016.5 2z"/>
-                  <line x1="9" y1="7" x2="15" y2="7"/>
-                  <line x1="9" y1="11" x2="15" y2="11"/>
-                </svg>
-                <span>Biblioteca</span>
-              </button>
-              <div class="sp-tooltip">Consulta todos los microretos guardados y comparte el QR con el alumnado<div class="sp-tooltip-arrow"/></div>
-            </div>
+          <div class="space-y-0.5">
+
+              <!-- Generador de microretos -->
+              <div class="group/tip relative">
+                <button
+                  @click="irA('/microretos')"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/microretos') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
+                  <span>Generador</span>
+                </button>
+                <div class="sp-tooltip">Genera microretos con IA a partir de una empresa y los criterios del ciclo<div class="sp-tooltip-arrow"/></div>
+              </div>
+
+              <!-- Biblioteca de microretos -->
+              <div class="group/tip relative">
+                <button
+                  @click="irA('/biblioteca')"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/biblioteca') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 22v-15A2.5 2.5 0 016.5 2z"/>
+                    <line x1="9" y1="7" x2="15" y2="7"/>
+                    <line x1="9" y1="11" x2="15" y2="11"/>
+                  </svg>
+                  <span>Biblioteca</span>
+                </button>
+                <div class="sp-tooltip">Consulta todos los microretos guardados y comparte el QR con el alumnado<div class="sp-tooltip-arrow"/></div>
+              </div>
 
           </div>
-        </Transition>
+
+          <div class="border-t border-[#00A859]/15 mx-1 my-1" />
+
+          <!-- FASE 2: TALLER DE IDEAS -->
+          <div class="group/tip relative">
+            <div class="w-full flex items-center gap-2 px-3 mb-1
+                     text-[9px] font-black uppercase tracking-[0.2em]
+                     text-[#00A859]/70 select-none">
+              <span class="flex-1 text-left flex items-center gap-1.5">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                             bg-[#00A859]/20 text-[#00A859] text-[8px] font-black shrink-0">2</span>
+                Taller de Ideas
+              </span>
+            </div>
+            <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
+          </div>
+
+          <div class="space-y-0.5">
+
+              <!-- Dashboard docentes -->
+              <div class="group/tip relative">
+                <button
+                  @click="irA('/dashboard')"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/dashboard') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    <path d="M9 12l2 2 4-4"/>
+                  </svg>
+                  <span>Dashboard docente</span>
+                </button>
+                <div class="sp-tooltip">Registra sesiones de trabajo con microretos<div class="sp-tooltip-arrow"/></div>
+              </div>
+
+              <!-- Microproyectos -->
+              <div class="group/tip relative">
+                <button
+                  @click="irA('/startup-day')"
+                  class="nav-item w-full text-left"
+                  :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                  <span>Microproyectos</span>
+                </button>
+                <div class="sp-tooltip">Crea y gestiona microproyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
+              </div>
+
+          </div>
+
+        </div>
 
         <div class="my-4 border-t border-white/10" />
 
-        <!-- ═══════════════ FASE 2: STARTUP DAY (Taller de ideas) (colapsable) ══════════ -->
+        <!-- ═══════════════ EMPRESAS ════════════════════ -->
         <div class="group/tip relative">
-          <button
-            @click="startup_abierto = !startup_abierto"
-            class="w-full flex items-center gap-2 px-3 mb-1
+          <div class="w-full flex items-center gap-2 px-3 mb-1
                    text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
-          >
-            <span class="flex-1 text-left flex items-center gap-1.5">
-              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
-                           bg-amber-400/20 text-amber-400 text-[8px] font-black shrink-0">2</span>
-              Taller de Ideas
-            </span>
-            <svg
-              class="w-3 h-3 transition-transform duration-200"
-              :class="startup_abierto ? 'rotate-180' : ''"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
-          <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
-        </div>
-
-        <Transition name="sp-collapse">
-          <div v-if="startup_abierto" class="space-y-0.5">
-
-            <!-- Dashboard docentes -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/dashboard')"
-                class="nav-item w-full text-left"
-                :class="isActive('/dashboard') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-                  <rect x="9" y="3" width="6" height="4" rx="1"/>
-                  <path d="M9 12l2 2 4-4"/>
-                </svg>
-                <span>Dashboard docente</span>
-              </button>
-              <div class="sp-tooltip">Registra sesiones de trabajo con microretos<div class="sp-tooltip-arrow"/></div>
-            </div>
-
-            <!-- Microproyectos -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/startup-day')"
-                class="nav-item w-full text-left"
-                :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                  <path d="M2 17l10 5 10-5"/>
-                  <path d="M2 12l10 5 10-5"/>
-                </svg>
-                <span>Microproyectos</span>
-              </button>
-              <div class="sp-tooltip">Crea y gestiona microproyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
-            </div>
-
-          </div>
-        </Transition>
-
-        <div class="my-4 border-t border-white/10" />
-
-        <!-- ═══════════════ EMPRESAS (colapsable) ════════════════════ -->
-        <div class="group/tip relative">
-          <button
-            @click="empresas_abierto = !empresas_abierto"
-            class="w-full flex items-center gap-2 px-3 mb-1
-                   text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
-          >
+                   text-white/40 select-none">
             <span class="flex-1 text-left flex items-center gap-1.5">
               <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
                            bg-blue-400/20 text-blue-400 text-[8px] font-black shrink-0">E</span>
@@ -303,19 +275,11 @@ defineExpose({ isOpen, toggle, close })
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
             </span>
-            <svg
-              class="w-3 h-3 transition-transform duration-200"
-              :class="empresas_abierto ? 'rotate-180' : ''"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
+          </div>
           <div class="sp-tooltip">Módulo Empresas — Contacto directo y envío de enlaces de validación (requiere contraseña especial)<div class="sp-tooltip-arrow"/></div>
         </div>
 
-        <Transition name="sp-collapse">
-          <div v-if="empresas_abierto" class="space-y-0.5">
+        <div class="space-y-0.5">
 
             <!-- Directorio empresas -->
             <div class="group/tip relative">
@@ -334,33 +298,21 @@ defineExpose({ isOpen, toggle, close })
               <div class="sp-tooltip">Consulta y contacta con las empresas de la base de datos<div class="sp-tooltip-arrow"/></div>
             </div>
 
-          </div>
-        </Transition>
+        </div>
 
         <div class="my-4 border-t border-white/10" />
 
-        <!-- ═══════════════ ADMINISTRACIÓN (colapsable) ═════════════ -->
+        <!-- ═══════════════ ADMINISTRACIÓN ═════════════ -->
         <div class="group/tip relative">
-          <button
-            @click="herramientas_abierto = !herramientas_abierto"
-            class="w-full flex items-center gap-2 px-3 mb-1
+          <div class="w-full flex items-center gap-2 px-3 mb-1
                    text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 hover:text-white/60 transition-colors duration-150 select-none"
-          >
+                   text-white/40 select-none">
             <span class="flex-1 text-left">Administración</span>
-            <svg
-              class="w-3 h-3 transition-transform duration-200"
-              :class="herramientas_abierto ? 'rotate-180' : ''"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
+          </div>
           <div class="sp-tooltip">Gestión de datos de la plataforma<div class="sp-tooltip-arrow"/></div>
         </div>
 
-        <Transition name="sp-collapse">
-          <div v-if="herramientas_abierto" class="space-y-0.5">
+        <div class="space-y-0.5">
 
             <!-- Base de datos -->
             <div class="group/tip relative">
@@ -380,8 +332,7 @@ defineExpose({ isOpen, toggle, close })
               <div class="sp-tooltip">Empresas, centros educativos, familias y ciclos del ecosistema DuaLab<div class="sp-tooltip-arrow"/></div>
             </div>
 
-          </div>
-        </Transition>
+        </div>
 
       </nav>
 
@@ -653,14 +604,6 @@ defineExpose({ isOpen, toggle, close })
   border: 5px solid transparent;
   border-right-color: #111827;
 }
-
-/* ─── Colapso sección ────────────────────────────────────────── */
-.sp-collapse-enter-active,
-.sp-collapse-leave-active { transition: all 0.22s ease; overflow: hidden; }
-.sp-collapse-enter-from,
-.sp-collapse-leave-to     { opacity: 0; transform: translateY(-6px); max-height: 0; }
-.sp-collapse-enter-to,
-.sp-collapse-leave-from   { max-height: 200px; }
 
 /* ─── Panel slide / fade ─────────────────────────────────────── */
 .sp-slide-enter-active,

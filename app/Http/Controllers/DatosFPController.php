@@ -65,6 +65,7 @@ class DatosFPController extends Controller
     public function getFamilias()
     {
         $familias = Familia::select('id', 'nombre', 'imagen_url')
+            ->withCount('ciclos')
             ->orderBy('nombre')
             ->get()
             ->map(function ($familia) {

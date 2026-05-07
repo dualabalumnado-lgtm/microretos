@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
         'resultados_aprendizaje', 'criterios_evaluacion',
         'modulos', 'centro_ciclo',
         'ciclos_formativos', 'empresa_familia',
-        'empresas', 'centro_educativo', 'familias', 'demos',
+        'empresas', 'centro_educativo', 'demos',
     ] as $tabla) {
         \Illuminate\Support\Facades\DB::table($tabla)->truncate();
     }
@@ -53,10 +53,10 @@ class DatabaseSeeder extends Seeder
 
     // Create admin user (credentials from .env — see .env.example)
     \App\Models\User::updateOrCreate(
-        ['email' => env('ADMIN_EMAIL')],
+        ['email' => config('services.admin.email')],
         [
             'name'     => 'Administrador DuaLab',
-            'password' => bcrypt(env('ADMIN_PASSWORD')),
+            'password' => bcrypt(config('services.admin.password')),
         ]
     );
 

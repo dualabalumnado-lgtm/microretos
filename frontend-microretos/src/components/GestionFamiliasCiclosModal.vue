@@ -65,7 +65,7 @@ const elimError            = ref('')
 
 const totalFamilias = computed(() => familias.value.length)
 const totalCiclos   = computed(() =>
-  familias.value.reduce((sum, f) => sum + (f.ciclosLoaded ? f.ciclos.length : 0), 0)
+  familias.value.reduce((sum, f) => sum + (f.ciclos_count ?? 0), 0)
 )
 
 const GRADOS = [
@@ -370,8 +370,6 @@ async function guardarNuevoCiclo(familiaId) {
                 <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
                 <span class="text-[11px] font-black text-gray-600">{{ totalCiclos }}</span>
                 <span class="text-[11px] text-gray-400">ciclos</span>
-                <span v-if="!familias.every(f => f.ciclosLoaded)"
-                      class="text-[9px] text-gray-300 ml-0.5">(parcial)</span>
               </div>
             </div>
 

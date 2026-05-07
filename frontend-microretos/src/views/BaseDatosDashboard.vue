@@ -9,6 +9,7 @@ import EliminarCentroModal from '../components/EliminarCentroModal.vue'
 import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
 import GestionFamiliasCiclosModal from '../components/GestionFamiliasCiclosModal.vue'
 import CatalogoBoeModal from '../components/CatalogoBoeModal.vue'
+import CatalogoBoeIntroModal from '../components/CatalogoBoeIntroModal.vue'
 import { useUIState } from '../composables/useUIState.js'
 
 const authStore = useAuthStore()
@@ -620,7 +621,35 @@ onBeforeRouteUpdate(async () => {
 // ═══════════════════════════════════════════════════════════
 //  MODAL INFO BOE (solo lectura) — lógica en CatalogoBoeModal
 // ═══════════════════════════════════════════════════════════
-const mostrarInfoBoe = ref(false)
+const mostrarIntroBoe = ref(false)
+const mostrarInfoBoe  = ref(false)
+
+function abrirCatalogoBoe() {
+  mostrarIntroBoe.value = true
+}
+function onIntroBoeNext() {
+  mostrarInfoBoe.value = true
+}
+
+// Contadores globales para zona de peligro (se cargan al abrir el desplegable)
+const familiasResumen      = ref([])
+const cargandoResumen      = ref(false)
+const totalFamiliasResumen = computed(() => familiasResumen.value.length)
+const totalCiclosResumen   = computed(() =>
+  familiasResumen.value.reduce((sum, f) => sum + (f.ciclos_count ?? 0), 0)
+)
+
+async function cargarResumen() {
+  if (familiasResumen.value.length > 0 || cargandoResumen.value) return
+  cargandoResumen.value = true
+  try {
+    const { data } = await api.get('/familias')
+    familiasResumen.value = data
+  } catch { /* silencioso */ }
+  finally { cargandoResumen.value = false }
+}
+
+watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
 
 </script>
 
@@ -756,10 +785,27 @@ const mostrarInfoBoe = ref(false)
                 <div v-if="zonaPeligroAbierta"
                   class="absolute right-0 top-full mt-2 z-30
                          bg-white border border-red-100 rounded-2xl shadow-xl
-                         w-56 overflow-hidden">
+                         w-64 overflow-hidden">
                   <div class="px-4 pt-3 pb-2 border-b border-red-50">
                     <p class="text-[10px] font-black uppercase tracking-widest text-red-400">Acciones críticas</p>
                     <p class="text-[10px] text-gray-400 mt-0.5">Afectan a toda la base de datos</p>
+                    <!-- Contadores BD -->
+                    <div class="flex items-center gap-2 mt-2.5">
+                      <div v-if="cargandoResumen"
+                           class="w-3 h-3 rounded-full border-2 border-gray-200 border-t-gray-400 animate-spin" />
+                      <template v-else-if="totalFamiliasResumen > 0">
+                        <div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100">
+                          <span class="w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
+                          <span class="text-[10px] font-black text-indigo-600">{{ totalFamiliasResumen }}</span>
+                          <span class="text-[10px] text-indigo-400">familias</span>
+                        </div>
+                        <div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00A859]/8 border border-[#00A859]/20">
+                          <span class="w-1 h-1 rounded-full bg-[#00A859] shrink-0" />
+                          <span class="text-[10px] font-black text-[#00A859]">{{ totalCiclosResumen }}</span>
+                          <span class="text-[10px] text-[#00A859]/70">ciclos</span>
+                        </div>
+                      </template>
+                    </div>
                   </div>
                   <div class="p-2">
                     <button
@@ -894,7 +940,7 @@ const mostrarInfoBoe = ref(false)
           <!-- Botón Info BOE (catálofo fp) (ref para el tour paso 8) -->
           <button
             ref="refBtnInfoBoe"
-            @click="mostrarInfoBoe = true"
+            @click="abrirCatalogoBoe"
             class="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-2xl border border-indigo-200
                    shadow-sm text-indigo-600 text-xs font-black uppercase tracking-wider
                    hover:bg-indigo-100 hover:border-indigo-300 transition-all"
@@ -1208,7 +1254,7 @@ const mostrarInfoBoe = ref(false)
                           </span>
                           <div class="relative inline-block shrink-0" @click.stop>
                             <button
-                              @click="estadoDropdownAbierto = estadoDropdownAbierto === empresa.id ? null : empresa.id"
+                              @click="estadoEditandoId = null; estadoDropdownAbierto = estadoDropdownAbierto === empresa.id ? null : empresa.id"
                               :disabled="guardandoEstado.has(empresa.id)"
                               :class="empresa.estado_contacto
                                 ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
@@ -1242,7 +1288,7 @@ const mostrarInfoBoe = ref(false)
                                     </div>
                                   </div>
                                   <button
-                                    @click="pedirEditarEstado(empresa)"
+                                    @click="estadoEditandoId = empresa.id"
                                     class="w-full flex items-center gap-2 px-4 py-3 text-left
                                            text-[11px] font-black uppercase tracking-widest text-[#1F2937]
                                            hover:bg-gray-50 transition-colors"
@@ -1426,7 +1472,7 @@ const mostrarInfoBoe = ref(false)
                               <dd>
                                 <div class="relative inline-block" @click.stop>
                                   <button
-                                    @click="estadoDropdownAbierto = estadoDropdownAbierto === `det-${empresa.id}` ? null : `det-${empresa.id}`"
+                                    @click="estadoEditandoId = null; estadoDropdownAbierto = estadoDropdownAbierto === `det-${empresa.id}` ? null : `det-${empresa.id}`"
                                     :disabled="guardandoEstado.has(empresa.id)"
                                     :class="empresa.estado_contacto
                                       ? [estadoBadge(empresa.estado_contacto).bg, estadoBadge(empresa.estado_contacto).text, estadoBadge(empresa.estado_contacto).border]
@@ -1460,7 +1506,7 @@ const mostrarInfoBoe = ref(false)
                                           </div>
                                         </div>
                                         <button
-                                          @click="pedirEditarEstado(empresa)"
+                                          @click="estadoEditandoId = empresa.id"
                                           class="w-full flex items-center gap-2 px-4 py-3 text-left
                                                  text-[11px] font-black uppercase tracking-widest text-[#1F2937]
                                                  hover:bg-gray-50 transition-colors"
@@ -2151,6 +2197,7 @@ const mostrarInfoBoe = ref(false)
     </Transition>
 
     <!-- ════════════════ MODAL: INFO catálogo fp ════════════════════ -->
+    <CatalogoBoeIntroModal v-model:show="mostrarIntroBoe" @siguiente="onIntroBoeNext" />
     <CatalogoBoeModal v-model:show="mostrarInfoBoe" />
 
     <!-- ════════════════ SNACKBAR ════════════════ -->

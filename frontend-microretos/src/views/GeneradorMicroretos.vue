@@ -1,10 +1,11 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../api.js';
 import { useAuthStore } from '../stores/auth';
 import LoginModal from '../components/LoginModal.vue';
 import InsertModifyEmpresa from '../components/InsertModifyEmpresa.vue';
+import { useUIState } from '../composables/useUIState.js';
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -425,11 +426,15 @@ onMounted(async () => {
     showLogin.value = true;
   } else {
     await cargarEmpresas();
+    await nextTick();
+    pasoGuia.value = 1;
+    modoGuia.value = true;
   }
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', cerrarDropdownFuera);
+  tourActivo.value = false;
 });
 
 watch(() => seleccion.value.empresaId, async (nuevoId) => {
@@ -509,7 +514,13 @@ watch(() => seleccion.value.cursoSeleccionado, () => {
   modulosSeleccionados.value = [];
 });
 
-const avanzarPaso = () => { if (pasoActual.value < totalPasos) pasoActual.value++; window.scrollTo({top: 0, behavior: 'smooth'}); };
+const avanzarPaso = async () => {
+  if (pasoActual.value < totalPasos) pasoActual.value++;
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  await nextTick();
+  pasoGuia.value = 1;
+  modoGuia.value = true;
+};
 const retrocederPaso = () => { if (pasoActual.value > 1) pasoActual.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
 const guardarInfoEmpresa = async () => {
@@ -671,6 +682,167 @@ const tieneContextoEmpresa = computed(() => {
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
+// ─── TOUR GUIADO (tres conjuntos independientes, uno por paso) ────────────
+const { tourActivo } = useUIState()
+const modoGuia = ref(false)
+const pasoGuia = ref(1)
+
+// Refs paso 1
+const refCentroEducativo = ref(null)
+const refBaseDatos       = ref(null)
+const refInsertarEmpresa = ref(null)
+const refBtnGuia         = ref(null)
+// Refs paso 2
+const refEncabezadoProblema = ref(null)
+const refPreguntaFriccion   = ref(null)
+const refExpectativas       = ref(null)
+// Refs paso 3
+const refFamiliaSelect     = ref(null)
+const refNivelExigencia    = ref(null)
+const refCicloGrid         = ref(null)
+const refCursoAlumno       = ref(null)
+const refModulosSection    = ref(null)
+const refCantidadVariantes = ref(null)
+const refGuardarEmpresa    = ref(null)
+const refBtnGenerar        = ref(null)
+// Refs reutilizados (de otra lógica existente)
+
+// Tres conjuntos de pasos, cada uno para su paso de formulario
+const guiaPasos1 = [
+  { ref: 'refCentroEducativo', seccion: 'busqueda', texto: 'Selecciona tu centro educativo. Este filtro determina qué empresas y ciclos están disponibles.' },
+  { ref: 'refBuscadorEmpresa', seccion: 'busqueda', texto: 'Selecciona una empresa. Puede ser simulada (guardada en la base de datos) o real, colaboradora del centro.' },
+  { ref: 'refBotonesDemo',     seccion: 'acciones', texto: 'Carga la demo para comprobar el funcionamiento del generador. Usa el botón Vaciar para borrar toda la información escrita.' },
+  { ref: 'refBaseDatos',       seccion: 'acciones', texto: 'Consulta la base de datos con todas las empresas disponibles en la plataforma.' },
+  { ref: 'refInsertarEmpresa', seccion: 'acciones', texto: 'Inserta una nueva empresa en la plataforma o modifica los datos de una existente.' },
+  { ref: 'refBtnGuia',         seccion: null,       texto: 'Pincha aquí para volver a activar esta guía cuando quieras.' },
+]
+const guiaPasos2 = [
+  { ref: 'refEncabezadoProblema', seccion: 'diagnostico', texto: 'Paso 2 — Realidad de la Empresa: rellena los campos con lo que te ha contado la empresa en la reunión de diagnóstico.' },
+  { ref: 'refPreguntaFriccion',   seccion: 'diagnostico', texto: 'El corazón del microreto: describe en qué área está el problema y por qué ocurre. Cuanto más detallado, mejor resultado generará la IA.' },
+  { ref: 'refExpectativas',       seccion: 'diagnostico', texto: 'Indica qué esperas que realice el alumno como entrega final. La IA lo usará para definir el objetivo del reto.' },
+]
+const guiaPasos3 = [
+  { ref: 'refFamiliaSelect',     seccion: 'match', texto: 'Selecciona la familia profesional asociada a la empresa. Determina qué ciclos aparecerán en el siguiente paso.' },
+  { ref: 'refNivelExigencia',    seccion: 'match', texto: 'Elige el nivel de exigencia del microreto: básico, medio o alto, según el dominio real del grupo.' },
+  { ref: 'refCicloGrid',         seccion: 'match', texto: 'Selecciona el ciclo formativo del alumnado que va a resolver el reto. Aparecen los ciclos vinculados a la empresa y al centro.' },
+  { ref: 'refCursoAlumno',       seccion: 'match', texto: 'Indica si el alumnado está en 1º o 2º curso. La IA ajustará la complejidad del reto según el nivel real del grupo.' },
+  { ref: 'refModulosSection',    seccion: 'match', texto: 'Puedes forzar un módulo específico o dejarlo vacío para que la IA cruce con todos los módulos del ciclo automáticamente.' },
+  { ref: 'refCantidadVariantes', seccion: 'match', texto: 'Elige cuántas variantes generar. La IA diseñará enfoques distintos para el mismo problema de empresa.' },
+  { ref: 'refGuardarEmpresa',    seccion: 'match', texto: 'Si has modificado los datos de la empresa en este flujo, pulsa aquí para guardarlos antes de generar el reto.' },
+  { ref: 'refBtnGenerar',        seccion: 'match', texto: '¡Todo listo! Pulsa aquí para que la IA genere el microreto con toda la información introducida.' },
+  { ref: 'refBtnGuia',           seccion: null,    texto: 'Pulsa este botón cuando quieras volver a ver esta guía en cualquier momento.' },
+]
+
+const guiaPasosActual = computed(() => {
+  if (pasoActual.value === 1) return guiaPasos1
+  if (pasoActual.value === 2) return guiaPasos2
+  if (pasoActual.value === 3) return guiaPasos3
+  return []
+})
+
+const tourRefs = {
+  // Paso 1
+  refCentroEducativo,
+  refBuscadorEmpresa: buscadorRef,
+  refBotonesDemo: demoSelectorRef,
+  refBaseDatos,
+  refInsertarEmpresa,
+  refBtnGuia,
+  // Paso 2
+  refEncabezadoProblema,
+  refPreguntaFriccion,
+  refExpectativas,
+  // Paso 3
+  refFamiliaSelect,
+  refNivelExigencia,
+  refCicloGrid,
+  refCursoAlumno,
+  refModulosSection,
+  refCantidadVariantes,
+  refGuardarEmpresa,
+  refBtnGenerar,
+}
+
+const tourTargetActivo = computed(() => {
+  if (!modoGuia.value) return null
+  return guiaPasosActual.value[pasoGuia.value - 1]?.ref ?? null
+})
+
+const seccionActiva = computed(() => {
+  if (!modoGuia.value) return null
+  return guiaPasosActual.value[pasoGuia.value - 1]?.seccion ?? null
+})
+
+const bocadilloPos = ref({ top: 0, left: 0, arrowLeft: 130, dir: 'top' })
+
+function recalcularBocadillo() {
+  const paso = guiaPasosActual.value[pasoGuia.value - 1]
+  if (!paso) return
+  const rawEl = tourRefs[paso.ref]?.value
+  const el = rawEl?.$el ?? rawEl
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const TOOLTIP_W = 272
+  const TOOLTIP_H = 155
+  const MARGIN    = 12
+  const WIN_W = window.innerWidth
+  const WIN_H = window.innerHeight
+
+  const visibleTop    = Math.max(0, rect.top)
+  const visibleBottom = Math.min(WIN_H, rect.bottom)
+  const centerX       = rect.left + rect.width / 2
+
+  let tooltipLeft = centerX - TOOLTIP_W / 2
+  tooltipLeft = Math.max(10, Math.min(tooltipLeft, WIN_W - TOOLTIP_W - 10))
+  const arrowLeft = Math.max(18, Math.min(centerX - tooltipLeft, TOOLTIP_W - 18))
+
+  let dir, tooltipTop
+  if (WIN_H - visibleBottom > TOOLTIP_H + MARGIN) {
+    dir = 'top'
+    tooltipTop = visibleBottom + MARGIN
+  } else if (visibleTop > TOOLTIP_H + MARGIN) {
+    dir = 'bottom'
+    tooltipTop = visibleTop - MARGIN - TOOLTIP_H
+  } else {
+    dir = 'top'
+    tooltipTop = WIN_H * 0.6
+  }
+  tooltipTop = Math.max(10, Math.min(tooltipTop, WIN_H - TOOLTIP_H - 10))
+
+  bocadilloPos.value = { top: tooltipTop, left: tooltipLeft, arrowLeft, dir }
+}
+
+async function avanzarGuia() {
+  if (pasoGuia.value < guiaPasosActual.value.length) {
+    pasoGuia.value++
+    await nextTick()
+    scrollYRecalcular()
+  } else {
+    modoGuia.value = false
+  }
+}
+
+function saltarGuia() {
+  modoGuia.value = false
+}
+
+async function scrollYRecalcular() {
+  const paso = guiaPasosActual.value[pasoGuia.value - 1]
+  if (!paso) return
+  const rawEl = tourRefs[paso.ref]?.value
+  const el = rawEl?.$el ?? rawEl
+  if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
+  requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+}
+
+watch(modoGuia, async (v) => {
+  tourActivo.value = v
+  if (v) {
+    await nextTick()
+    requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+  }
+})
+
 // ── ESTADO DE CONTACTO (editable inline) ──────────────
 const ESTADOS_OPCIONES_GEN = [
   'Pendiente de llamar',
@@ -715,8 +887,102 @@ async function guardarEstadoGen(nuevoEstado) {
 <template>
   <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden">
     
-    <div class="max-w-6xl mx-auto">
-      
+    <!-- ══════════ TOUR OVERLAY ════════════════════════════════════════════ -->
+  <Transition name="sp-fade">
+    <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
+
+      <!-- ── PASO 2: modal explicativo centrado ── -->
+      <template v-if="pasoActual === 2">
+        <div class="absolute inset-0 bg-black/50 pointer-events-auto" @click="saltarGuia" />
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index:9992">
+          <div class="pointer-events-auto w-[380px] max-w-[calc(100vw-2rem)] bg-[#1a2332] border border-white/15 rounded-3xl shadow-2xl p-7 text-white" @click.stop>
+            <!-- Cabecera -->
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-9 h-9 rounded-2xl bg-[#00A859]/20 flex items-center justify-center text-[#00A859] font-black text-sm shrink-0">
+                {{ pasoGuia }}
+              </div>
+              <div class="flex-1">
+                <p class="text-[9px] font-black uppercase tracking-widest text-white/40 mb-0.5">Paso {{ pasoGuia }} de {{ guiaPasosActual.length }}</p>
+                <div class="flex gap-1">
+                  <span v-for="i in guiaPasosActual.length" :key="i"
+                        class="h-[3px] rounded-full transition-all duration-300"
+                        :class="i <= pasoGuia ? 'bg-[#00A859] w-5' : 'bg-white/20 w-3'" />
+                </div>
+              </div>
+            </div>
+            <!-- Texto -->
+            <p class="text-[13px] text-white/85 leading-relaxed mb-6">{{ guiaPasosActual[pasoGuia - 1].texto }}</p>
+            <!-- Botones -->
+            <div class="flex items-center gap-2">
+              <button @click="avanzarGuia"
+                      class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#00A859]/90 transition-all">
+                {{ pasoGuia < guiaPasosActual.length ? 'Siguiente →' : 'Finalizar' }}
+              </button>
+              <button @click="saltarGuia"
+                      class="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[10px] font-black uppercase tracking-widest hover:text-white/60 transition-all">
+                Saltar
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── PASO 1 & 3: bocadillo spotlight ── -->
+      <template v-else>
+        <div class="absolute inset-0 pointer-events-auto" @click="saltarGuia" />
+
+        <div class="absolute pointer-events-auto"
+             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: '272px', zIndex: 9992 }">
+
+          <div v-if="bocadilloPos.dir === 'top'"
+               class="absolute -top-[10px] w-0 h-0"
+               :style="{
+                 left: bocadilloPos.arrowLeft + 'px',
+                 transform: 'translateX(-50%)',
+                 borderLeft: '9px solid transparent',
+                 borderRight: '9px solid transparent',
+                 borderBottom: '10px solid #1a2332'
+               }" />
+
+          <div class="bg-[#1a2332] border border-white/15 rounded-2xl shadow-2xl p-4 text-white">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex gap-1 items-center">
+                <span v-for="i in guiaPasosActual.length" :key="i"
+                      class="h-[3px] rounded-full transition-all duration-300"
+                      :class="i <= pasoGuia ? 'bg-[#00A859] w-5' : 'bg-white/20 w-3'" />
+              </div>
+              <span class="text-[9px] font-bold text-white/40">{{ pasoGuia }}/{{ guiaPasosActual.length }}</span>
+            </div>
+            <p class="text-[11px] text-white/85 leading-relaxed mb-3">{{ guiaPasosActual[pasoGuia - 1].texto }}</p>
+            <div class="flex items-center gap-2">
+              <button @click="avanzarGuia"
+                      class="flex-1 py-1.5 rounded-xl bg-[#00A859] text-white text-[9px] font-black uppercase tracking-widest hover:bg-[#00A859]/90 transition-all">
+                {{ pasoGuia < guiaPasosActual.length ? 'Siguiente →' : 'Finalizar' }}
+              </button>
+              <button @click="saltarGuia"
+                      class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[9px] font-black uppercase tracking-widest hover:text-white/60 transition-all">
+                Saltar
+              </button>
+            </div>
+          </div>
+
+          <div v-if="bocadilloPos.dir === 'bottom'"
+               class="absolute -bottom-[10px] w-0 h-0"
+               :style="{
+                 left: bocadilloPos.arrowLeft + 'px',
+                 transform: 'translateX(-50%)',
+                 borderLeft: '9px solid transparent',
+                 borderRight: '9px solid transparent',
+                 borderTop: '10px solid #1a2332'
+               }" />
+        </div>
+      </template>
+
+    </div>
+  </Transition>
+
+  <div class="max-w-6xl mx-auto">
+
       <header class="mb-10 text-center flex flex-col items-center">
         <div class="inline-flex items-center mb-8 bg-[#1F2937] py-3 sm:py-4 pr-6 sm:pr-10 pl-4 sm:pl-6 rounded-[3rem] shadow-lg border border-[#333333] transition-all duration-1000 ease-out transform"
              :class="isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0'">
@@ -735,6 +1001,24 @@ async function guardarEstadoGen(nuevoEstado) {
            :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
           Convierte problemas empresariales reales en retos educativos clasificados por el currículo oficial.
         </p>
+
+        <!-- Botón Guía -->
+        <div class="flex justify-center mt-5 transition-all duration-1000 ease-out transform"
+             :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'"
+             style="transition-delay:450ms">
+          <button
+            ref="refBtnGuia"
+            @click="modoGuia = true; pasoGuia = 1"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-2xl border border-blue-100
+                   shadow-sm text-blue-500 text-xs font-black uppercase tracking-wider
+                   hover:bg-blue-100 hover:border-blue-200 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Activar Guía
+          </button>
+        </div>
 
       </header>
 
@@ -779,9 +1063,11 @@ async function guardarEstadoGen(nuevoEstado) {
                   <h2 class="text-2xl font-black uppercase tracking-tight text-[#1F2937]">Buscar en DuaLab</h2>
                 </div>
                 
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2"
+                     :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'acciones' }">
                   <!-- Cargar Demo -->
-                  <div class="relative" ref="demoSelectorRef">
+                  <div class="relative" ref="demoSelectorRef"
+                       :class="{ 'tour-active': tourTargetActivo === 'refBotonesDemo' }">
                     <button
                       @click="mostrarSelectorDemo = !mostrarSelectorDemo"
                       :class="esModoDemo ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/30 hover:bg-[#00A859]/15' : 'bg-white text-[#00A859] hover:bg-gray-50 border-gray-200 hover:border-[#00A859] shadow-sm'"
@@ -834,8 +1120,10 @@ async function guardarEstadoGen(nuevoEstado) {
 
                   <!-- Ver base de datos -->
                   <RouterLink
+                    ref="refBaseDatos"
                     to="/base-datos"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border bg-white text-gray-600 hover:bg-gray-50 border-gray-200 hover:border-gray-400 shadow-sm"
+                    :class="{ 'tour-active': tourTargetActivo === 'refBaseDatos' }"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -847,10 +1135,13 @@ async function guardarEstadoGen(nuevoEstado) {
                   </RouterLink>
 
                   <!-- Insertar / Modificar empresa -->
-                  <button @click="abrirModalEmpresa"
-                    :class="seleccion.empresaId
-                      ? 'bg-[#00A859] text-white border-[#00A859] hover:bg-[#007a42] shadow-md'
-                      : 'bg-white text-[#1F2937] hover:bg-gray-50 border-gray-200 shadow-sm'"
+                  <button ref="refInsertarEmpresa" @click="abrirModalEmpresa"
+                    :class="[
+                      seleccion.empresaId
+                        ? 'bg-[#00A859] text-white border-[#00A859] hover:bg-[#007a42] shadow-md'
+                        : 'bg-white text-[#1F2937] hover:bg-gray-50 border-gray-200 shadow-sm',
+                      tourTargetActivo === 'refInsertarEmpresa' ? 'tour-active' : ''
+                    ]"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path v-if="seleccion.empresaId" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -877,9 +1168,15 @@ async function guardarEstadoGen(nuevoEstado) {
                 </p>
               </div>
 
-              <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="mb-10 relative z-20 grid grid-cols-1 md:grid-cols-2 gap-6"
+                   :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'busqueda' }">
                 <!-- PASO 1: Centro educativo obligatorio -->
-                <div class="rounded-2xl transition-all duration-300" :class="!centroFiltro && !esModoDemo ? 'step-glow-active' : ''">
+                <div ref="refCentroEducativo"
+                     class="rounded-2xl transition-all duration-300"
+                     :class="[
+                       !centroFiltro && !esModoDemo ? 'step-glow-active' : '',
+                       tourTargetActivo === 'refCentroEducativo' ? 'tour-active' : ''
+                     ]">
                   <label class="label-style" :class="!centroFiltro && !esModoDemo ? '!text-[#00A859]' : ''">
                     {{ !centroFiltro && !esModoDemo ? '① Centro Educativo *' : 'Centro Educativo *' }}
                   </label>
@@ -892,7 +1189,10 @@ async function guardarEstadoGen(nuevoEstado) {
 
                 <!-- PASO 2: Buscar empresa (bloqueado hasta elegir centro) -->
                 <div class="relative rounded-2xl transition-all duration-300" ref="buscadorRef"
-                     :class="centroFiltro && !seleccion.empresaId && !esModoDemo ? 'step-glow-empresa' : ''">
+                     :class="[
+                       centroFiltro && !seleccion.empresaId && !esModoDemo ? 'step-glow-empresa' : '',
+                       tourTargetActivo === 'refBuscadorEmpresa' ? 'tour-active' : ''
+                     ]">
                   <label class="label-style"
                     :class="centroFiltro && !seleccion.empresaId && !esModoDemo ? '!text-[#00A859]' : (!centroFiltro && !esModoDemo ? 'opacity-40' : '')">
                     <template v-if="centroFiltro && !seleccion.empresaId && !esModoDemo">② Elige empresa</template>
@@ -1156,7 +1456,8 @@ async function guardarEstadoGen(nuevoEstado) {
                 Entrevista de Diagnóstico
               </div>
               
-              <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0">
+              <div ref="refEncabezadoProblema" class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-4 xl:mt-0"
+                   :class="{ 'tour-active': tourTargetActivo === 'refEncabezadoProblema' }">
                 <div class="flex items-center gap-4">
                   <div class="w-12 h-12 rounded-2xl bg-[#99CC33]/15 flex items-center justify-center text-[#00A859]">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
@@ -1235,7 +1536,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div ref="refPreguntaFriccion" class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                     :class="{ 'tour-active': tourTargetActivo === 'refPreguntaFriccion' }">
                   <div>
                     <div class="flex items-center gap-2 mb-3">
                       <label class="label-style !mb-0 flex items-center gap-2">
@@ -1328,7 +1630,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                <div ref="refExpectativas" class="bg-gray-50 p-6 rounded-3xl border border-gray-100"
+                     :class="{ 'tour-active': tourTargetActivo === 'refExpectativas' }">
                   <div class="flex items-center gap-2 mb-3">
                     <label class="label-style !mb-0 flex items-center gap-2">
                       <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">5</span>
@@ -1413,7 +1716,8 @@ async function guardarEstadoGen(nuevoEstado) {
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="col-span-2 md:col-span-1">
+                <div ref="refFamiliaSelect" class="col-span-2 md:col-span-1"
+                     :class="{ 'tour-active': tourTargetActivo === 'refFamiliaSelect' }">
                   <label class="label-style">Familia Profesional Asociada *</label>
                   <select v-model="seleccion.familia" :disabled="esModoDemo" class="input-style">
                     <option value="">Selecciona Familia...</option>
@@ -1421,7 +1725,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </select>
                 </div>
 
-                <div class="col-span-2 md:col-span-1">
+                <div ref="refNivelExigencia" class="col-span-2 md:col-span-1"
+                     :class="{ 'tour-active': tourTargetActivo === 'refNivelExigencia' }">
                   <label class="label-style">Nivel de exigencia del microreto *</label>
                   <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
                     <option value="Bajo">Básico — El grupo tiene un nivel de comprensión inicial; el microreto debe ser sencillo y guiado</option>
@@ -1430,9 +1735,10 @@ async function guardarEstadoGen(nuevoEstado) {
                   </select>
                 </div>
 
-                <div class="col-span-2 mt-4">
+                <div ref="refCicloGrid" class="col-span-2 mt-4"
+                     :class="{ 'tour-active': tourTargetActivo === 'refCicloGrid' }">
                   <label class="label-style !mb-4">Ciclo Formativo Implicado *</label>
-                  
+
                   <!-- Ciclos de BD -->
                   <div v-if="ciclos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                      <button v-for="c in ciclos" :key="c.id"
@@ -1468,7 +1774,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div class="col-span-2 mt-6">
+                <div ref="refCursoAlumno" class="col-span-2 mt-6"
+                     :class="{ 'tour-active': tourTargetActivo === 'refCursoAlumno' }">
                   <label class="label-style !mb-3">Curso del Alumnado *</label>
                   <div class="flex bg-[#1F2937] p-1.5 rounded-2xl w-full md:w-1/2 shadow-inner">
                     <button @click="!esModoDemo && (seleccion.cursoSeleccionado = 1)" 
@@ -1486,7 +1793,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div class="col-span-2 mt-2 pt-6 border-t border-gray-100">
+                <div ref="refModulosSection" class="col-span-2 mt-2 pt-6 border-t border-gray-100"
+                     :class="{ 'tour-active': tourTargetActivo === 'refModulosSection' }">
                   <div class="w-full bg-gray-50 p-6 rounded-3xl border border-gray-200 relative">
                     <div class="flex items-center justify-between mb-3">
                       <label class="label-style !mb-0 !ml-0">Forzar Módulo Específico (Opcional)</label>
@@ -1507,7 +1815,8 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div class="col-span-2 mt-2 pt-6 border-t border-gray-100">
+                <div ref="refCantidadVariantes" class="col-span-2 mt-2 pt-6 border-t border-gray-100"
+                     :class="{ 'tour-active': tourTargetActivo === 'refCantidadVariantes' }">
                   <div class="w-full md:w-1/3">
                     <label class="label-style !mb-3 text-[#1F2937]">Cantidad de Variantes a Generar *</label>
                     <select v-model="seleccion.cantidadMicroretos" :disabled="esModoDemo" class="input-style focus:!border-[#00A859]">
@@ -1549,9 +1858,9 @@ async function guardarEstadoGen(nuevoEstado) {
             SIGUIENTE PASO
           </button>
 
-          <button v-if="pasoActual === totalPasos" @click="guardarInfoEmpresa" :disabled="actualizandoCRM || crmActualizado"
+          <button ref="refGuardarEmpresa" v-if="pasoActual === totalPasos" @click="guardarInfoEmpresa" :disabled="actualizandoCRM || crmActualizado"
             class="flex-1 min-w-[200px] px-6 py-6 border-2 text-[#1F2937] bg-white border-gray-200 hover:border-[#00A859] hover:text-[#00A859] rounded-full font-black text-xs tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
-            :class="crmActualizado ? '!border-[#00A859] !bg-[#00A859]/5 !text-[#00A859]' : ''">
+            :class="[crmActualizado ? '!border-[#00A859] !bg-[#00A859]/5 !text-[#00A859]' : '', tourTargetActivo === 'refGuardarEmpresa' ? 'tour-active' : '']">
             <template v-if="actualizandoCRM">
               <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg>
               GUARDANDO...
@@ -1568,8 +1877,8 @@ async function guardarEstadoGen(nuevoEstado) {
             </template>
           </button>
 
-          <button v-if="pasoActual === totalPasos" @click="esModoDemo ? generarRetoDemo() : generarReto()" :disabled="!paso3Valido || cargando"
-            :class="esModoDemo ? 'from-[#1F2937] to-[#374151] shadow-[0_10px_30px_rgba(31,41,55,0.3)] hover:shadow-[0_15px_40px_rgba(31,41,55,0.4)]' : 'from-[#00A859] to-[#99CC33] shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)]'"
+          <button ref="refBtnGenerar" v-if="pasoActual === totalPasos" @click="esModoDemo ? generarRetoDemo() : generarReto()" :disabled="!paso3Valido || cargando"
+            :class="[esModoDemo ? 'from-[#1F2937] to-[#374151] shadow-[0_10px_30px_rgba(31,41,55,0.3)] hover:shadow-[0_15px_40px_rgba(31,41,55,0.4)]' : 'from-[#00A859] to-[#99CC33] shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)]', tourTargetActivo === 'refBtnGenerar' ? 'tour-active' : '']"
             class="flex-[2] min-w-[250px] px-8 py-6 bg-gradient-to-r text-white rounded-full font-black text-lg transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-40 flex items-center justify-center gap-3">
             <template v-if="!cargando">
               <svg v-if="esModoDemo" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1919,4 +2228,23 @@ async function guardarEstadoGen(nuevoEstado) {
   0%, 100% { box-shadow: 0 0 0 2px #99CC33, 0 0 14px rgba(153, 204, 51, 0.25); }
   50%       { box-shadow: 0 0 0 3px #99CC33, 0 0 24px rgba(153, 204, 51, 0.45); }
 }
+
+/* ─── Tour guiado ────────────────────────────────────────────────────────── */
+.tour-active {
+  box-shadow: 0 0 0 3px #00A859, 0 0 0 8px rgba(0, 168, 89, 0.2), 0 4px 20px rgba(0,0,0,0.1) !important;
+  border-radius: 1rem;
+  transition: box-shadow 0.25s ease;
+  position: relative;
+  z-index: 9991;
+}
+
+.tour-seccion-blur {
+  filter: blur(2px);
+  opacity: 0.4;
+  pointer-events: none;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+.sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
+.sp-fade-enter-from, .sp-fade-leave-to { opacity: 0; }
 </style>
