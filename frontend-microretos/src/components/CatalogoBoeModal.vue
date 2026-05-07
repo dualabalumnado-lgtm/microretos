@@ -22,7 +22,7 @@ const boeRaCeMap    = ref({})   // { moduloId: { ra: [{orden,descripcion,criteri
 
 const totalFamilias = computed(() => boeFamilias.value.length)
 const totalCiclos   = computed(() =>
-  boeFamilias.value.reduce((sum, f) => sum + (f.ciclosLoaded ? f.ciclos.length : 0), 0)
+  boeFamilias.value.reduce((sum, f) => sum + (f.ciclos_count ?? 0), 0)
 )
 
 // Carga familias la primera vez que se abre el modal
@@ -126,8 +126,6 @@ async function toggleBoeModulo(cicloId, moduloId) {
             <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] shrink-0" />
             <span class="text-[11px] font-black text-[#00A859]">{{ totalCiclos }}</span>
             <span class="text-[11px] text-[#00A859]/70">ciclos</span>
-            <span v-if="!boeFamilias.every(f => f.ciclosLoaded)"
-                  class="text-[9px] text-gray-400 ml-0.5">(parcial)</span>
           </div>
         </div>
 

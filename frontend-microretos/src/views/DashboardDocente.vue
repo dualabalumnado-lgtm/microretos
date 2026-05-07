@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '../api.js'
 import MicroretoModal from '../components/MicroretoModal.vue'
-import BienvenidaModal from '../components/BienvenidaModal.vue'
+import BienvenidaModal from '../components/BienvenidaModal_DashboardDocente.vue'
 import { useUIState } from '../composables/useUIState.js'
 
 const { tourActivo } = useUIState()
