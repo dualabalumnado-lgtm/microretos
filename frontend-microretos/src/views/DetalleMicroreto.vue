@@ -246,7 +246,7 @@ async function copiarUrl() {
                      M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2
                      m-6 9l2 2 4-4"/>
           </svg>
-          Trabajar este microreto
+          Trabajar este reto
         </button>
 
       </div>
@@ -272,7 +272,7 @@ async function copiarUrl() {
                      L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
           </svg>
         </div>
-        <h3 class="text-[#1F2937] font-black text-2xl mb-2">No se pudo cargar el microreto</h3>
+        <h3 class="text-[#1F2937] font-black text-2xl mb-2">No se pudo cargar el reto</h3>
         <p class="text-gray-500 text-sm mb-6">Comprueba tu conexión o vuelve a intentarlo.</p>
         <button @click="volver"
                 class="px-6 py-2.5 bg-white border border-gray-200
@@ -317,7 +317,7 @@ async function copiarUrl() {
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
                            a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                DuaLab · Ficha de Microreto
+                DuaLab · Ficha de Reto
               </p>
 
               <h1 class="text-2xl sm:text-3xl md:text-5xl font-black text-[#1F2937]
@@ -395,7 +395,7 @@ async function copiarUrl() {
                              a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2
                              2h-2a2 2 0 01-2-2z"/>
                   </svg>
-                  Nivel microreto: {{ reto.nivel_grupo }}
+                  Nivel: {{ reto.nivel_grupo }}
                 </span>
 
                 <span v-if="reto.ciclo"
@@ -747,7 +747,7 @@ async function copiarUrl() {
               <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#00A859] mb-0.5">
                 Acceso Alumnado
               </p>
-              <h3 class="text-lg font-black text-[#1F2937]">QR del Microreto</h3>
+              <h3 class="text-lg font-black text-[#1F2937]">QR del Reto</h3>
             </div>
             <button @click="showQrModal = false"
                     class="w-8 h-8 flex items-center justify-center rounded-full
@@ -784,7 +784,7 @@ async function copiarUrl() {
                 </div>
                 <p class="text-sm font-semibold text-[#1F2937]">No hay ningún acceso activo</p>
                 <p class="text-[11px] text-gray-400 leading-relaxed max-w-[220px]">
-                  Crea un código QR temporal para que el alumnado acceda a este microreto.
+                  Crea un código QR temporal para que el alumnado acceda a este reto.
                 </p>
 
                 <!-- Error -->

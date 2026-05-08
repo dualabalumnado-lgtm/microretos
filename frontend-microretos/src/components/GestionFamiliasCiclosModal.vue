@@ -697,7 +697,7 @@ async function guardarNuevoCiclo(familiaId) {
                     <p class="text-xs text-red-600 mt-1">
                       {{ confirmElimFamilia.numCiclos > 0
                         ? `Tiene ${confirmElimFamilia.numCiclos} ciclo(s) asociado(s). Elimina primero todos sus ciclos.`
-                        : 'Afecta a todos los microretos y empresas vinculadas a esta familia.' }}
+                        : 'Afecta a todos los retos y empresas vinculadas a esta familia.' }}
                     </p>
                   </div>
 

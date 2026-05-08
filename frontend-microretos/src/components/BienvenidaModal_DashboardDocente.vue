@@ -43,7 +43,7 @@ const emit = defineEmits(['seleccionar'])
             </div>
             <div>
               <p class="font-black text-white text-sm mb-0.5">Crear una sesión</p>
-              <p class="text-xs text-white/50 leading-relaxed">Registra una nueva sesión de trabajo con un microreto.</p>
+              <p class="text-xs text-white/50 leading-relaxed">Registra una nueva sesión de trabajo con un reto.</p>
             </div>
           </button>
 

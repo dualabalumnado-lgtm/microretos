@@ -65,7 +65,7 @@ function cerrar() {
           <div class="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-100
                       px-6 py-3 flex items-center justify-between gap-4">
             <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-              Ficha del microreto
+              Ficha del reto
             </p>
             <div class="flex items-center gap-2">
               <button v-if="reto" @click="descargarPDF(reto)"
@@ -111,7 +111,7 @@ function cerrar() {
                          L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
               </svg>
             </div>
-            <p class="font-black text-lg text-[#1F2937] mb-1">No se pudo cargar el microreto</p>
+            <p class="font-black text-lg text-[#1F2937] mb-1">No se pudo cargar el reto</p>
             <p class="text-sm text-gray-400">Comprueba tu conexión e inténtalo de nuevo.</p>
           </div>
 
@@ -138,7 +138,7 @@ function cerrar() {
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
                                a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    DuaLab · Ficha de Microreto
+                    DuaLab · Ficha de Reto
                   </p>
                   <h1 class="text-2xl md:text-4xl font-black text-[#1F2937] tracking-tight leading-tight mb-2">
                     {{ reto.titulo }}

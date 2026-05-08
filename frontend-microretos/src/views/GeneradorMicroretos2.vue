@@ -626,7 +626,7 @@ const guardar = async () => {
           
           <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>
-              <h3 class="text-lg font-black text-slate-800">Previsualización del Microreto</h3>
+              <h3 class="text-lg font-black text-slate-800">Previsualización del Reto</h3>
               <p class="text-sm text-slate-500">Diseño listo para el aula.</p>
             </div>
             <button @click="guardar" :disabled="guardadoExitoso" class="btn-save" :class="guardadoExitoso ? 'bg-emerald-600' : ''">
@@ -764,7 +764,7 @@ const guardar = async () => {
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                     Aprendizaje Aplicado
                   </div>
-                  <h2 class="text-3xl md:text-4xl font-black text-white tracking-tight">Relación del microreto con tu ciclo</h2>
+                  <h2 class="text-3xl md:text-4xl font-black text-white tracking-tight">Relación del reto con tu ciclo</h2>
                 </div>
                 
                 <div class="bg-emerald-950 p-4 rounded-xl border border-emerald-800">

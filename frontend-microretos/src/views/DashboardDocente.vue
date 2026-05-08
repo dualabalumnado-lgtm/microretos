@@ -322,13 +322,13 @@ const modoGuia       = ref(false)
 const pasoGuia       = ref(1)
 
 const guiaPasosData = [
-  { ref: 'refMicroreto',     seccion: 'microreto', texto: 'Busca y elige el microreto que vas a trabajar con tu grupo. Este es el punto de partida.' },
+  { ref: 'refMicroreto',     seccion: 'microreto', texto: 'Busca y elige el reto que vas a trabajar con tu grupo. Este es el punto de partida.' },
   { ref: 'refCampoFecha',    seccion: 'datos',     texto: 'Indica la fecha en la que se realizó la sesión.' },
   { ref: 'refCampoCentro',   seccion: 'datos',     texto: 'Indica el centro educativo.' },
   { ref: 'refCampoAlumnado', seccion: 'datos',     texto: 'Indica la información del alumnado: curso, grupo y número de alumnos.' },
   { ref: 'refCampoNotas',    seccion: 'datos',     texto: 'Indica cualquier nota relevante sobre la sesión.' },
   { ref: 'refBtnGuardar',    seccion: 'datos',     texto: 'Pulsa guardar sesión para registrar la información.' },
-  { ref: 'refSesiones',      seccion: 'sesiones',  texto: 'Quedará disponible para crear el microproyecto y comenzar el taller de ideas, o consultar esta info más adelante.' },
+  { ref: 'refSesiones',      seccion: 'sesiones',  texto: 'Quedará disponible para crear el proyecto y comenzar el taller de ideas, o consultar esta info más adelante.' },
   { ref: 'refBtnGuia',       seccion: null,        texto: 'Pincha aquí para volver a activar la guía cuando quieras.' },
 ]
 
@@ -609,7 +609,7 @@ function formatFecha(isoDate) {
             <h1 class="text-3xl md:text-4xl font-black tracking-tight text-[#121212]">
               Sesiones <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">DuaLab</span>
             </h1>
-            <p class="text-gray-500 text-sm mt-1">Registra y consulta tus sesiones de trabajo con microretos.</p>
+            <p class="text-gray-500 text-sm mt-1">Registra y consulta tus sesiones de trabajo con retos.</p>
           </div>
 
           <!-- Stats chips -->
@@ -661,7 +661,7 @@ function formatFecha(isoDate) {
                }">
             <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                Microreto a trabajar
+                Reto a trabajar
               </p>
               <button v-if="!mostrarBuscador && !microretoSeleccionado"
                       @click="abrirBuscador"
@@ -672,7 +672,7 @@ function formatFecha(isoDate) {
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                 </svg>
-                Buscar microreto
+                Buscar reto
               </button>
             </div>
 
@@ -683,7 +683,7 @@ function formatFecha(isoDate) {
                 <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
                 </svg>
-                <span class="text-sm">Cargando microreto...</span>
+                <span class="text-sm">Cargando reto...</span>
               </div>
 
               <!-- Microreto seleccionado -->
@@ -837,7 +837,7 @@ function formatFecha(isoDate) {
                     <span v-if="cargandoCatalogo">Cargando catálogo...</span>
                     <span v-else-if="filtroCentro || filtroSimulado">
                       {{ resultadosFiltrados.length }}
-                      {{ resultadosFiltrados.length === 1 ? 'microreto' : 'microretos' }}
+                      {{ resultadosFiltrados.length === 1 ? 'reto' : 'retos' }}
                       encontrados
                     </span>
                     <span v-else class="text-gray-300">Selecciona un centro para ver resultados</span>
@@ -911,7 +911,7 @@ function formatFecha(isoDate) {
                   </div>
                   <p class="text-xs text-gray-400 font-medium">
                     Selecciona un centro educativo<br>
-                    <span class="text-gray-300">para ver los microretos disponibles</span>
+                    <span class="text-gray-300">para ver los retos disponibles</span>
                   </p>
                 </div>
 
@@ -928,12 +928,12 @@ function formatFecha(isoDate) {
                           d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                   <p class="text-xs text-amber-700 font-medium leading-relaxed">
-                    Usa el buscador de microretos o ve a la
+                    Usa el buscador de retos o ve a la
                     <button @click="router.push('/biblioteca')"
                             class="underline font-black hover:text-amber-900 transition-colors">
                       Biblioteca
                     </button>
-                    y pulsa "Trabajar este microreto".
+                    y pulsa "Trabajar este reto".
                   </p>
                 </div>
 
@@ -945,7 +945,7 @@ function formatFecha(isoDate) {
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                   </svg>
-                  Buscar microreto
+                  Buscar reto
                 </button>
 
                 <!-- Separador -->
@@ -1424,7 +1424,7 @@ function formatFecha(isoDate) {
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
-                Crear microproyecto
+                Crear proyecto
               </button>
             </div>
           </div>
