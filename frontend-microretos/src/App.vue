@@ -64,6 +64,11 @@ const segundosModal = computed(() => secondsUntilLogout.value % 60)
 const seguirConectado = () => {
   showIdleWarning.value = false
   resetIdle()
+  // Si el token tiene menos de 2 horas, aprovechamos que el usuario ha confirmado
+  // que quiere seguir para renovarlo silenciosamente (sin introducir credenciales)
+  if (authStore.isAuthenticated && authStore.minutosRestantes >= 0 && authStore.minutosRestantes <= 120) {
+    authStore.refresh()
+  }
 }
 
 const cerrarSesionIdle = () => {
