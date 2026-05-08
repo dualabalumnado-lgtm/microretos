@@ -6,6 +6,17 @@ import api from '../api.js'
 const TOKEN_DURATION_MINUTES = 1440
 
 export const useAuthStore = defineStore('auth', () => {
+  // Limpiar token caducado o sin timestamp al inicializar la store,
+  // evitando que un token antiguo en localStorage supere el guard de navegación.
+  const _initToken     = localStorage.getItem('admin_token')
+  const _initCreatedAt = Number(localStorage.getItem('admin_token_created_at') || 0)
+  const _isExpiredOnLoad = _initToken && (!_initCreatedAt ||
+    (Date.now() - _initCreatedAt) / 1000 / 60 >= TOKEN_DURATION_MINUTES)
+  if (_isExpiredOnLoad) {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_token_created_at')
+  }
+
   const isAuthenticated = ref(!!localStorage.getItem('admin_token'))
   const refreshing = ref(false)
 
