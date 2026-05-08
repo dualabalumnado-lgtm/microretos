@@ -9,8 +9,9 @@ const router = useRouter();
 
 const paso       = ref(1);
 const totalPasos = 8;
-const guardando  = ref(false);
-const cargando   = ref(false);
+const guardando         = ref(false);
+const cargando          = ref(false);
+const cargandoProyecto  = ref(false);
 const uuid       = ref(route.params.uuid || null);
 const isLoaded   = ref(false);
 const errorMsg   = ref('');
@@ -61,10 +62,9 @@ async function seleccionarSesion(s) {
   sesionSeleccionada.value = s
   form.value.sesion_id     = s.id
   form.value.microreto_id  = s.microreto_id
-  if (s.microreto_id) {
-    const mr = microretos.value.find(m => m.id == s.microreto_id)
-    if (mr) await autocompletarDesdeMicroreto(mr)
-  }
+  // Usar microreto eager-loaded de la sesión; fallback al array local
+  const mr = s.microreto || (s.microreto_id ? microretos.value.find(m => m.id == s.microreto_id) : null)
+  if (mr) await autocompletarDesdeMicroreto(mr, s)
 }
 
 function limpiarSesion() {
@@ -343,6 +343,7 @@ async function cargarCatalogos() {
 }
 
 watch(() => form.value.familia_id, async (id) => {
+  if (cargandoProyecto.value) return;
   ciclos.value  = []; modulos.value = [];
   form.value.ciclo_id = ''; form.value.modulos_seleccionados = [];
   if (!id) return;
@@ -358,6 +359,7 @@ watch(() => form.value.familia_id, async (id) => {
 });
 
 watch(() => form.value.ciclo_id, async (id) => {
+  if (cargandoProyecto.value) return;
   modulos.value = []; form.value.modulos_seleccionados = [];
   if (!id) return;
   const res = await api.get(`/ciclos/${id}/modulos`);
@@ -376,17 +378,25 @@ watch(() => form.value.ciclo_id, async (id) => {
 });
 
 watch(() => form.value.empresa_id, (id) => {
+  if (cargandoProyecto.value) return;
   const e = empresas.value.find(x => x.id == id);
   if (!e) return;
   form.value.datos_empresa = {
-    nombre: e.nombre_comercial || '', cif: e.cif || '', sector: e.sector || '',
-    actividad: e.actividad || '', persona_contacto: e.persona_contacto || '',
-    email: e.email_general || '', telefono: e.telefono || '', web: e.web || '', descripcion: '',
+    nombre:            e.nombre_comercial || '',
+    cif:               e.cif || '',
+    sector:            e.sector || '',
+    actividad:         e.actividad || '',
+    persona_contacto:  e.persona_contacto || '',
+    email:             e.email_contacto || e.email_general || '',
+    telefono:          e.telefono || '',
+    web:               e.web || '',
+    descripcion:       e.dia_a_normal || '',
   };
   if (e.familias?.length === 1) form.value.familia_id = e.familias[0].id;
 });
 
 watch(() => form.value.centro_id, (id) => {
+  if (cargandoProyecto.value) return;
   const c = centros.value.find(x => x.id == id);
   if (!c) return;
   form.value.datos_centro.nombre    = c.nombre    || '';
@@ -394,7 +404,7 @@ watch(() => form.value.centro_id, (id) => {
 });
 
 // ── Autocomplete desde microreto ─────────────────────────────────────────────
-async function autocompletarDesdeMicroreto(mr) {
+async function autocompletarDesdeMicroreto(mr, sesion = null) {
   if (!mr) return;
   autocompletando.value = true;
 
@@ -403,17 +413,16 @@ async function autocompletarDesdeMicroreto(mr) {
     mrEvalOficial.value = mr.evaluacion_oficial;
   }
 
-  // Título (solo si vacío)
+  // ── Paso 1: Básicos ───────────────────────────────────────────────────────
   if (!form.value.titulo && mr.titulo) form.value.titulo = mr.titulo;
 
-  // Curso (con indicador visual)
   if (mr.curso) {
     form.value.curso = String(mr.curso) === '1' ? '1º' : '2º';
     cursoAutocompletado.value = true;
     setTimeout(() => { cursoAutocompletado.value = false; }, 6000);
   }
 
-  // Campos de texto (solo si vacíos)
+  // ── Paso 5: El Reto ───────────────────────────────────────────────────────
   if (!form.value.diseno_reto.pregunta_reto && mr.pregunta_reto)
     form.value.diseno_reto.pregunta_reto = mr.pregunta_reto;
 
@@ -421,32 +430,61 @@ async function autocompletarDesdeMicroreto(mr) {
   if (!form.value.fundamentacion.contexto && contexto)
     form.value.fundamentacion.contexto = contexto;
 
-  const restricciones = Array.isArray(mr.dificultades) ? mr.dificultades.join(', ') : (mr.dificultades || '');
-  if (!form.value.diseno_reto.restricciones && restricciones)
-    form.value.diseno_reto.restricciones = restricciones;
+  // Descripción del reto: qué necesita la empresa
+  if (!form.value.diseno_reto.descripcion) {
+    const queNecesitan = Array.isArray(mr.que_necesitan) ? mr.que_necesitan.join('\n') : (mr.que_necesitan || '');
+    const friccion     = [mr.empresa?.friccion_area, mr.empresa?.friccion_problema].filter(Boolean).join('. ');
+    const descripcion  = queNecesitan || friccion;
+    if (descripcion) form.value.diseno_reto.descripcion = descripcion;
+  }
 
-  // FK: empresa → dispara watch que rellena datos_empresa y puede setear familia_id
+  // Restricciones: dificultades + limitaciones
+  if (!form.value.diseno_reto.restricciones) {
+    const dificultades = Array.isArray(mr.dificultades) ? mr.dificultades : (mr.dificultades ? [mr.dificultades] : []);
+    const limitaciones = Array.isArray(mr.limitaciones) ? mr.limitaciones : (mr.limitaciones ? [mr.limitaciones] : []);
+    const restricciones = [...dificultades, ...limitaciones].join(', ');
+    if (restricciones) form.value.diseno_reto.restricciones = restricciones;
+  }
+
+  // Entregables: prototipos esperados
+  if (!form.value.diseno_reto.entregables && Array.isArray(mr.prototipos) && mr.prototipos.length)
+    form.value.diseno_reto.entregables = mr.prototipos.join('\n');
+
+  // ── FK: empresa → dispara watch que rellena datos_empresa ─────────────────
   if (mr.empresa_id) {
     // Reservar el ciclo pendiente ANTES de que la cascada de watches lo resetee
     if (mr.ciclo_id) pendingCicloId.value = mr.ciclo_id;
 
     form.value.empresa_id = mr.empresa_id;
 
-    // Si el watch de empresa no configuró familia (empresa con varias familias),
-    // tomamos la primera del microreto si está disponible
+    // Si el watch no configuró familia (empresa con varias), usar la del microreto
     await nextTick();
     if (!form.value.familia_id && mr.empresa?.familias?.length) {
       form.value.familia_id = mr.empresa.familias[0].id;
     }
   }
 
-  // FK: centro → usar el centro_id de la empresa del microreto (no hay que buscar por nombre)
+  // ── FK: centro → empresa.centro_id o búsqueda por nombre desde sesión ────
   if (!form.value.centro_id) {
-    const centroId = mr.empresa?.centro_id ?? mr.empresa?.centroEducativo?.id;
-    if (centroId) form.value.centro_id = centroId; // el watch rellena datos_centro.nombre y municipio
+    const centroId = mr.empresa?.centro_id ?? mr.empresa?.centroEducativo?.id ?? null;
+    if (centroId) {
+      form.value.centro_id = centroId; // el watch rellena datos_centro.nombre
+    } else if (sesion?.centro_educativo) {
+      // Intentar coincidencia por nombre en el catálogo de centros
+      const q = sesion.centro_educativo.toLowerCase().trim();
+      const matched = centros.value.find(c =>
+        (c.nombre || '').toLowerCase().includes(q) || q.includes((c.nombre || '').toLowerCase())
+      );
+      if (matched) {
+        form.value.centro_id = matched.id; // el watch rellena datos_centro.nombre
+      } else {
+        // Fallback directo: escribir el nombre tal cual viene de la sesión
+        form.value.datos_centro.nombre = sesion.centro_educativo;
+      }
+    }
   }
 
-  // RA/CE desde evaluacion_oficial del microreto (solo si vacío)
+  // ── RA/CE desde evaluacion_oficial ───────────────────────────────────────
   if (!form.value.ra_ce && Array.isArray(mr.evaluacion_oficial) && mr.evaluacion_oficial.length) {
     form.value.ra_ce = mr.evaluacion_oficial.map(e => {
       const ces = Array.isArray(e.ce) ? e.ce.map(c => `  • ${c}`).join('\n') : '';
@@ -461,6 +499,7 @@ async function autocompletarDesdeMicroreto(mr) {
 async function cargarProyecto() {
   if (!uuid.value) return;
   cargando.value = true;
+  cargandoProyecto.value = true;
   try {
     const [proyRes, recRes] = await Promise.all([
       api.get(`/startup/proyectos/${uuid.value}`),
@@ -485,10 +524,23 @@ async function cargarProyecto() {
       ...(p.objetivos        && { objetivos: p.objetivos }),
       ...(p.kpis             && { kpis: p.kpis }),
     });
+    // Cargar ciclos y módulos en cascada sin que los watchers vacíen los valores
+    if (p.familia_id) {
+      const fam = familias.value.find(f => f.id == p.familia_id);
+      if (fam) {
+        const res = await api.get(`/familias/${encodeURIComponent(fam.nombre)}/ciclos`);
+        ciclos.value = res.data;
+      }
+    }
+    if (p.ciclo_id) {
+      const res = await api.get(`/ciclos/${p.ciclo_id}/modulos`);
+      modulos.value = res.data;
+    }
     // Recursos viven en Cloudinary — se cargan aparte
     videosLocales.value     = recRes.data.videos    || [];
     documentosLocales.value = recRes.data.documentos || [];
   } finally {
+    cargandoProyecto.value = false;
     cargando.value = false;
   }
 }
