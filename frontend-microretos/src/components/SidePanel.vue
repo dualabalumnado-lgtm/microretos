@@ -114,7 +114,7 @@ defineExpose({ isOpen, toggle, close })
   <Transition name="sp-slide">
     <aside
       v-if="isOpen && !tourActivo"
-      class="fixed top-0 left-0 h-full w-64 z-40 flex flex-col overflow-visible
+      class="fixed top-0 left-0 h-full w-64 max-w-[85vw] z-40 flex flex-col
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
@@ -122,8 +122,8 @@ defineExpose({ isOpen, toggle, close })
       <RouterLink
         to="/"
         @click="close"
-        class="flex items-center gap-3 px-5 pt-7 pb-5 border-b border-white/10
-               hover:opacity-80 transition-opacity duration-150"
+        class="flex items-center gap-3 px-5 pt-4 pb-4 border-b border-white/10
+               hover:opacity-80 transition-opacity duration-150 shrink-0"
       >
         <img
           src="../assets/logo.png"
@@ -142,7 +142,7 @@ defineExpose({ isOpen, toggle, close })
       </RouterLink>
 
       <!-- ── Navegación ── -->
-      <nav class="flex-1 px-3 py-5 space-y-1 overflow-visible">
+      <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 
         <!-- ═══ GRUPO: MICRORETOS + TALLER DE IDEAS ═══ -->
         <div class="rounded-2xl border border-[#00A859]/20 bg-[#00A859]/5 px-2 pt-2 pb-2 space-y-1">
@@ -167,6 +167,7 @@ defineExpose({ isOpen, toggle, close })
               <div class="group/tip relative">
                 <button
                   @click="irA('/microretos')"
+                  title="Genera retos con IA a partir de una empresa y los criterios del ciclo"
                   class="nav-item w-full text-left"
                   :class="isActive('/microretos') ? 'nav-item--active' : 'nav-item--idle'"
                 >
@@ -183,6 +184,7 @@ defineExpose({ isOpen, toggle, close })
               <div class="group/tip relative">
                 <button
                   @click="irA('/biblioteca')"
+                  title="Consulta todos los retos guardados y comparte el QR con el alumnado"
                   class="nav-item w-full text-left"
                   :class="isActive('/biblioteca') ? 'nav-item--active' : 'nav-item--idle'"
                 >
@@ -222,6 +224,7 @@ defineExpose({ isOpen, toggle, close })
               <div class="group/tip relative">
                 <button
                   @click="irA('/dashboard')"
+                  title="Registra sesiones de trabajo con retos"
                   class="nav-item w-full text-left"
                   :class="isActive('/dashboard') ? 'nav-item--active' : 'nav-item--idle'"
                 >
@@ -240,6 +243,7 @@ defineExpose({ isOpen, toggle, close })
               <div class="group/tip relative">
                 <button
                   @click="irA('/startup-day')"
+                  title="Crea y gestiona proyectos para el Taller de Ideas"
                   class="nav-item w-full text-left"
                   :class="$route.path.startsWith('/startup-day') ? 'nav-item--active' : 'nav-item--idle'"
                 >
@@ -258,7 +262,7 @@ defineExpose({ isOpen, toggle, close })
 
         </div>
 
-        <div class="my-4 border-t border-white/10" />
+        <div class="my-2 border-t border-white/10" />
 
         <!-- ═══════════════ EMPRESAS ════════════════════ -->
         <div class="group/tip relative">
@@ -285,6 +289,7 @@ defineExpose({ isOpen, toggle, close })
             <div class="group/tip relative">
               <button
                 @click="irA('/empresas')"
+                title="Consulta y contacta con las empresas de la base de datos (requiere contraseña especial)"
                 class="nav-item w-full text-left"
                 :class="isActive('/empresas') ? 'nav-item--active' : 'nav-item--idle'"
               >
@@ -300,7 +305,7 @@ defineExpose({ isOpen, toggle, close })
 
         </div>
 
-        <div class="my-4 border-t border-white/10" />
+        <div class="my-2 border-t border-white/10" />
 
         <!-- ═══════════════ ADMINISTRACIÓN ═════════════ -->
         <div class="group/tip relative">
@@ -318,6 +323,7 @@ defineExpose({ isOpen, toggle, close })
             <div class="group/tip relative">
               <button
                 @click="irA('/base-datos')"
+                title="Empresas, centros educativos, familias y ciclos del ecosistema DuaLab"
                 class="nav-item w-full text-left"
                 :class="isActive('/base-datos') ? 'nav-item--active' : 'nav-item--idle'"
               >
@@ -337,7 +343,7 @@ defineExpose({ isOpen, toggle, close })
       </nav>
 
       <!-- ── Footer: sesión + info + sistema ── -->
-      <div class="px-4 py-4 border-t border-white/10 space-y-3">
+      <div class="px-4 py-3 border-t border-white/10 space-y-2 shrink-0">
 
         <!-- Botón de información -->
         <button
@@ -356,7 +362,7 @@ defineExpose({ isOpen, toggle, close })
         </button>
 
         <!-- Sesión activa -->
-        <div v-if="authStore.isAuthenticated" class="px-3 py-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+        <div v-if="authStore.isAuthenticated" class="px-3 py-2 rounded-2xl bg-white/5 border border-white/10 space-y-2">
           <div class="flex items-center gap-2">
             <div class="w-7 h-7 rounded-full bg-[#00A859]/20 border border-[#00A859]/30 flex items-center justify-center shrink-0">
               <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,9 +378,9 @@ defineExpose({ isOpen, toggle, close })
 
           <!-- Aviso de expiración inminente -->
           <Transition name="sp-fade">
-            <div v-if="authStore.minutosRestantes >= 0 && authStore.minutosRestantes <= 30"
+            <div v-if="authStore.minutosRestantes >= 0 && authStore.minutosRestantes <= 120"
               class="rounded-xl px-3 py-2 text-[10px] font-bold space-y-2"
-              :class="authStore.minutosRestantes <= 5
+              :class="authStore.minutosRestantes <= 30
                 ? 'bg-red-500/15 border border-red-500/30 text-red-300'
                 : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'">
               <div class="flex items-center gap-1.5">
@@ -385,7 +391,9 @@ defineExpose({ isOpen, toggle, close })
                 <span>
                   {{ authStore.minutosRestantes <= 0
                     ? 'Sesión a punto de expirar'
-                    : `Sesión expira en ${authStore.minutosRestantes} min` }}
+                    : authStore.minutosRestantes >= 60
+                      ? `Sesión expira en ${Math.floor(authStore.minutosRestantes / 60)}h ${authStore.minutosRestantes % 60}min`
+                      : `Sesión expira en ${authStore.minutosRestantes} min` }}
                 </span>
               </div>
               <button
@@ -393,10 +401,10 @@ defineExpose({ isOpen, toggle, close })
                 :disabled="authStore.refreshing"
                 class="w-full py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest
                        transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="authStore.minutosRestantes <= 5
+                :class="authStore.minutosRestantes <= 30
                   ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200'
                   : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'">
-                {{ authStore.refreshing ? 'Renovando...' : 'Renovar sesión' }}
+                {{ authStore.refreshing ? 'Renovando...' : 'Extender sesión' }}
               </button>
             </div>
           </Transition>
@@ -439,10 +447,10 @@ defineExpose({ isOpen, toggle, close })
         </button>
 
         <!-- Indicador sistema activo -->
-        <div class="flex items-center gap-2 px-3 py-2.5 rounded-2xl
+        <div class="flex items-center gap-2 px-3 py-2 rounded-2xl
                     bg-[#99CC33]/10 border border-[#99CC33]/20">
-          <span class="w-2 h-2 rounded-full bg-[#99CC33] animate-pulse flex-shrink-0" />
-          <span class="text-xs font-black uppercase tracking-widest text-[#99CC33]">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#99CC33] animate-pulse flex-shrink-0" />
+          <span class="text-[10px] font-black uppercase tracking-widest text-[#99CC33]">
             Sistema activo
           </span>
         </div>
@@ -507,14 +515,14 @@ defineExpose({ isOpen, toggle, close })
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
             <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Taller de Ideas</p>
-            <p class="text-xs text-white/60"><span class="text-white font-bold">Proyectos</span> — Diseña y gestiona proyectos Taller de Ideas equipo, módulos, objetivos y validación por empresa.</p>
+            <p class="text-xs text-white/60"><span class="text-white font-bold">Microproyectos</span> — Diseña y gestiona proyectos Taller de Ideas equipo, módulos, objetivos y validación por empresa.</p>
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
             <p class="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-2">Herramientas</p>
             <div class="space-y-2 text-xs text-white/60">
               <p><span class="text-white font-bold">Dashboard docentes</span> — Panel de seguimiento del alumnado: proyectos activos, progreso y retos asignados.</p>
-              <p><span class="text-white font-bold">Biblioteca de retos</span> — Acceso directo a la colección completa de retos para gestión docente.</p>
+              <p><span class="text-white font-bold">Biblioteca retos</span> — Acceso directo a la colección completa de retos para gestión docente.</p>
               <p><span class="text-white font-bold">Base de datos</span> — Gestión de empresas, centros educativos, familias profesionales y ciclos formativos.</p>
             </div>
           </div>
@@ -569,41 +577,16 @@ defineExpose({ isOpen, toggle, close })
   color: inherit;
 }
 
-/* ─── Tooltip que aparece a la derecha del sidebar ─────────── */
-.sp-tooltip {
-  pointer-events: none;
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%);
-  width: 200px;
-  padding: 8px 12px;
-  background: #111827;
-  color: rgba(255,255,255,0.85);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-50%) translateX(4px);
-  z-index: 9999;
-  white-space: normal;
-}
-.group\/tip:hover .sp-tooltip {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-}
-.sp-tooltip-arrow {
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-right-color: #111827;
-}
+/* Tooltips deshabilitados: el nav usa overflow-y:auto (scroll)
+   que crea un scroll container y recorta los children absolutos */
+.sp-tooltip       { display: none; }
+.sp-tooltip-arrow { display: none; }
+
+/* Scrollbar discreta para el nav */
+nav::-webkit-scrollbar        { width: 3px; }
+nav::-webkit-scrollbar-track  { background: transparent; }
+nav::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 99px; }
+nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
 /* ─── Panel slide / fade ─────────────────────────────────────── */
 .sp-slide-enter-active,
