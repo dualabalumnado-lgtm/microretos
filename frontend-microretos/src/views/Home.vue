@@ -85,7 +85,7 @@ const irABiblioteca = () => {
               Conecta talento <br class="hidden md:block"/> con <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">retos reales.</span>
             </h1>
             <p class="text-lg md:text-xl text-gray-500 leading-relaxed font-medium max-w-xl mx-auto md:mx-0">
-              DuaLab es la solución definitiva para conectar empresas con el alumnado en prácticas. Transformamos necesidades empresariales en <strong class="text-[#00A859] font-bold">microretos académicos</strong> para impulsar el aprendizaje práctico y descubrir talento emergente.
+              DuaLab es la solución definitiva para conectar empresas con el alumnado en prácticas. Transformamos necesidades empresariales en <strong class="text-[#00A859] font-bold">retos académicos</strong> para impulsar el aprendizaje práctico y descubrir talento emergente.
             </p>
           </div>
 
@@ -94,7 +94,7 @@ const irABiblioteca = () => {
             
             <button @click="irAGenerador" class="group relative w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white rounded-full font-black text-sm uppercase tracking-widest shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)] transition-all duration-300 hover:-translate-y-1 active:scale-95">
               <svg class="w-5 h-5 transition-transform group-hover:rotate-180 duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              Generador de Microretos
+              Generador de Retos
             </button>
 
             <button @click="irABiblioteca" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-5 bg-white text-[#1F2937] border-2 border-gray-200 rounded-full font-black text-sm uppercase tracking-widest shadow-sm hover:border-[#00A859] hover:text-[#00A859] transition-all duration-300 hover:-translate-y-1 active:scale-95">
@@ -131,7 +131,7 @@ const irABiblioteca = () => {
                 <div class="bg-[#99CC33] text-[#121212] w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black shadow-md">2</div>
                 <div>
                   <h4 class="font-bold text-[#00A859] text-lg">La IA lo transforma</h4>
-                  <p class="text-sm text-gray-600 leading-relaxed mt-1">DuaLab genera un microreto académico alineado al currículo oficial.</p>
+                  <p class="text-sm text-gray-600 leading-relaxed mt-1">DuaLab genera un reto académico alineado al currículo oficial.</p>
                 </div>
               </div>
 

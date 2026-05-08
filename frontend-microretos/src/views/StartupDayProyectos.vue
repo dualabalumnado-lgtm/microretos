@@ -31,10 +31,10 @@ const refBtnGuia  = ref(null);
 const tourRefs = { refBusqueda, refFiltros, refGrid, refBtnNuevo, refBtnGuia };
 
 const guiaPasosData = [
-  { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar microproyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
-  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los microproyectos por estado: Todos, Borrador (aún en edición), Publicado (enlace enviado a la empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
-  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los microproyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo o seguir editándola.' },
-  { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo microproyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al microreto correspondiente.' },
+  { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar proyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
+  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Todos, Borrador (aún en edición), Propuesta (enviada a empresa, pendiente de validación), Proyecto (validado por empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
+  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los proyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo o seguir editándola.' },
+  { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo proyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al reto correspondiente.' },
   { ref: 'refBtnGuia',  seccion: null,        texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
 ];
 
@@ -141,16 +141,30 @@ onBeforeRouteUpdate(async () => {
   modoGuia.value = true;
 });
 
-const estadoLabel = { borrador: 'Borrador', publicado: 'Publicado', archivado: 'Archivado' };
-const estadoColor = {
-  borrador:  'bg-amber-50 border-amber-200 text-amber-700',
-  publicado: 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
-  archivado: 'bg-gray-100 border-gray-200 text-gray-400',
-};
+function getEtiqueta(p) {
+  if (p.estado === 'borrador')  return 'Borrador';
+  if (p.estado === 'archivado') return 'Archivado';
+  return p.empresa_validado ? 'Proyecto' : 'Propuesta';
+}
+function getColor(p) {
+  if (p.estado === 'borrador')  return 'bg-amber-50 border-amber-200 text-amber-700';
+  if (p.estado === 'archivado') return 'bg-gray-100 border-gray-200 text-gray-400';
+  if (p.empresa_validado)       return 'bg-blue-50 border-blue-200 text-blue-700';
+  return 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]';
+}
+
+const filtroOpciones = ['todos', 'borrador', 'propuesta', 'proyecto', 'archivado'];
+const filtroLabels   = { todos: 'Todos', borrador: 'Borrador', propuesta: 'Propuesta', proyecto: 'Proyecto', archivado: 'Archivado' };
 
 const proyectosFiltrados = computed(() => {
   let lista = proyectos.value;
-  if (filtroEstado.value !== 'todos') lista = lista.filter(p => p.estado === filtroEstado.value);
+  if (filtroEstado.value !== 'todos') {
+    lista = lista.filter(p => {
+      if (filtroEstado.value === 'propuesta') return p.estado === 'publicado' && !p.empresa_validado;
+      if (filtroEstado.value === 'proyecto')  return !!p.empresa_validado;
+      return p.estado === filtroEstado.value;
+    });
+  }
   if (busqueda.value.trim()) {
     const q = busqueda.value.toLowerCase();
     lista = lista.filter(p =>
@@ -163,7 +177,7 @@ const proyectosFiltrados = computed(() => {
 });
 
 async function eliminar(uuid) {
-  if (!confirm('¿Eliminar este microproyecto? Esta acción no se puede deshacer.')) return;
+  if (!confirm('¿Eliminar este proyecto? Esta acción no se puede deshacer.')) return;
   await api.delete(`/startup/proyectos/${uuid}`);
   proyectos.value = proyectos.value.filter(p => p.uuid !== uuid);
 }
@@ -244,7 +258,7 @@ async function eliminar(uuid) {
             Micro<span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">proyectos</span>
           </h1>
           <p class="text-gray-500 text-sm mt-1">
-            Aquí se trabajan los microretos para convertirlos en microproyectos de empresa reales.
+            Aquí se trabajan los retos para convertirlos en proyectos de empresa reales.
           </p>
           <!-- Botón Guía -->
           <button ref="refBtnGuia"
@@ -279,7 +293,7 @@ async function eliminar(uuid) {
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
           </svg>
-          Nuevo microproyecto
+          Nuevo proyecto
         </button>
       </header>
 
@@ -314,7 +328,7 @@ async function eliminar(uuid) {
                'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'filtros'
              }"
              class="flex gap-2">
-          <button v-for="op in ['todos','borrador','publicado','archivado']" :key="op"
+          <button v-for="op in filtroOpciones" :key="op"
                   @click="filtroEstado = op"
                   :class="[
                     'px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all',
@@ -322,7 +336,7 @@ async function eliminar(uuid) {
                       ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md'
                       : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'
                   ]">
-            {{ op === 'todos' ? 'Todos' : estadoLabel[op] }}
+            {{ filtroLabels[op] }}
           </button>
         </div>
 
@@ -354,10 +368,10 @@ async function eliminar(uuid) {
             </svg>
           </div>
           <h3 class="text-[#1F2937] font-black text-xl mb-2">
-            {{ busqueda || filtroEstado !== 'todos' ? 'Sin resultados' : 'Todavía no hay microproyectos' }}
+            {{ busqueda || filtroEstado !== 'todos' ? 'Sin resultados' : 'Todavía no hay proyectos' }}
           </h3>
           <p class="text-gray-400 text-sm mb-6">
-            {{ busqueda || filtroEstado !== 'todos' ? 'Prueba con otros filtros' : 'Crea tu primer microproyecto StartUp Day' }}
+            {{ busqueda || filtroEstado !== 'todos' ? 'Prueba con otros filtros' : 'Crea tu primer proyecto StartUp Day' }}
           </p>
           <button v-if="!busqueda && filtroEstado === 'todos'"
                   @click="router.push({ name: 'startup-day-crear' })"
@@ -380,8 +394,8 @@ async function eliminar(uuid) {
             <div class="p-5 flex-1 flex flex-col gap-3">
               <!-- Estado + paso -->
               <div class="flex items-center justify-between">
-                <span :class="['text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border', estadoColor[p.estado]]">
-                  {{ estadoLabel[p.estado] }}
+                <span :class="['text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border', getColor(p)]">
+                  {{ getEtiqueta(p) }}
                 </span>
                 <span class="text-[10px] text-gray-400 font-bold">Paso {{ p.paso_actual }}/8</span>
               </div>

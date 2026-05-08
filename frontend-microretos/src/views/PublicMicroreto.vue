@@ -60,7 +60,7 @@ const imagenFondo = computed(() => {
         <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
       </svg>
       <p class="text-[#00A859] font-black tracking-widest uppercase text-sm animate-pulse">
-        Cargando microreto...
+        Cargando reto...
       </p>
     </div>
 
@@ -136,7 +136,7 @@ const imagenFondo = computed(() => {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
                          a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
               </svg>
-              DuaLab · Ficha de Microreto
+              DuaLab · Ficha de Reto
             </p>
 
             <h1 class="text-2xl sm:text-3xl md:text-4xl font-black text-[#1F2937]

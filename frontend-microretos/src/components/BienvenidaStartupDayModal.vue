@@ -26,7 +26,7 @@ const emit = defineEmits(['seleccionar'])
           </div>
         </div>
         <p class="text-xs text-white/40 leading-relaxed mb-6 pl-[3.75rem]">
-          Aquí se trabajan los microretos para convertirlos en microproyectos reales de empresa.
+          Aquí se trabajan los retos para convertirlos en proyectos reales de empresa.
         </p>
 
         <!-- Opciones -->
@@ -45,8 +45,8 @@ const emit = defineEmits(['seleccionar'])
               </svg>
             </div>
             <div>
-              <p class="font-black text-white text-sm mb-0.5">Crear un microproyecto</p>
-              <p class="text-xs text-white/50 leading-relaxed">Empieza el wizard guiado para registrar un nuevo microproyecto StartUp Day.</p>
+              <p class="font-black text-white text-sm mb-0.5">Crear un proyecto</p>
+              <p class="text-xs text-white/50 leading-relaxed">Empieza el wizard guiado para registrar un nuevo proyecto StartUp Day.</p>
             </div>
           </button>
 
@@ -66,8 +66,8 @@ const emit = defineEmits(['seleccionar'])
               </svg>
             </div>
             <div>
-              <p class="font-black text-white text-sm mb-0.5">Trabajar un microproyecto creado</p>
-              <p class="text-xs text-white/50 leading-relaxed">Accede a la biblioteca y continúa editando un microproyecto existente.</p>
+              <p class="font-black text-white text-sm mb-0.5">Continuar con un proyecto</p>
+              <p class="text-xs text-white/50 leading-relaxed">Accede a la biblioteca y continúa editando un proyecto existente.</p>
             </div>
           </button>
 

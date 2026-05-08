@@ -146,8 +146,8 @@ async function confirmarEliminacion() {
                     </svg>
                   </div>
                   <div class="flex-1">
-                    <p class="font-black text-sm text-blue-700">Los microretos generados permanecerán en la biblioteca</p>
-                    <p class="text-xs text-blue-500 mt-0.5">Los microretos ya creados con esta empresa no se eliminarán.</p>
+                    <p class="font-black text-sm text-blue-700">Los retos generados permanecerán en la biblioteca</p>
+                    <p class="text-xs text-blue-500 mt-0.5">Los retos ya creados con esta empresa no se eliminarán.</p>
                   </div>
                 </div>
 

@@ -654,7 +654,7 @@ const guardarTodos = async () => {
     }
   } catch (e) { 
     console.error("Error al guardar el lote:", e);
-    alert("Error al guardar el lote de microretos en BD"); 
+    alert("Error al guardar el lote de retos en BD");
   } finally { 
     guardandoTodos.value = false; 
   }
@@ -670,7 +670,7 @@ const guardar = async (index) => {
     reto._ui_guardado = true;
   } catch (e) { 
     console.error("Error al guardar:", e);
-    alert("Error al guardar este microreto"); 
+    alert("Error al guardar este reto");
   } finally { 
     reto._ui_guardando = false; 
   }
@@ -690,6 +690,7 @@ const pasoGuia = ref(1)
 
 // Refs paso 1
 const refCentroEducativo = ref(null)
+const refInfoSimulada    = ref(null)
 const refBaseDatos       = ref(null)
 const refInsertarEmpresa = ref(null)
 const refBtnGuia         = ref(null)
@@ -710,27 +711,28 @@ const refBtnGenerar        = ref(null)
 
 // Tres conjuntos de pasos, cada uno para su paso de formulario
 const guiaPasos1 = [
-  { ref: 'refCentroEducativo', seccion: 'busqueda', texto: 'Selecciona tu centro educativo. Este filtro determina qué empresas y ciclos están disponibles.' },
-  { ref: 'refBuscadorEmpresa', seccion: 'busqueda', texto: 'Selecciona una empresa. Puede ser simulada (guardada en la base de datos) o real, colaboradora del centro.' },
-  { ref: 'refBotonesDemo',     seccion: 'acciones', texto: 'Carga la demo para comprobar el funcionamiento del generador. Usa el botón Vaciar para borrar toda la información escrita.' },
-  { ref: 'refBaseDatos',       seccion: 'acciones', texto: 'Consulta la base de datos con todas las empresas disponibles en la plataforma.' },
-  { ref: 'refInsertarEmpresa', seccion: 'acciones', texto: 'Inserta una nueva empresa en la plataforma o modifica los datos de una existente.' },
-  { ref: 'refBtnGuia',         seccion: null,       texto: 'Pincha aquí para volver a activar esta guía cuando quieras.' },
+  { ref: 'refCentroEducativo', seccion: 'busqueda', texto: 'Selecciona primero tu centro educativo. Esto filtra el listado de empresas y ciclos, mostrando únicamente los vinculados a tu centro.' },
+  { ref: 'refBuscadorEmpresa', seccion: 'busqueda', texto: 'Busca y selecciona la empresa con la que vas a generar el microreto. Puedes elegir entre empresas simuladas (creadas para practicar) y empresas reales colaboradoras de tu centro.' },
+  { ref: 'refBotonesDemo',     seccion: 'acciones', texto: 'Carga una demo preconfigurada para ver cómo funciona el generador de principio a fin. Al elegir una familia profesional del desplegable, se rellenan automáticamente todos los campos de los tres pasos con datos de ejemplo listos para generar.' },
+  { ref: 'refInfoSimulada',    seccion: 'acciones', texto: 'La IA se comporta como la empresa seleccionada en el Paso 1 y rellena automáticamente todos los campos del diagnóstico (Paso 2) simulando lo que esa empresa habría dicho en una reunión real. Muy útil si no has podido hacer la reunión con la empresa. Puedes revisar y editar los datos generados antes de continuar.' },
+  { ref: 'refBaseDatos',       seccion: 'acciones', texto: 'Accede a la base de datos completa de la plataforma: empresas, centros, familias profesionales y ciclos formativos disponibles. Desde aquí puedes revisar o añadir empresas que no aparezcan en el buscador.' },
+  { ref: 'refInsertarEmpresa', seccion: 'acciones', texto: 'Registra una nueva empresa en la base de datos o modifica los datos de la empresa actualmente seleccionada. Los cambios quedan guardados para todos los usuarios de tu centro.' },
+  { ref: 'refBtnGuia',         seccion: null,       texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía.' },
 ]
 const guiaPasos2 = [
-  { ref: 'refEncabezadoProblema', seccion: 'diagnostico', texto: 'Paso 2 — Realidad de la Empresa: rellena los campos con lo que te ha contado la empresa en la reunión de diagnóstico.' },
-  { ref: 'refPreguntaFriccion',   seccion: 'diagnostico', texto: 'El corazón del microreto: describe en qué área está el problema y por qué ocurre. Cuanto más detallado, mejor resultado generará la IA.' },
-  { ref: 'refExpectativas',       seccion: 'diagnostico', texto: 'Indica qué esperas que realice el alumno como entrega final. La IA lo usará para definir el objetivo del reto.' },
+  { ref: 'refEncabezadoProblema', seccion: 'diagnostico', texto: 'Paso 2 — Realidad de la empresa: aquí transcribes lo que la empresa te ha contado en la reunión de diagnóstico. Estos datos son la materia prima con la que la IA construirá el microreto. Si no has hecho la reunión, puedes usar el botón "Información Simulada" del Paso 1.' },
+  { ref: 'refPreguntaFriccion',   seccion: 'diagnostico', texto: 'El corazón del microreto: describe el área donde se produce el problema (¿marketing, producción, logística, atención al cliente...?) y explica por qué ocurre. Cuanto más específico y concreto seas aquí, mejor y más relevante será el microreto que genere la IA.' },
+  { ref: 'refExpectativas',       seccion: 'diagnostico', texto: 'Indica qué resultado concreto esperas que el alumnado entregue al final del reto: un informe, un prototipo, un plan de acción, una maqueta digital... La IA usará esto para definir el objetivo del reto y los criterios de evaluación.' },
 ]
 const guiaPasos3 = [
-  { ref: 'refFamiliaSelect',     seccion: 'match', texto: 'Selecciona la familia profesional asociada a la empresa. Determina qué ciclos aparecerán en el siguiente paso.' },
-  { ref: 'refNivelExigencia',    seccion: 'match', texto: 'Elige el nivel de exigencia del microreto: básico, medio o alto, según el dominio real del grupo.' },
-  { ref: 'refCicloGrid',         seccion: 'match', texto: 'Selecciona el ciclo formativo del alumnado que va a resolver el reto. Aparecen los ciclos vinculados a la empresa y al centro.' },
-  { ref: 'refCursoAlumno',       seccion: 'match', texto: 'Indica si el alumnado está en 1º o 2º curso. La IA ajustará la complejidad del reto según el nivel real del grupo.' },
-  { ref: 'refModulosSection',    seccion: 'match', texto: 'Puedes forzar un módulo específico o dejarlo vacío para que la IA cruce con todos los módulos del ciclo automáticamente.' },
-  { ref: 'refCantidadVariantes', seccion: 'match', texto: 'Elige cuántas variantes generar. La IA diseñará enfoques distintos para el mismo problema de empresa.' },
-  { ref: 'refGuardarEmpresa',    seccion: 'match', texto: 'Si has modificado los datos de la empresa en este flujo, pulsa aquí para guardarlos antes de generar el reto.' },
-  { ref: 'refBtnGenerar',        seccion: 'match', texto: '¡Todo listo! Pulsa aquí para que la IA genere el microreto con toda la información introducida.' },
+  { ref: 'refFamiliaSelect',     seccion: 'match', texto: 'Selecciona la familia profesional del ciclo que va a trabajar el reto. Esto determina qué ciclos aparecerán abajo y qué módulos y RA/CE se cruzarán con el diagnóstico de empresa.' },
+  { ref: 'refNivelExigencia',    seccion: 'match', texto: 'Ajusta el nivel de dificultad según el dominio real del grupo: Básico para grupos en formación inicial, Medio para grupos estándar, Alto para grupos avanzados o de segundo año. La IA calibrará la complejidad del reto en consecuencia.' },
+  { ref: 'refCicloGrid',         seccion: 'match', texto: 'Selecciona el ciclo formativo concreto del grupo que resolverá el reto. Aparecen los ciclos vinculados tanto a la empresa seleccionada como a tu centro educativo.' },
+  { ref: 'refCursoAlumno',       seccion: 'match', texto: 'Indica si el grupo es de 1º o 2º curso. Este dato, combinado con el nivel de exigencia, permite a la IA ajustar la profundidad y el enfoque competencial del reto.' },
+  { ref: 'refModulosSection',    seccion: 'match', texto: 'Si quieres que el reto se centre en un módulo concreto, selecciónalo aquí. Si lo dejas vacío, la IA cruzará el diagnóstico con todos los módulos del ciclo y elegirá el más relevante automáticamente.' },
+  { ref: 'refCantidadVariantes', seccion: 'match', texto: 'Elige cuántas variantes del microreto quieres generar. Cada variante presenta un enfoque distinto para el mismo problema de empresa, permitiéndote elegir la que mejor encaje con tu grupo.' },
+  { ref: 'refGuardarEmpresa',    seccion: 'match', texto: 'Si has completado o modificado datos de la empresa durante este flujo, guárdalos aquí antes de generar. Así el registro queda actualizado en la base de datos para futuros usos.' },
+  { ref: 'refBtnGenerar',        seccion: 'match', texto: '¡Todo listo! Pulsa aquí para que la IA genere el microreto cruzando el diagnóstico de empresa del Paso 2 con el perfil académico del alumnado que has configurado en este paso. El proceso tarda unos segundos.' },
   { ref: 'refBtnGuia',           seccion: null,    texto: 'Pulsa este botón cuando quieras volver a ver esta guía en cualquier momento.' },
 ]
 
@@ -746,6 +748,7 @@ const tourRefs = {
   refCentroEducativo,
   refBuscadorEmpresa: buscadorRef,
   refBotonesDemo: demoSelectorRef,
+  refInfoSimulada,
   refBaseDatos,
   refInsertarEmpresa,
   refBtnGuia,
@@ -1003,7 +1006,7 @@ async function guardarEstadoGen(nuevoEstado) {
         
         <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-4 text-[#121212] transition-all duration-1000 delay-150 ease-out transform"
             :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
-          Factoría de <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Micro-Retos</span>
+          Factoría de <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Retos</span>
         </h1>
         
         <p class="text-gray-500 max-w-2xl mx-auto text-base md:text-lg leading-relaxed font-medium transition-all duration-1000 delay-300 ease-out transform"
@@ -1113,9 +1116,13 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
 
                   <!-- Información Simulada -->
-                  <button @click="toggleInfoSimulada()"
+                  <button ref="refInfoSimulada"
+                    @click="toggleInfoSimulada()"
                     :disabled="esModoDemo || cargandoSimulacion"
-                    :class="esModoDemo || cargandoSimulacion ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm'"
+                    :class="[
+                      esModoDemo || cargandoSimulacion ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200' : esInfoSimulada ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200 shadow-sm',
+                      tourTargetActivo === 'refInfoSimulada' ? 'tour-active' : ''
+                    ]"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border">
                     <svg v-if="cargandoSimulacion" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <svg v-else-if="esInfoSimulada" class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
@@ -1366,7 +1373,7 @@ async function guardarEstadoGen(nuevoEstado) {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                     </svg>
                     <p class="text-xs font-bold text-amber-700">
-                      Empresa <span class="uppercase tracking-wider">pendiente de llamar</span> — contacta con ella antes de generar microretos con su información.
+                      Empresa <span class="uppercase tracking-wider">pendiente de llamar</span> — contacta con ella antes de generar retos con su información.
                     </p>
                   </div>
                 </Transition>
@@ -1736,11 +1743,11 @@ async function guardarEstadoGen(nuevoEstado) {
 
                 <div ref="refNivelExigencia" class="col-span-2 md:col-span-1"
                      :class="{ 'tour-active': tourTargetActivo === 'refNivelExigencia' }">
-                  <label class="label-style">Nivel de exigencia del microreto *</label>
+                  <label class="label-style">Nivel de exigencia del reto *</label>
                   <select v-model="seleccion.nivelGrupo" :disabled="esModoDemo" class="input-style">
-                    <option value="Bajo">Básico — El grupo tiene un nivel de comprensión inicial; el microreto debe ser sencillo y guiado</option>
-                    <option value="Medio">Medio — El grupo maneja conceptos con soltura; el microreto puede tener cierta complejidad y autonomía</option>
-                    <option value="Alto">Alto — El grupo domina la materia; el microreto es exigente, abierto y requiere criterio propio</option>
+                    <option value="Bajo">Básico — El grupo tiene un nivel de comprensión inicial; el reto debe ser sencillo y guiado</option>
+                    <option value="Medio">Medio — El grupo maneja conceptos con soltura; el reto puede tener cierta complejidad y autonomía</option>
+                    <option value="Alto">Alto — El grupo domina la materia; el reto es exigente, abierto y requiere criterio propio</option>
                   </select>
                 </div>
 
@@ -1949,7 +1956,7 @@ async function guardarEstadoGen(nuevoEstado) {
             <div class="bg-gray-50 border-b border-gray-100 p-10 md:px-16 pt-12">
               <p class="text-[#00A859] font-bold text-[10px] tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                DuaLab · Ficha de Microreto
+                DuaLab · Ficha de Reto
               </p>
               <h1 class="text-3xl md:text-5xl font-black text-[#1F2937] tracking-tight leading-tight mb-2">
                 {{ reto.titulo }}

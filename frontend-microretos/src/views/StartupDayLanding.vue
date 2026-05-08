@@ -49,7 +49,7 @@ async function enviarValidacion() {
 
 const preguntas = [
   { key: 'reto_comprensible',   label: '¿El planteamiento del reto es comprensible y realista?' },
-  { key: 'objetivos_alineados', label: '¿Los objetivos del microproyecto se alinean con las necesidades de la empresa?' },
+  { key: 'objetivos_alineados', label: '¿Los objetivos del proyecto se alinean con las necesidades de la empresa?' },
   { key: 'equipo_adecuado',     label: '¿El perfil del equipo de alumnos os parece adecuado para este reto?' },
   { key: 'viabilidad',          label: '¿Consideráis que el proyecto es viable en el contexto de vuestra empresa?' },
 ];
@@ -83,7 +83,7 @@ function youtubeId(url) {
       </div>
       <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#00A859]/8 border border-[#00A859]/15">
         <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] animate-pulse"/>
-        <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]">Microproyecto activo</span>
+        <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]">Proyecto activo</span>
       </div>
     </header>
 
@@ -121,7 +121,7 @@ function youtubeId(url) {
           </div>
           <h2 class="text-xl font-black text-[#121212] mb-2">¡Validación enviada!</h2>
           <p class="text-gray-400 text-sm max-w-sm mx-auto">
-            Muchas gracias por revisar el microproyecto. El equipo docente recibirá vuestra valoración
+            Muchas gracias por revisar el proyecto. El equipo docente recibirá vuestra valoración
             y os trasladará los próximos pasos.
           </p>
           <div class="mt-6 flex items-center justify-center gap-2">
@@ -137,7 +137,7 @@ function youtubeId(url) {
           <div class="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full
                       bg-[#00A859]/10 border border-[#00A859]/20">
             <span class="w-2 h-2 rounded-full bg-[#00A859]" />
-            <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day · Microproyecto</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day · Proyecto</span>
           </div>
 
           <!-- ════════════════════════════════════════════════════════
@@ -182,11 +182,11 @@ function youtubeId(url) {
                 </p>
               </div>
 
-              <!-- Qué es un microproyecto -->
+              <!-- Qué es un proyecto -->
               <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 mb-4">
-                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">¿Qué es un microproyecto?</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">¿Qué es un proyecto?</p>
                 <p class="text-sm text-gray-600 leading-relaxed">
-                  Un microproyecto es una propuesta de trabajo del alumnado en torno a un reto
+                  Un proyecto es una propuesta de trabajo del alumnado en torno a un reto
                   relacionado con vuestra empresa. No es un encargo real ni un compromiso contractual —
                   es un ejercicio de aprendizaje donde los alumnos y alumnas practican cómo
                   <strong class="text-[#121212]">detectar problemas, diseñar soluciones y presentar resultados</strong>
@@ -242,7 +242,7 @@ function youtubeId(url) {
                 </div>
                 <button @click="guiaVisible = false"
                         class="text-xs font-bold text-[#00A859] hover:text-[#009950] transition-colors">
-                  Entendido, ir al microproyecto →
+                  Entendido, ir al proyecto →
                 </button>
               </div>
             </div>
@@ -265,12 +265,12 @@ function youtubeId(url) {
             <svg class="w-5 h-5 text-[#00A859] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
             </svg>
-            <p class="text-sm font-bold text-[#00A859]">Este microproyecto ya ha sido validado. Gracias por vuestra participación.</p>
+            <p class="text-sm font-bold text-[#00A859]">Este proyecto ya ha sido validado. Gracias por vuestra participación.</p>
           </div>
 
           <!-- Ficha del proyecto -->
           <div class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Microproyecto</p>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Proyecto</p>
             <h1 class="text-xl font-black text-[#121212] mb-5">{{ proyecto.titulo }}</h1>
 
             <div v-if="proyecto.diseno_reto?.descripcion" class="mb-5">
@@ -381,7 +381,7 @@ function youtubeId(url) {
 
             <div class="pb-4 border-b border-gray-100">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859] mb-1">Validación empresa</p>
-              <p class="text-sm text-gray-400">Por favor, responded las siguientes preguntas sobre el microproyecto.</p>
+              <p class="text-sm text-gray-400">Por favor, responded las siguientes preguntas sobre el proyecto.</p>
             </div>
 
             <div v-for="preg in preguntas" :key="preg.key" class="space-y-2.5">
@@ -435,7 +435,7 @@ function youtubeId(url) {
     <!-- Footer -->
     <footer class="relative z-10 border-t border-gray-100 bg-white/60 px-6 py-4 text-center">
       <p class="text-[10px] text-gray-300">
-        Dua<span class="text-[#00A859] font-bold">Lab</span> · Plataforma de microretos para FP Dual
+        Dua<span class="text-[#00A859] font-bold">Lab</span> · Plataforma de retos para FP Dual
       </p>
     </footer>
   </div>

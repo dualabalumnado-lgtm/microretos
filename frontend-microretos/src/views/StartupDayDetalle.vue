@@ -26,10 +26,18 @@ onMounted(async () => {
 
 const estadoColor = {
   borrador:  'bg-amber-50 border-amber-200 text-amber-700',
-  publicado: 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
   archivado: 'bg-gray-100 border-gray-200 text-gray-400',
+  propuesta: 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
+  proyecto:  'bg-blue-50 border-blue-200 text-blue-700',
 };
-const estadoLabel = { borrador: 'Borrador', publicado: 'Publicado', archivado: 'Archivado' };
+
+function getEstadoKey(p) {
+  if (!p) return 'borrador';
+  if (p.estado === 'borrador')  return 'borrador';
+  if (p.estado === 'archivado') return 'archivado';
+  return p.empresa_validado ? 'proyecto' : 'propuesta';
+}
+const estadoLabel = { borrador: 'Borrador', archivado: 'Archivado', propuesta: 'Propuesta', proyecto: 'Proyecto' };
 
 const landingUrl = computed(() => {
   if (!proyecto.value?.token_empresa) return '';
@@ -47,7 +55,7 @@ async function copiarUrl() {
 const { descargarPDF } = useMicroproyectoPdfExport();
 
 async function archivar() {
-  if (!confirm('¿Archivar este microproyecto?')) return;
+  if (!confirm('¿Archivar este proyecto?')) return;
   await api.put(`/startup/proyectos/${proyecto.value.uuid}`, { estado: 'archivado' });
   proyecto.value.estado = 'archivado';
 }
@@ -74,7 +82,7 @@ async function archivar() {
 
       <!-- Error -->
       <div v-else-if="error" class="text-center py-32">
-        <p class="text-gray-400 text-sm mb-4">No se pudo cargar el microproyecto.</p>
+        <p class="text-gray-400 text-sm mb-4">No se pudo cargar el proyecto.</p>
         <button @click="router.push({ name: 'startup-day' })"
                 class="text-[#00A859] text-sm font-bold hover:underline">← Volver a la lista</button>
       </div>
@@ -97,8 +105,8 @@ async function archivar() {
                 <span class="w-2 h-2 rounded-full bg-[#00A859]" />
                 <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day</span>
               </div>
-              <span :class="['text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border', estadoColor[proyecto.estado]]">
-                {{ estadoLabel[proyecto.estado] }}
+              <span :class="['text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border', estadoColor[getEstadoKey(proyecto)]]">
+                {{ estadoLabel[getEstadoKey(proyecto)] }}
               </span>
             </div>
             <h1 class="text-2xl md:text-3xl font-black tracking-tight text-[#121212]">{{ proyecto.titulo }}</h1>
@@ -162,7 +170,7 @@ async function archivar() {
             <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
             </svg>
-            <p class="text-sm font-bold text-[#00A859]">La empresa ha validado el microproyecto</p>
+            <p class="text-sm font-bold text-[#00A859]">La empresa ha validado el proyecto</p>
           </div>
         </div>
 

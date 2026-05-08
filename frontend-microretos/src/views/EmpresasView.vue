@@ -322,7 +322,7 @@ const centrosOrdenados = computed(() => {
               </div>
               <div>
                 <p class="font-black text-white text-sm mb-0.5">Enviar validación</p>
-                <p class="text-xs text-white/50 leading-relaxed">Compartir enlace de microproyecto con la empresa.</p>
+                <p class="text-xs text-white/50 leading-relaxed">Compartir enlace de propuesta con la empresa.</p>
               </div>
             </button>
 
@@ -404,7 +404,7 @@ const centrosOrdenados = computed(() => {
                   </template>
                   <template v-else>
                     Busca la empresa en el listado, despliégala y pulsa
-                    <strong>«Enviar validación»</strong> para compartir el enlace del microproyecto.
+                    <strong>«Enviar validación»</strong> para compartir el enlace de la propuesta.
                   </template>
                 </p>
               </div>
@@ -552,8 +552,8 @@ const centrosOrdenados = computed(() => {
                       El correo se envía a la dirección registrada de la empresa.
                     </template>
                     <template v-else>
-                      Al pulsar «Enviar validación» podrás seleccionar un microproyecto publicado
-                      y enviar su enlace a la empresa para que lo valide.
+                      Al pulsar «Enviar validación» podrás seleccionar una propuesta publicada
+                      y enviar su enlace a la empresa para que la valide.
                     </template>
                   </p>
                 </div>
@@ -1009,18 +1009,18 @@ const centrosOrdenados = computed(() => {
                                                 focus:outline-none focus:border-amber-400 transition-colors"/>
                                 </div>
                                 <div>
-                                  <label class="block text-[9px] text-gray-500 uppercase tracking-wider mb-1">Microproyecto a validar</label>
+                                  <label class="block text-[9px] text-gray-500 uppercase tracking-wider mb-1">Propuesta a validar</label>
                                   <select v-model="validForm.proyecto_uuid"
                                           class="w-full bg-white border border-gray-200 rounded-xl px-3 py-2
                                                  text-xs text-[#1F2937] shadow-sm
                                                  focus:outline-none focus:border-amber-400 transition-colors">
-                                    <option value="">Selecciona un microproyecto publicado...</option>
+                                    <option value="">Selecciona una propuesta publicada...</option>
                                     <option v-for="p in proyectos" :key="p.uuid" :value="p.uuid">
                                       {{ p.titulo }}<template v-if="p.empresa_nombre"> · {{ p.empresa_nombre }}</template>
                                     </option>
                                   </select>
                                   <p v-if="proyectos.length === 0" class="text-[10px] text-gray-400 mt-1">
-                                    No hay microproyectos publicados. Publícalos en el StartUp Day.
+                                    No hay propuestas publicadas. Publícalas en el StartUp Day.
                                   </p>
                                 </div>
                                 <div>
