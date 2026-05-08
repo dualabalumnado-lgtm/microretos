@@ -23,15 +23,20 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Si el servidor responde 401, el token ha expirado: limpiar sesión local
+// Si el servidor responde 401, el token ha expirado: limpiar sesión local.
+// Excepción: /empresas/verificar-acceso devuelve 401 para contraseña de módulo
+// incorrecta — no es un error de sesión y no debe cerrar la sesión del usuario.
 api.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_token_created_at');
-      // Notificar a los componentes que escuchen este evento
-      window.dispatchEvent(new CustomEvent('auth:token-expired'));
+      const url = error.config?.url || ''
+      if (!url.includes('/empresas/verificar-acceso')) {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_token_created_at');
+        // Notificar a los componentes que escuchen este evento
+        window.dispatchEvent(new CustomEvent('auth:token-expired'));
+      }
     }
     return Promise.reject(error);
   }
