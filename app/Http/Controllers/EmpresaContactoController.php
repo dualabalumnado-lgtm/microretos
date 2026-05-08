@@ -51,7 +51,6 @@ class EmpresaContactoController extends Controller
 
         Mail::raw($data['mensaje'], function ($mail) use ($empresa, $data, $destinatario) {
             $mail->to($destinatario, $empresa->nombre_comercial)
-                 ->from($data['remitente'], 'DuaLab · ViaÓptima')
                  ->replyTo($data['remitente'])
                  ->subject($data['asunto']);
         });
@@ -112,7 +111,6 @@ class EmpresaContactoController extends Controller
 
         Mail::raw($cuerpo, function ($mail) use ($empresa, $data, $destinatario, $proyecto) {
             $mail->to($destinatario, $empresa->nombre_comercial)
-                 ->from($data['remitente'], 'DuaLab · ViaÓptima')
                  ->replyTo($data['remitente'])
                  ->subject("Validación de microproyecto: {$proyecto->titulo}");
         });
