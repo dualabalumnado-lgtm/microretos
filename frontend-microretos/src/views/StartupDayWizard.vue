@@ -559,11 +559,11 @@ const modoGuia = ref(false);
 const guiaWizard = [
   {
     titulo: 'Paso 1 · Datos básicos',
-    texto: 'Selecciona la sesión de trabajo que origina este microproyecto. La sesión proviene del Dashboard Docente y ya tiene un microreto asignado, por lo que autocompleta automáticamente empresa, centro y ciclo. Después escribe un título descriptivo y confirma familia, ciclo y curso del grupo de alumnado.',
+    texto: 'Selecciona la sesión de trabajo que origina este proyecto. La sesión proviene del Dashboard Docente y ya tiene un reto asignado, por lo que autocompleta automáticamente empresa, centro y ciclo. Después escribe un título descriptivo y confirma familia, ciclo y curso del grupo de alumnado.',
   },
   {
     titulo: 'Paso 2 · Datos de la empresa',
-    texto: 'Completa o corrige la ficha de la empresa colaboradora. Estos datos aparecerán en el dossier del microproyecto que verá la empresa. Revisa especialmente el email de contacto, que se usará para enviar el enlace de validación del proyecto.',
+    texto: 'Completa o corrige la ficha de la empresa colaboradora. Estos datos aparecerán en el dossier del proyecto que verá la empresa. Revisa especialmente el email de contacto, que se usará para enviar el enlace de validación del proyecto.',
   },
   {
     titulo: 'Paso 3 · Centro y equipo',
@@ -571,23 +571,23 @@ const guiaWizard = [
   },
   {
     titulo: 'Paso 4 · Módulos y currículum',
-    texto: 'Selecciona los módulos formativos del ciclo que se trabajan en este microproyecto. Si el microreto vinculado ya tenía módulos asignados, aparecerán pre-seleccionados. Añade también los RA/CE (Resultados de Aprendizaje y Criterios de Evaluación) más relevantes para justificar el microproyecto ante la programación oficial.',
+    texto: 'Selecciona los módulos formativos del ciclo que se trabajan en este proyecto. Si el reto vinculado ya tenía módulos asignados, aparecerán pre-seleccionados. Añade también los RA/CE (Resultados de Aprendizaje y Criterios de Evaluación) más relevantes para justificar el proyecto ante la programación oficial.',
   },
   {
     titulo: 'Paso 5 · El reto',
-    texto: 'Define el núcleo del microproyecto: la fundamentación (contexto de partida, justificación pedagógica e innovación) y el diseño del reto (descripción de la problemática, pregunta reto en formato "¿Cómo podríamos…?", restricciones que condicionan la solución y los entregables que el equipo debe producir). Cuanto más concreto, más fácil será la evaluación final.',
+    texto: 'Define el núcleo del proyecto: la fundamentación (contexto de partida, justificación pedagógica e innovación) y el diseño del reto (descripción de la problemática, pregunta reto en formato "¿Cómo podríamos…?", restricciones que condicionan la solución y los entregables que el equipo debe producir). Cuanto más concreto, más fácil será la evaluación final.',
   },
   {
-    titulo: 'Paso 6 · Diseño del microproyecto',
+    titulo: 'Paso 6 · Diseño del proyecto',
     texto: 'Planifica el desarrollo del trabajo: divide el proyecto en fases con nombre y duración estimada, describe la metodología que seguirá el equipo y esboza el cronograma con los hitos clave. Termina con un resumen ejecutivo de 3-4 líneas que la empresa verá al abrir el enlace de validación.',
   },
   {
     titulo: 'Paso 7 · Objetivos y KPIs',
-    texto: 'Define los objetivos de aprendizaje del microproyecto (qué competencias desarrollará el alumnado) y los indicadores de éxito o KPIs (cómo medirá la empresa que el reto se ha resuelto correctamente). Los KPIs hacen el proyecto evaluable y aumentan el compromiso de la empresa con el resultado final.',
+    texto: 'Define los objetivos de aprendizaje del proyecto (qué competencias desarrollará el alumnado) y los indicadores de éxito o KPIs (cómo medirá la empresa que el reto se ha resuelto correctamente). Los KPIs hacen el proyecto evaluable y aumentan el compromiso de la empresa con el resultado final.',
   },
   {
     titulo: 'Paso 8 · Publicar',
-    texto: 'Revisa el resumen del microproyecto. Aquí también puedes adjuntar vídeos o documentos de presentación que la empresa verá al abrir el enlace de validación. Cuando todo esté listo, pulsa "Publicar" para generar ese enlace único. Si aún falta información, guárdalo como Borrador y termínalo más tarde.',
+    texto: 'Revisa el resumen del proyecto. Aquí también puedes adjuntar vídeos o documentos de presentación que la empresa verá al abrir el enlace de validación. Cuando todo esté listo, pulsa "Publicar" para generar ese enlace único. Si aún falta información, guárdalo como Borrador y termínalo más tarde.',
   },
 ];
 
@@ -621,7 +621,7 @@ onUnmounted(() => { tourActivo.value = false; });
             <p class="text-[9px] font-black uppercase tracking-[0.25em] text-[#00A859]">
               StartUp Day · Paso {{ paso }} de {{ totalPasos }}
             </p>
-            <p class="text-xs font-bold text-gray-600 truncate">{{ form.titulo || 'Nuevo microproyecto' }}</p>
+            <p class="text-xs font-bold text-gray-600 truncate">{{ form.titulo || 'Nuevo proyecto' }}</p>
           </div>
           <span class="text-xs font-black text-gray-400 shrink-0">{{ progreso }}%</span>
           <button @click="modoGuia = true"
@@ -731,7 +731,7 @@ onUnmounted(() => { tourActivo.value = false; });
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
           </svg>
           <p class="text-sm font-semibold text-[#00A859]">
-            Datos autocompletados desde el microreto vinculado. Revisa y ajusta lo que necesites.
+            Datos autocompletados desde el reto vinculado. Revisa y ajusta lo que necesites.
           </p>
         </div>
       </Transition>
@@ -754,7 +754,7 @@ onUnmounted(() => { tourActivo.value = false; });
             </div>
             <h2 class="text-2xl font-black text-[#121212]">Datos básicos</h2>
             <p class="text-gray-500 text-sm mt-1">
-              {{ uuid ? 'Revisa los datos de base del microproyecto.' : 'Selecciona la sesión de trabajo — el microproyecto hereda el microreto que contiene.' }}
+              {{ uuid ? 'Revisa los datos de base del proyecto.' : 'Selecciona la sesión de trabajo — el proyecto hereda el reto que contiene.' }}
             </p>
           </div>
 
@@ -768,7 +768,7 @@ onUnmounted(() => { tourActivo.value = false; });
             <div>
               <p class="text-sm font-bold text-amber-800 mb-1">No hay sesiones registradas</p>
               <p class="text-xs text-amber-700 leading-relaxed">
-                Para crear un microproyecto es necesario haber registrado primero una sesión con un microreto en el
+                Para crear un proyecto es necesario haber registrado primero una sesión con un reto en el
                 <button @click="router.push({ name: 'dashboard-docente' })"
                         class="underline font-black hover:text-amber-900 transition-colors">
                   Dashboard docente
@@ -803,8 +803,8 @@ onUnmounted(() => { tourActivo.value = false; });
                       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
               <div>
-                <p class="text-xs font-bold text-amber-800">Microproyecto sin sesión vinculada</p>
-                <p class="text-xs text-amber-600 mt-0.5">Microreto: {{ microretoVinculado?.titulo || '#' + form.microreto_id }}</p>
+                <p class="text-xs font-bold text-amber-800">Proyecto sin sesión vinculada</p>
+                <p class="text-xs text-amber-600 mt-0.5">Reto: {{ microretoVinculado?.titulo || '#' + form.microreto_id }}</p>
               </div>
             </div>
 
@@ -822,7 +822,7 @@ onUnmounted(() => { tourActivo.value = false; });
                 </div>
                 <div>
                   <p class="text-xs font-black text-[#121212]">Sesión de trabajo <span class="text-red-500">*</span></p>
-                  <p class="text-[11px] text-gray-400 mt-0.5">El microproyecto hereda el microreto de la sesión y autocompleta empresa, centro y ciclo.</p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">El proyecto hereda el reto de la sesión y autocompleta empresa, centro y ciclo.</p>
                 </div>
               </div>
 
@@ -847,7 +847,7 @@ onUnmounted(() => { tourActivo.value = false; });
                   </button>
                 </div>
                 <div v-if="microretoVinculado" class="mt-3 pt-3 border-t border-[#99CC33]/20">
-                  <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Microreto</p>
+                  <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Reto</p>
                   <div class="flex flex-wrap gap-1.5 items-center">
                     <span class="text-xs font-black text-[#1F2937]">{{ microretoVinculado.titulo }}</span>
                     <span v-if="microretoVinculado.familia" class="tag tag-gray">{{ microretoVinculado.familia }}</span>
@@ -864,7 +864,7 @@ onUnmounted(() => { tourActivo.value = false; });
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                   </svg>
                   <input v-model="sesionBusqueda" type="text"
-                         placeholder="Buscar por microreto, centro o ciclo..."
+                         placeholder="Buscar por reto, centro o ciclo..."
                          class="field-input pl-10" />
                 </div>
                 <p v-if="!sesionesFiltradas.length" class="text-xs text-gray-400 font-medium text-center py-6">
@@ -898,7 +898,7 @@ onUnmounted(() => { tourActivo.value = false; });
             <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-5"
                  :class="(!uuid && !sesionSeleccionada) ? 'opacity-50 pointer-events-none select-none' : ''">
               <div>
-                <label class="field-label">Título del microproyecto *</label>
+                <label class="field-label">Título del proyecto *</label>
                 <input v-model="form.titulo" type="text" required class="field-input"
                        placeholder="Ej: Rediseño de packaging sostenible para EcoFab" />
               </div>
@@ -943,7 +943,7 @@ onUnmounted(() => { tourActivo.value = false; });
                                    bg-[#00A859]/15 border border-[#00A859]/30 text-[#00A859]
                                    text-[9px] font-black uppercase tracking-widest">
                         <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] animate-ping" />
-                        Del microreto
+                        Del reto
                       </span>
                     </Transition>
                   </label>
@@ -965,7 +965,7 @@ onUnmounted(() => { tourActivo.value = false; });
                       <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                       </svg>
-                      Rellenado automáticamente desde el microreto
+                      Rellenado automáticamente desde el reto
                     </div>
                   </Transition>
                 </div>
@@ -1074,7 +1074,7 @@ onUnmounted(() => { tourActivo.value = false; });
               <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Paso 4</span>
             </div>
             <h2 class="text-2xl font-black text-[#121212]">Módulos y currículum</h2>
-            <p class="text-gray-500 text-sm mt-1">Selecciona los módulos del ciclo que se trabajan en este microproyecto.</p>
+            <p class="text-gray-500 text-sm mt-1">Selecciona los módulos del ciclo que se trabajan en este proyecto.</p>
           </div>
 
           <div class="space-y-4">
@@ -1094,8 +1094,8 @@ onUnmounted(() => { tourActivo.value = false; });
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-black text-[#00A859] mb-0.5">Módulos seleccionados automáticamente</p>
                   <p class="text-xs text-[#00A859]/70 leading-relaxed">
-                    Esto se basa en el microreto vinculado. Si crees que se trabajan otros módulos,
-                    revisa el microreto para que esté acorde, o ajusta la selección manualmente.
+                    Esto se basa en el reto vinculado. Si crees que se trabajan otros módulos,
+                    revisa el reto para que esté acorde, o ajusta la selección manualmente.
                   </p>
                 </div>
                 <button @click="modulosAutocompletados = false"
@@ -1139,7 +1139,7 @@ onUnmounted(() => { tourActivo.value = false; });
                                bg-amber-50 border border-amber-200 text-amber-600
                                text-[9px] font-black uppercase tracking-widest">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    Del microreto
+                    Del reto
                   </span>
                 </Transition>
               </div>
@@ -1157,7 +1157,7 @@ onUnmounted(() => { tourActivo.value = false; });
                       d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                   <p class="text-xs text-amber-700 leading-relaxed flex-1">
-                    RA y CE generados a partir del microreto vinculado. Revisa que estén alineados con tu
+                    RA y CE generados a partir del reto vinculado. Revisa que estén alineados con tu
                     programación o ajusta la selección.
                   </p>
                   <button @click="raCeAutocompletado = false"
@@ -1343,7 +1343,7 @@ onUnmounted(() => { tourActivo.value = false; });
                         {{ totalCeSeleccionados }} CE de {{ totalRaSeleccionados }} RA seleccionados
                       </template>
                       <template v-else>
-                        Marca los CE que se trabajarán en el microproyecto.
+                        Marca los CE que se trabajarán en el proyecto.
                       </template>
                     </p>
                     <button @click="aplicarSeleccionManual"
@@ -1359,7 +1359,7 @@ onUnmounted(() => { tourActivo.value = false; });
               <!-- ── MODO IA ── -->
               <div v-else-if="modoRaCe === 'ia'" class="space-y-4">
                 <div class="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 text-sm text-violet-700 leading-relaxed">
-                  La IA analizará el contexto del microproyecto y los módulos seleccionados para sugerir los RA y CE más relevantes del catálogo oficial.
+                  La IA analizará el contexto del proyecto y los módulos seleccionados para sugerir los RA y CE más relevantes del catálogo oficial.
                 </div>
                 <button @click="sugerirRaCeConIa"
                         :disabled="cargandoIaRaCe || !form.modulos_seleccionados.length"
@@ -1387,7 +1387,7 @@ onUnmounted(() => { tourActivo.value = false; });
               <!-- ── MODO TEXTO LIBRE ── -->
               <div v-else>
                 <textarea v-model="form.ra_ce" rows="6" class="field-input resize-none"
-                          placeholder="Describe los RA y CE que se trabajarán en este microproyecto…" />
+                          placeholder="Describe los RA y CE que se trabajarán en este proyecto…" />
               </div>
             </div>
           </div>
@@ -1405,7 +1405,7 @@ onUnmounted(() => { tourActivo.value = false; });
               <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Paso 5</span>
             </div>
             <h2 class="text-2xl font-black text-[#121212]">El reto</h2>
-            <p class="text-gray-500 text-sm mt-1">Define el contexto, la fundamentación y el reto central del microproyecto.</p>
+            <p class="text-gray-500 text-sm mt-1">Define el contexto, la fundamentación y el reto central del proyecto.</p>
           </div>
 
           <div class="space-y-4">
@@ -1419,7 +1419,7 @@ onUnmounted(() => { tourActivo.value = false; });
                           placeholder="¿Por qué este reto es relevante para el aprendizaje del alumnado?" /></div>
               <div><label class="field-label">Elemento innovador</label>
                 <textarea v-model="form.fundamentacion.innovacion" rows="2" class="field-input resize-none"
-                          placeholder="¿Qué tiene de innovador este microproyecto?" /></div>
+                          placeholder="¿Qué tiene de innovador este proyecto?" /></div>
             </div>
 
             <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 space-y-4">
@@ -1445,13 +1445,13 @@ onUnmounted(() => { tourActivo.value = false; });
           </div>
         </div>
 
-        <!-- ═══ PASO 6: Diseño del microproyecto ═══ -->
+        <!-- ═══ PASO 6: Diseño del proyecto ═══ -->
         <div v-if="paso === 6">
           <div class="mb-6">
             <div class="inline-flex items-center gap-2 mb-2 px-3 py-1 rounded-full bg-[#00A859]/10 border border-[#00A859]/20">
               <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Paso 6</span>
             </div>
-            <h2 class="text-2xl font-black text-[#121212]">Diseño del microproyecto</h2>
+            <h2 class="text-2xl font-black text-[#121212]">Diseño del proyecto</h2>
             <p class="text-gray-500 text-sm mt-1">Define las fases, metodología y cronograma del trabajo.</p>
           </div>
 
@@ -1496,7 +1496,7 @@ onUnmounted(() => { tourActivo.value = false; });
                           placeholder="Fechas clave, hitos y plazos…" /></div>
               <div><label class="field-label">Resumen ejecutivo</label>
                 <textarea v-model="form.resumen.texto" rows="4" class="field-input resize-none"
-                          placeholder="Síntesis del microproyecto para compartir con la empresa…" /></div>
+                          placeholder="Síntesis del proyecto para compartir con la empresa…" /></div>
             </div>
           </div>
 
@@ -1570,13 +1570,13 @@ onUnmounted(() => { tourActivo.value = false; });
             <div class="inline-flex items-center gap-2 mb-2 px-3 py-1 rounded-full bg-[#00A859]/10 border border-[#00A859]/20">
               <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Paso 8</span>
             </div>
-            <h2 class="text-2xl font-black text-[#121212]">Publicar microproyecto</h2>
+            <h2 class="text-2xl font-black text-[#121212]">Publicar proyecto</h2>
             <p class="text-gray-500 text-sm mt-1">Al publicar se genera un enlace único para que la empresa valide el proyecto.</p>
           </div>
 
           <!-- Resumen -->
           <div class="bg-white rounded-4xl border border-gray-100 shadow-sm p-6 mb-4">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Resumen del microproyecto</p>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Resumen del proyecto</p>
             <div class="grid sm:grid-cols-2 gap-4 text-sm">
               <div class="p-3 bg-gray-50 rounded-2xl">
                 <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-1">Título</p>
@@ -1740,7 +1740,7 @@ onUnmounted(() => { tourActivo.value = false; });
                       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
               <p class="text-sm text-[#1F2937] leading-relaxed">
-                Al publicar se generará un <strong>enlace único</strong> que podrás enviar a la empresa para que valide el microproyecto.
+                Al publicar se generará un <strong>enlace único</strong> que podrás enviar a la empresa para que valide el proyecto.
                 Podrás seguir editando el proyecto después de publicarlo.
               </p>
             </div>
@@ -1753,7 +1753,7 @@ onUnmounted(() => { tourActivo.value = false; });
                 {{ guardando ? 'Guardando…' : 'Guardar borrador' }}
               </button>
               <button @click="publicar" :disabled="guardando || !form.titulo.trim()" class="btn-primary">
-                {{ guardando ? 'Publicando…' : 'Publicar microproyecto' }}
+                {{ guardando ? 'Publicando…' : 'Publicar proyecto' }}
               </button>
             </div>
           </div>

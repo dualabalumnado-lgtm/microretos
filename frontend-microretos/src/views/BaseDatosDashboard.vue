@@ -2046,7 +2046,7 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
           <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
             <p class="text-xs text-amber-700 font-semibold leading-relaxed">
               Esta sección modifica el <span class="font-black">catálogo académico global</span>.
-              Los cambios afectan a centros, empresas, generación de microretos y todas las relaciones de la base de datos.
+              Los cambios afectan a centros, empresas, generación de retos y todas las relaciones de la base de datos.
               Solo procede si eres administrador del sistema.
             </p>
           </div>

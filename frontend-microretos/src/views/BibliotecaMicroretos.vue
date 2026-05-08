@@ -279,7 +279,7 @@ const descargarGrupoFiltrado = () => {
   const retos = microretosFiltrados.value;
   if (!retos.length) return;
   _lanzarGeneracion(() => {
-    let titulo = familiaSeleccionada.value || 'Microretos';
+    let titulo = familiaSeleccionada.value || 'Retos';
     if (filtroCentro.value) titulo += ` – ${filtroCentro.value}`;
     const partes = [];
     if (filtroCiclo.value)        partes.push(`Ciclo: ${filtroCiclo.value}`);
@@ -346,7 +346,7 @@ const confirmarEliminar = async () => {
           class="text-4xl md:text-5xl font-black tracking-tight mb-4 text-[#121212] transition-all duration-1000 delay-150 ease-out transform"
           :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
           Explorador de
-          <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Micro-Retos</span>
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Retos</span>
         </h1>
         <p class="text-gray-500 max-w-2xl mx-auto text-base md:text-lg leading-relaxed font-medium transition-all duration-1000 delay-300 ease-out transform"
           :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
@@ -380,7 +380,7 @@ const confirmarEliminar = async () => {
                 Centro Educativo
                 <span class="tooltip-wrap">
                   <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
-                  <span class="tooltip-text">Filtra microretos del centro de formación profesional seleccionado.</span>
+                  <span class="tooltip-text">Filtra retos del centro de formación profesional seleccionado.</span>
                 </span>
               </label>
               <div class="flex flex-wrap items-center gap-2 flex-1">
@@ -404,7 +404,7 @@ const confirmarEliminar = async () => {
                   :class="generandoPDFGrupo
                     ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-wait'
                     : 'border-[#00A859]/40 text-[#00A859] hover:bg-[#00A859] hover:text-white hover:border-[#00A859]'"
-                  :title="`Descargar todos los microretos de ${filtroCentro}`">
+                  :title="`Descargar todos los retos de ${filtroCentro}`">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -528,7 +528,7 @@ const confirmarEliminar = async () => {
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-400 font-bold">
-                  {{ microretosFiltrados.length }} micro-reto{{ microretosFiltrados.length !== 1 ? 's' : '' }}
+                  {{ microretosFiltrados.length }} reto{{ microretosFiltrados.length !== 1 ? 's' : '' }}
                 </span>
 
                 <!-- Botón de descarga del grupo filtrado actual (nivel 3) -->
@@ -540,7 +540,7 @@ const confirmarEliminar = async () => {
                   :class="generandoPDFGrupo
                     ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-wait'
                     : 'border-[#00A859]/30 text-[#00A859] hover:bg-[#00A859] hover:text-white hover:border-[#00A859]'"
-                  :title="hayFiltrosActivos ? 'Descargar microretos con los filtros actuales' : 'Descargar todos los microretos de esta familia'">
+                  :title="hayFiltrosActivos ? 'Descargar retos con los filtros actuales' : 'Descargar todos los retos de esta familia'">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -552,7 +552,7 @@ const confirmarEliminar = async () => {
 
             <!-- ── CARDS DE DIFICULTAD ───────────────────────────── -->
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 px-1 flex items-center gap-1.5">
-              Nivel del microreto
+              Nivel del reto
               <span class="tooltip-wrap">
                 <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
                 <span class="tooltip-text">Dificultad del reto: Bajo (básico/introductorio), Medio (aplicado), Alto (avanzado).</span>
@@ -840,7 +840,7 @@ const confirmarEliminar = async () => {
                   Búsqueda por palabras clave
                   <span class="tooltip-wrap">
                     <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
-                    <span class="tooltip-text">Busca en título, empresa, ciclo formativo y pregunta del microreto.</span>
+                    <span class="tooltip-text">Busca en título, empresa, ciclo formativo y pregunta del reto.</span>
                   </span>
                 </label>
                 <div class="relative">
@@ -873,7 +873,7 @@ const confirmarEliminar = async () => {
                     Ciclo Formativo
                     <span class="tooltip-wrap">
                       <svg class="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
-                      <span class="tooltip-text">Filtra por ciclo formativo al que está orientado el microreto.</span>
+                      <span class="tooltip-text">Filtra por ciclo formativo al que está orientado el reto.</span>
                     </span>
                   </label>
                   <select v-model="filtroCiclo"
@@ -1007,7 +1007,7 @@ const confirmarEliminar = async () => {
                   <!-- Papelera -->
                   <button @click.prevent="abrirModalEliminar(reto)"
                     class="shrink-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm transition-all duration-300 hover:bg-red-50 hover:border-red-300 active:scale-95"
-                    title="Eliminar microreto">
+                    title="Eliminar reto">
                     <svg class="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1098,7 +1098,7 @@ const confirmarEliminar = async () => {
                 </svg>
               </div>
               <h3 class="text-[#1F2937] font-black text-2xl mb-2">No hay resultados</h3>
-              <p class="text-gray-500 text-sm max-w-md mx-auto">Prueba a limpiar los filtros o genera nuevos microretos en el Estudio interactivo.</p>
+              <p class="text-gray-500 text-sm max-w-md mx-auto">Prueba a limpiar los filtros o genera nuevos retos en el Estudio interactivo.</p>
               <button @click="limpiarFiltros"
                 class="mt-6 px-6 py-2 bg-white border border-gray-200 hover:border-[#00A859] hover:text-[#00A859] text-[#1F2937] rounded-full text-xs font-bold uppercase tracking-widest transition-colors shadow-sm">
                 Restablecer Búsqueda
@@ -1124,7 +1124,7 @@ const confirmarEliminar = async () => {
               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </div>
-        <h3 class="text-[#1F2937] font-black text-2xl text-center mb-2">¿Eliminar microreto?</h3>
+        <h3 class="text-[#1F2937] font-black text-2xl text-center mb-2">¿Eliminar reto?</h3>
         <p class="text-gray-500 text-sm text-center mb-2 leading-relaxed">Vas a eliminar permanentemente:</p>
         <p class="text-[#1F2937] font-bold text-sm text-center mb-6 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
           "{{ retoAEliminar?.titulo }}"

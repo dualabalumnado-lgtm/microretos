@@ -155,10 +155,10 @@ defineExpose({ isOpen, toggle, close })
               <span class="flex-1 text-left flex items-center gap-1.5">
                 <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
                              bg-[#00A859]/20 text-[#00A859] text-[8px] font-black shrink-0">1</span>
-                Microretos
+                Retos
               </span>
             </div>
-            <div class="sp-tooltip">Fase 1 — Crea microretos con IA y compártelos con el alumnado<div class="sp-tooltip-arrow"/></div>
+            <div class="sp-tooltip">Fase 1 — Crea retos con IA y compártelos con el alumnado<div class="sp-tooltip-arrow"/></div>
           </div>
 
           <div class="space-y-0.5">
@@ -176,7 +176,7 @@ defineExpose({ isOpen, toggle, close })
                   </svg>
                   <span>Generador</span>
                 </button>
-                <div class="sp-tooltip">Genera microretos con IA a partir de una empresa y los criterios del ciclo<div class="sp-tooltip-arrow"/></div>
+                <div class="sp-tooltip">Genera retos con IA a partir de una empresa y los criterios del ciclo<div class="sp-tooltip-arrow"/></div>
               </div>
 
               <!-- Biblioteca de microretos -->
@@ -195,7 +195,7 @@ defineExpose({ isOpen, toggle, close })
                   </svg>
                   <span>Biblioteca</span>
                 </button>
-                <div class="sp-tooltip">Consulta todos los microretos guardados y comparte el QR con el alumnado<div class="sp-tooltip-arrow"/></div>
+                <div class="sp-tooltip">Consulta todos los retos guardados y comparte el QR con el alumnado<div class="sp-tooltip-arrow"/></div>
               </div>
 
           </div>
@@ -213,7 +213,7 @@ defineExpose({ isOpen, toggle, close })
                 Taller de Ideas
               </span>
             </div>
-            <div class="sp-tooltip">Fase 2 — Registra sesiones, crea microproyectos y gestiona el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
+            <div class="sp-tooltip">Fase 2 — Registra sesiones, crea proyectos y gestiona el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
           </div>
 
           <div class="space-y-0.5">
@@ -233,7 +233,7 @@ defineExpose({ isOpen, toggle, close })
                   </svg>
                   <span>Dashboard docente</span>
                 </button>
-                <div class="sp-tooltip">Registra sesiones de trabajo con microretos<div class="sp-tooltip-arrow"/></div>
+                <div class="sp-tooltip">Registra sesiones de trabajo con retos<div class="sp-tooltip-arrow"/></div>
               </div>
 
               <!-- Microproyectos -->
@@ -249,9 +249,9 @@ defineExpose({ isOpen, toggle, close })
                     <path d="M2 17l10 5 10-5"/>
                     <path d="M2 12l10 5 10-5"/>
                   </svg>
-                  <span>Microproyectos</span>
+                  <span>Proyectos</span>
                 </button>
-                <div class="sp-tooltip">Crea y gestiona microproyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
+                <div class="sp-tooltip">Crea y gestiona proyectos para el Taller de Ideas<div class="sp-tooltip-arrow"/></div>
               </div>
 
           </div>
@@ -485,36 +485,36 @@ defineExpose({ isOpen, toggle, close })
             <h2 class="text-2xl font-black tracking-tight">
               Dua<span class="text-[#00A859]">Lab</span>
             </h2>
-            <p class="text-white/40 text-xs font-medium">Plataforma de microretos para FP Dual</p>
+            <p class="text-white/40 text-xs font-medium">Plataforma de retos para FP Dual</p>
           </div>
         </div>
 
         <p class="text-white/60 text-sm leading-relaxed mb-6">
           DuaLab es la plataforma que conecta centros educativos de FP con empresas para
-          generar microretos de aprendizaje real, alineados con los módulos y resultados de aprendizaje del ciclo.
+          generar retos de aprendizaje real, alineados con los módulos y resultados de aprendizaje del ciclo.
         </p>
 
         <!-- Secciones explicadas -->
         <div class="space-y-4">
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
-            <p class="text-[10px] font-black uppercase tracking-widest text-[#99CC33] mb-2">Microretos</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-[#99CC33] mb-2">Retos</p>
             <div class="space-y-2 text-xs text-white/60">
-              <p><span class="text-white font-bold">Generador</span> — Crea microretos con IA a partir de los datos de una empresa y los criterios de evaluación del ciclo. Requiere sesión.</p>
-              <p><span class="text-white font-bold">Biblioteca</span> — Accede a todos los microretos generados. Comparte cada reto con el alumnado mediante un código QR temporal.</p>
+              <p><span class="text-white font-bold">Generador</span> — Crea retos con IA a partir de los datos de una empresa y los criterios de evaluación del ciclo. Requiere sesión.</p>
+              <p><span class="text-white font-bold">Biblioteca</span> — Accede a todos los retos generados. Comparte cada reto con el alumnado mediante un código QR temporal.</p>
             </div>
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
             <p class="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">Taller de Ideas</p>
-            <p class="text-xs text-white/60"><span class="text-white font-bold">Microproyectos</span> — Diseña y gestiona microproyectos Taller de Ideas equipo, módulos, objetivos y validación por empresa.</p>
+            <p class="text-xs text-white/60"><span class="text-white font-bold">Proyectos</span> — Diseña y gestiona proyectos Taller de Ideas equipo, módulos, objetivos y validación por empresa.</p>
           </div>
 
           <div class="rounded-2xl bg-white/5 border border-white/8 p-4">
             <p class="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-2">Herramientas</p>
             <div class="space-y-2 text-xs text-white/60">
-              <p><span class="text-white font-bold">Dashboard docentes</span> — Panel de seguimiento del alumnado: proyectos activos, progreso y microretos asignados.</p>
-              <p><span class="text-white font-bold">Biblioteca microretos</span> — Acceso directo a la colección completa de retos para gestión docente.</p>
+              <p><span class="text-white font-bold">Dashboard docentes</span> — Panel de seguimiento del alumnado: proyectos activos, progreso y retos asignados.</p>
+              <p><span class="text-white font-bold">Biblioteca de retos</span> — Acceso directo a la colección completa de retos para gestión docente.</p>
               <p><span class="text-white font-bold">Base de datos</span> — Gestión de empresas, centros educativos, familias profesionales y ciclos formativos.</p>
             </div>
           </div>

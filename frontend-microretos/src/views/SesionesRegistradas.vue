@@ -196,7 +196,7 @@ function irPaginaSiguiente() {
                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
               </svg>
               <span class="font-black text-xl text-[#1F2937]">{{ stats.microretos }}</span>
-              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">microretos</span>
+              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">retos</span>
             </div>
           </div>
         </div>
@@ -217,7 +217,7 @@ function irPaginaSiguiente() {
 
           <!-- Búsqueda por título -->
           <div class="lg:col-span-2">
-            <label class="field-label">Buscar por título de microreto</label>
+            <label class="field-label">Buscar por título de reto</label>
             <div class="relative">
               <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none"
                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -369,7 +369,7 @@ function irPaginaSiguiente() {
                 <!-- Trabajar microreto → crear microproyecto -->
                 <button @click.stop="crearMicroproyecto(s.id)"
                         class="p-1.5 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 transition-all"
-                        title="Trabajar microreto (crear microproyecto)">
+                        title="Trabajar reto (crear proyecto)">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -380,7 +380,7 @@ function irPaginaSiguiente() {
                 <button v-if="s.microreto_id"
                         @click.stop="abrirMicroretoModal(s.microreto_id)"
                         class="p-1.5 rounded-lg bg-[#00A859]/10 text-[#00A859] hover:bg-[#00A859]/20 transition-all"
-                        title="Ver ficha del microreto">
+                        title="Ver ficha del reto">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
@@ -556,7 +556,7 @@ function irPaginaSiguiente() {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
                 </svg>
-                Ver microreto
+                Ver reto
               </button>
               <button @click="crearMicroproyecto(sesionAbierta.id); cerrarSesion()"
                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A859] text-white
@@ -568,7 +568,7 @@ function irPaginaSiguiente() {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
                 </svg>
-                Trabajar microreto
+                Trabajar reto
               </button>
             </div>
           </div>
