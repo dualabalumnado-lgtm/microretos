@@ -102,14 +102,31 @@ const router = createRouter({
   ]
 })
 
-// Guarda de navegación global: bloquea rutas protegidas si no hay sesión activa.
-// Redirige a / con el parámetro ?redirect=<ruta> para que el modal de login
-// sepa a dónde mandar al usuario tras autenticarse.
+// Duración del token en ms — debe coincidir con TOKEN_DURATION_MINUTES en auth.js
+// y con config/sanctum.php → expiration (1440 min = 24 h).
+const TOKEN_DURATION_MS = 1440 * 60 * 1000
+
+// Guarda de navegación global: bloquea rutas protegidas si no hay sesión activa
+// o si el token presente está caducado. Redirige a / con ?redirect=<ruta> para
+// que el modal de login sepa a dónde enviar al usuario tras autenticarse.
 router.beforeEach((to, _from, next) => {
-  if (to.meta.requiresAuth && !localStorage.getItem('admin_token')) {
+  if (!to.meta.requiresAuth) {
+    next()
+    return
+  }
+
+  const token     = localStorage.getItem('admin_token')
+  const createdAt = Number(localStorage.getItem('admin_token_created_at') || 0)
+  const isValid   = token && createdAt && (Date.now() - createdAt) < TOKEN_DURATION_MS
+
+  if (!isValid) {
+    // Limpia credenciales inválidas/caducadas antes de redirigir
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_token_created_at')
     next({ path: '/', query: { redirect: to.fullPath } })
     return
   }
+
   next()
 })
 
