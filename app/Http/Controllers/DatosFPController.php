@@ -440,6 +440,19 @@ class DatosFPController extends Controller
 
         $request->validate([
             'nombreComercial'  => 'required|string|max:255',
+            'razonSocial'      => 'nullable|string|max:255',
+            'cif'              => 'nullable|string|max:20',
+            'sector'           => 'nullable|string|max:255',
+            'tamano'           => 'nullable|string|max:50',
+            'web'              => 'nullable|string|max:255',
+            'actividad'        => 'nullable|string|max:500',
+            'personaContacto'  => 'nullable|string|max:255',
+            'telefono'         => 'nullable|string|max:20',
+            'emailGeneral'     => 'nullable|email|max:255',
+            'direccion'        => 'nullable|string|max:255',
+            'municipio'        => 'nullable|string|max:255',
+            'provincia'        => 'nullable|string|max:255',
+            'codigoPostal'     => 'nullable|string|max:10',
             'diaANormal'       => 'nullable|string|max:1000',
             'friccionArea'     => 'nullable|string|max:400',
             'friccionProblema' => 'nullable|string|max:1200',
@@ -463,11 +476,21 @@ class DatosFPController extends Controller
 
         $empresa = Empresa::create([
             'nombre_comercial'  => $request->nombreComercial,
+            'razon_social'      => $request->razonSocial,
+            'cif'               => $request->cif,
             'centro_educativo'  => $request->centroEducativo, // legacy
             'centro_id'         => $centroId,
             'sector'            => $request->sector,
             'tamano'            => $request->tamano,
             'web'               => $request->web,
+            'actividad'         => $request->actividad,
+            'persona_contacto'  => $request->personaContacto,
+            'telefono'          => $request->telefono,
+            'email_general'     => $request->emailGeneral,
+            'direccion'         => $request->direccion,
+            'municipio'         => $request->municipio,
+            'provincia'         => $request->provincia,
+            'codigo_postal'     => $request->codigoPostal,
             'dia_a_normal'      => $request->diaANormal,
             'friccion_area'     => $request->friccionArea,
             'friccion_problema' => $request->friccionProblema,
@@ -536,6 +559,7 @@ class DatosFPController extends Controller
         }
 
         DB::table('empresa_familia')->where('empresa_id', $id)->delete();
+        DB::table('microretos')->where('empresa_id', $id)->update(['empresa_id' => null]);
         $empresa->delete();
 
         return response()->json(['message' => 'Empresa eliminada correctamente']);
@@ -552,6 +576,20 @@ class DatosFPController extends Controller
         $estadosPermitidos = ['Pendiente de llamar', 'Llamado - Información obtenida', 'Llamado - Negativa', 'Llamado - Llamar más tarde', 'En colaboración activa', 'Descartada'];
 
         $request->validate([
+            'nombreComercial'  => 'required|string|max:255',
+            'razonSocial'      => 'nullable|string|max:255',
+            'cif'              => 'nullable|string|max:20',
+            'sector'           => 'nullable|string|max:255',
+            'tamano'           => 'nullable|string|max:50',
+            'web'              => 'nullable|string|max:255',
+            'actividad'        => 'nullable|string|max:500',
+            'personaContacto'  => 'nullable|string|max:255',
+            'telefono'         => 'nullable|string|max:20',
+            'emailGeneral'     => 'nullable|email|max:255',
+            'direccion'        => 'nullable|string|max:255',
+            'municipio'        => 'nullable|string|max:255',
+            'provincia'        => 'nullable|string|max:255',
+            'codigoPostal'     => 'nullable|string|max:10',
             'diaANormal'       => 'nullable|string|max:1000',
             'friccionArea'     => 'nullable|string|max:400',
             'friccionProblema' => 'nullable|string|max:1200',
@@ -571,14 +609,27 @@ class DatosFPController extends Controller
         if ($request->filled('centroEducativo')) {
             $centro   = CentroEducativo::firstOrCreate(['nombre' => $request->centroEducativo]);
             $centroId = $centro->id;
+        } elseif ($request->has('centroEducativo') && !$request->centroEducativo) {
+            $centroId = null;
         }
 
         $updateData = [
+            'nombre_comercial'  => $request->nombreComercial,
+            'razon_social'      => $request->razonSocial,
+            'cif'               => $request->cif,
             'centro_educativo'  => $request->centroEducativo, // legacy
             'centro_id'         => $centroId,
             'sector'            => $request->sector,
             'tamano'            => $request->tamano,
             'web'               => $request->web,
+            'actividad'         => $request->actividad,
+            'persona_contacto'  => $request->personaContacto,
+            'telefono'          => $request->telefono,
+            'email_general'     => $request->emailGeneral,
+            'direccion'         => $request->direccion,
+            'municipio'         => $request->municipio,
+            'provincia'         => $request->provincia,
+            'codigo_postal'     => $request->codigoPostal,
             'dia_a_normal'      => $request->diaANormal,
             'friccion_area'     => $request->friccionArea,
             'friccion_problema' => $request->friccionProblema,

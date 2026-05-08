@@ -10,7 +10,10 @@ class SesionController extends Controller
 {
     public function index()
     {
-        return Sesion::orderBy('created_at', 'desc')->get();
+        return Sesion::with([
+            'microreto.empresa.centroEducativo',
+            'microreto.empresa.familias',
+        ])->orderBy('created_at', 'desc')->get();
     }
 
     public function store(Request $request)
