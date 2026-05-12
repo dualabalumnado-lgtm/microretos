@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import api from '../api.js';
 import BienvenidaStartupDayModal from '../components/BienvenidaStartupDayModal.vue';
+import EliminarProyectoModal from '../components/EliminarProyectoModal.vue';
 import { useUIState } from '../composables/useUIState.js';
 
 const router = useRouter();
@@ -176,10 +177,31 @@ const proyectosFiltrados = computed(() => {
   return lista;
 });
 
-async function eliminar(uuid) {
-  if (!confirm('¿Eliminar este proyecto? Esta acción no se puede deshacer.')) return;
-  await api.delete(`/startup/proyectos/${uuid}`);
+// ── Modal eliminar ──────────────────────────────────────────────────────────
+const modalEliminarVisible = ref(false);
+const proyectoAEliminar    = ref(null);
+
+function abrirModalEliminar(proyecto) {
+  proyectoAEliminar.value   = proyecto;
+  modalEliminarVisible.value = true;
+}
+
+function cerrarModalEliminar() {
+  modalEliminarVisible.value = false;
+  proyectoAEliminar.value    = null;
+}
+
+function onProyectoEliminado({ uuid, titulo }) {
   proyectos.value = proyectos.value.filter(p => p.uuid !== uuid);
+  cerrarModalEliminar();
+  mostrarSnack(`"${titulo}" movido a la papelera.`, { label: 'Ir a la papelera', fn: () => router.push({ name: 'papelera' }) });
+}
+
+// ── Snackbar ────────────────────────────────────────────────────────────────
+const snackbar = ref({ visible: false, mensaje: '', accion: null });
+function mostrarSnack(mensaje, accion = null) {
+  snackbar.value = { visible: true, mensaje, accion };
+  setTimeout(() => { snackbar.value.visible = false; }, 5000);
 }
 </script>
 
@@ -260,20 +282,36 @@ async function eliminar(uuid) {
           <p class="text-gray-500 text-sm mt-1">
             Aquí se trabajan los retos para convertirlos en proyectos de empresa reales.
           </p>
-          <!-- Botón Guía -->
-          <button ref="refBtnGuia"
-                  @click="modoGuia = true; pasoGuia = 1"
-                  :class="{ 'tour-active': pasoRefActivo === 'refBtnGuia' }"
-                  class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full
-                         bg-blue-500/10 border border-blue-500/20 text-blue-500
-                         text-[10px] font-black uppercase tracking-widest
-                         hover:bg-blue-500/20 transition-all">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Guía
-          </button>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <!-- Botón Guía -->
+            <button ref="refBtnGuia"
+                    @click="modoGuia = true; pasoGuia = 1"
+                    :class="{ 'tour-active': pasoRefActivo === 'refBtnGuia' }"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-full
+                           bg-blue-500/10 border border-blue-500/20 text-blue-500
+                           text-[10px] font-black uppercase tracking-widest
+                           hover:bg-blue-500/20 transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Guía
+            </button>
+            <!-- Botón Papelera -->
+            <button
+              @click="router.push({ name: 'papelera' })"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-full
+                     bg-amber-400/10 border border-amber-400/20 text-amber-600
+                     text-[10px] font-black uppercase tracking-widest
+                     hover:bg-amber-400/20 transition-all"
+              title="Ver proyectos eliminados">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+              Papelera
+            </button>
+          </div>
         </div>
 
         <!-- Nuevo microproyecto -->
@@ -443,9 +481,10 @@ async function eliminar(uuid) {
                 Editar
               </button>
               <button
-                @click="eliminar(p.uuid)"
+                @click="abrirModalEliminar(p)"
                 class="py-2 px-3 rounded-xl bg-gray-50 border border-gray-200 text-red-400
                        hover:bg-red-50 hover:border-red-200 transition-all"
+                title="Mover a papelera"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -460,11 +499,47 @@ async function eliminar(uuid) {
 
     </div>
   </div>
+
+  <!-- MODAL ELIMINAR PROYECTO -->
+  <EliminarProyectoModal
+    :visible="modalEliminarVisible"
+    :proyecto="proyectoAEliminar"
+    @proyecto-eliminado="onProyectoEliminado"
+    @cerrar="cerrarModalEliminar"
+  />
+
+  <!-- SNACKBAR -->
+  <Transition name="sp-snack">
+    <div
+      v-if="snackbar.visible"
+      class="fixed bottom-6 right-6 z-[60] flex items-center gap-3
+             px-5 py-3.5 rounded-2xl shadow-xl text-sm font-bold
+             max-w-sm bg-[#1a2332] text-white border border-white/10"
+    >
+      <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      <span class="flex-1">{{ snackbar.mensaje }}</span>
+      <button
+        v-if="snackbar.accion"
+        @click="snackbar.accion.fn(); snackbar.visible = false"
+        class="ml-1 shrink-0 px-3 py-1.5 rounded-xl bg-amber-400 text-[#1a2332] text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 transition-all"
+      >
+        {{ snackbar.accion.label }}
+      </button>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
 .sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
 .sp-fade-enter-from, .sp-fade-leave-to { opacity: 0; }
+
+.sp-snack-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.sp-snack-leave-active { transition: all 0.2s ease-in; }
+.sp-snack-enter-from   { opacity: 0; transform: translateY(12px); }
+.sp-snack-leave-to     { opacity: 0; transform: translateY(8px); }
 
 .tour-active {
   box-shadow: 0 0 0 3px #00A859, 0 0 0 8px rgba(0,168,89,0.15);
