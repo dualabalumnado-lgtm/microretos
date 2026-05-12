@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
 import api from '../api.js';
 import LoginModal from '../components/LoginModal.vue';
+import EliminarMicrorretoModal from '../components/EliminarMicrorretoModal.vue';
 import { usePdfExport } from '../composables/usePdfExport.js';
 
 const router = useRouter();
@@ -307,17 +308,21 @@ const abrirModalEliminar = (reto) => {
 
 const cancelarEliminar = () => { modalVisible.value = false; retoAEliminar.value = null; };
 
-const confirmarEliminar = async () => {
-  if (!retoAEliminar.value) return;
-  try {
-    await api.delete(`/microretos/${retoAEliminar.value.id}`);
-    microretos.value = microretos.value.filter(m => m.id !== retoAEliminar.value.id);
-  } catch (error) {
-    console.error('Error al eliminar el microreto:', error);
-  } finally {
-    cancelarEliminar();
-  }
+const onRetoEliminado = ({ id, titulo }) => {
+  microretos.value = microretos.value.filter(m => m.id !== id);
+  cancelarEliminar();
+  mostrarSnack(`"${titulo}" movido a la papelera.`, 'ok', {
+    label: 'Ir a la papelera',
+    fn: () => router.push({ name: 'papelera' }),
+  });
 };
+
+// ── SNACKBAR ─────────────────────────────────────────────
+const snackbar = ref({ visible: false, mensaje: '', tipo: 'ok', accion: null });
+function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
+  snackbar.value = { visible: true, mensaje, tipo, accion };
+  setTimeout(() => { snackbar.value.visible = false; }, 5000);
+}
 </script>
 
 <template>
@@ -410,6 +415,18 @@ const confirmarEliminar = async () => {
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   {{ generandoPDFGrupo ? 'Generando...' : `PDF centro (${countCentroActual})` }}
+                </button>
+
+                <!-- Acceso directo a la papelera -->
+                <button
+                  @click="router.push({ name: 'papelera' })"
+                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-widest border border-gray-200 text-gray-500 bg-gray-50 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50 transition-all duration-200"
+                  title="Ver elementos eliminados en la papelera">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  Papelera
                 </button>
               </div>
             </div>
@@ -1112,35 +1129,34 @@ const confirmarEliminar = async () => {
     </div>
   </div>
 
-  <!-- MODAL ELIMINAR -->
-  <Transition name="fade">
-    <div v-if="modalVisible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      @click.self="cancelarEliminar">
-      <div class="bg-white rounded-[2rem] shadow-2xl p-8 max-w-md w-full border border-gray-100">
-        <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-100">
-          <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </div>
-        <h3 class="text-[#1F2937] font-black text-2xl text-center mb-2">¿Eliminar reto?</h3>
-        <p class="text-gray-500 text-sm text-center mb-2 leading-relaxed">Vas a eliminar permanentemente:</p>
-        <p class="text-[#1F2937] font-bold text-sm text-center mb-6 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-          "{{ retoAEliminar?.titulo }}"
-        </p>
-        <p class="text-gray-400 text-xs text-center mb-8">Esta acción no se puede deshacer.</p>
-        <div class="flex gap-3">
-          <button @click="cancelarEliminar"
-            class="flex-1 py-3.5 rounded-xl font-bold text-xs tracking-widest uppercase border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
-            Cancelar
-          </button>
-          <button @click="confirmarEliminar"
-            class="flex-1 py-3.5 rounded-xl font-bold text-xs tracking-widest uppercase bg-red-500 hover:bg-red-600 text-white transition-all shadow-sm">
-            Sí, eliminar
-          </button>
-        </div>
-      </div>
+  <!-- MODAL ELIMINAR (doble confirmación) -->
+  <EliminarMicrorretoModal
+    :visible="modalVisible"
+    :reto="retoAEliminar"
+    @reto-eliminado="onRetoEliminado"
+    @cerrar="cancelarEliminar"
+  />
+
+  <!-- SNACKBAR -->
+  <Transition name="snack">
+    <div
+      v-if="snackbar.visible"
+      class="fixed bottom-6 right-6 z-[60] flex items-center gap-3
+             px-5 py-3.5 rounded-2xl shadow-xl text-sm font-bold
+             max-w-sm bg-[#1F2937] text-white border border-[#333333]"
+    >
+      <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      <span class="flex-1">{{ snackbar.mensaje }}</span>
+      <button
+        v-if="snackbar.accion"
+        @click="snackbar.accion.fn(); snackbar.visible = false"
+        class="ml-1 shrink-0 px-3 py-1.5 rounded-xl bg-amber-400 text-[#1F2937] text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 transition-all"
+      >
+        {{ snackbar.accion.label }}
+      </button>
     </div>
   </Transition>
 
@@ -1158,6 +1174,11 @@ const confirmarEliminar = async () => {
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.snack-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.snack-leave-active { transition: all 0.2s ease-in; }
+.snack-enter-from   { opacity: 0; transform: translateY(12px); }
+.snack-leave-to     { opacity: 0; transform: translateY(8px); }
 
 .slide-up-enter-active { transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
 .slide-up-leave-active { transition: all 0.2s ease-in; }
