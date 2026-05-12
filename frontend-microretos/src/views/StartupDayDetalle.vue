@@ -157,13 +157,26 @@ async function archivar() {
               <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-1">Enlace de validación empresa</p>
               <p class="text-xs text-gray-400 break-all">{{ landingUrl }}</p>
             </div>
-            <button @click="copiarUrl"
-                    :class="['shrink-0 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border',
-                              urlCopiada
-                                ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20'
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]']">
-              {{ urlCopiada ? '¡Copiado!' : 'Copiar enlace' }}
-            </button>
+            <div class="flex items-center gap-2 shrink-0">
+              <button v-if="proyecto.empresa_id && !proyecto.empresa_validado"
+                      @click="router.push({ name: 'empresas', query: { empresa_id: proyecto.empresa_id, proyecto_uuid: proyecto.uuid, panel: 'validacion' } })"
+                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase
+                             tracking-wider border bg-amber-50 text-amber-700 border-amber-200
+                             hover:bg-amber-100 transition-all">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                Enviar a empresa
+              </button>
+              <button @click="copiarUrl"
+                      :class="['px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border',
+                                urlCopiada
+                                  ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]']">
+                {{ urlCopiada ? '¡Copiado!' : 'Copiar enlace' }}
+              </button>
+            </div>
           </div>
 
           <div v-if="proyecto.empresa_validado" class="flex items-center gap-2 mt-3 pt-3 border-t border-[#00A859]/15">
