@@ -12,9 +12,10 @@ const totalPasos = 8;
 const guardando         = ref(false);
 const cargando          = ref(false);
 const cargandoProyecto  = ref(false);
-const uuid       = ref(route.params.uuid || null);
-const isLoaded   = ref(false);
-const errorMsg   = ref('');
+const uuid           = ref(route.params.uuid || null);
+const isLoaded       = ref(false);
+const errorMsg       = ref('');
+const publicadoExito = ref(false);
 
 const familias   = ref([]);
 const ciclos     = ref([]);
@@ -593,7 +594,7 @@ async function guardar(siguientePaso) {
 async function publicar() {
   form.value.estado = 'publicado';
   await guardar(paso.value);
-  if (!errorMsg.value) router.push({ name: 'startup-day-detalle', params: { uuid: uuid.value } });
+  if (!errorMsg.value) publicadoExito.value = true;
 }
 
 const progreso = computed(() => Math.round(((paso.value - 1) / (totalPasos - 1)) * 100));
@@ -1618,6 +1619,40 @@ onUnmounted(() => { tourActivo.value = false; });
 
         <!-- ═══ PASO 8: Publicar ═══ -->
         <div v-if="paso === 8">
+
+          <!-- ── Estado de éxito tras publicar ── -->
+          <div v-if="publicadoExito" class="flex flex-col items-center text-center py-8 gap-6">
+            <div class="w-20 h-20 rounded-full bg-[#00A859]/10 border-2 border-[#00A859]/20 flex items-center justify-center">
+              <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-2xl font-black text-[#121212]">¡Proyecto publicado!</h2>
+              <p class="text-gray-500 text-sm mt-1.5 max-w-sm mx-auto">
+                El enlace de validación ya está listo. Puedes enviárselo a la empresa por correo para que valide el proyecto.
+              </p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+              <button v-if="form.empresa_id"
+                      @click="router.push({ name: 'empresas', query: { empresa_id: form.empresa_id, proyecto_uuid: uuid, panel: 'validacion' } })"
+                      class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 bg-amber-500 text-white
+                             rounded-full text-xs font-black uppercase tracking-widest shadow-sm
+                             hover:bg-amber-400 transition-all active:scale-95">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                Enviar enlace a empresa
+              </button>
+              <button @click="router.push({ name: 'startup-day-detalle', params: { uuid } })"
+                      class="flex-1 btn-secondary justify-center">
+                Ver proyecto
+              </button>
+            </div>
+          </div>
+
+          <template v-else>
           <div class="mb-6">
             <div class="inline-flex items-center gap-2 mb-2 px-3 py-1 rounded-full bg-[#00A859]/10 border border-[#00A859]/20">
               <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Paso 8</span>
@@ -1809,6 +1844,7 @@ onUnmounted(() => { tourActivo.value = false; });
               </button>
             </div>
           </div>
+          </template>
         </div>
 
       </template>

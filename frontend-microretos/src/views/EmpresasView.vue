@@ -83,13 +83,47 @@ onMounted(async () => {
 
 // `onActivated` cubre KeepAlive; el watcher cubre re-navegación a la misma ruta (SidePanel añade ?_t=)
 onActivated(() => {
-  if (desbloqueado.value) mostrarBienvenida.value = true
+  if (!desbloqueado.value) return
+  if (route.query.empresa_id) {
+    aplicarQueryParams()
+  } else {
+    mostrarBienvenida.value = true
+  }
 })
 
 const route = useRoute()
 watch(() => route.fullPath, () => {
-  if (desbloqueado.value) mostrarBienvenida.value = true
+  if (!desbloqueado.value) return
+  if (route.query.empresa_id) {
+    aplicarQueryParams()
+  } else {
+    mostrarBienvenida.value = true
+  }
 })
+
+// Auto-expande empresa y abre panel de validación cuando se llega desde el wizard
+watch(empresas, (list) => {
+  if (!list.length || !route.query.empresa_id) return
+  aplicarQueryParams()
+})
+
+function aplicarQueryParams() {
+  const empresa = empresas.value.find(e => String(e.id) === String(route.query.empresa_id))
+  if (!empresa) return
+  mostrarBienvenida.value = false
+  empresaExpandida.value = empresa
+  emailOk.value = false
+  emailError.value = ''
+  validacionOk.value = false
+  validacionError.value = ''
+  emailForm.value = { remitente: 'info@viaoptima.es', asunto: '', mensaje: '' }
+  validForm.value = {
+    remitente: 'info@viaoptima.es',
+    proyecto_uuid: route.query.proyecto_uuid || '',
+    mensaje: '',
+  }
+  if (route.query.panel === 'validacion') panelActivo.value = 'validacion'
+}
 
 async function cargarDatos() {
   cargando.value = true
