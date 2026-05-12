@@ -190,7 +190,8 @@ class DatosFPController extends Controller
 
     /**
      * DELETE /centros/{id}
-     * Elimina un centro: desvincula sus ciclos y deja sus empresas sin centro asignado.
+     * Mueve el centro a la papelera (soft delete). Sus empresas y ciclos no se tocan
+     * para que una restauración posterior recupere todo el estado original.
      */
     public function eliminarCentro($id)
     {
@@ -200,24 +201,9 @@ class DatosFPController extends Controller
             return response()->json(['error' => 'Centro no encontrado'], 404);
         }
 
-        $numEmpresas = Empresa::where('centro_id', $id)->count();
-
-        // Desvincular empresas (quedan sin centro asignado)
-        Empresa::where('centro_id', $id)->update([
-            'centro_id'        => null,
-            'centro_educativo' => null,
-        ]);
-
-        // Eliminar relaciones ciclo-centro
-        DB::table('centro_ciclo')->where('centro_id', $id)->delete();
-
-        // Eliminar el centro
         $centro->delete();
 
-        return response()->json([
-            'message'           => 'Centro eliminado correctamente',
-            'empresas_afectadas' => $numEmpresas,
-        ]);
+        return response()->json(['message' => 'Centro movido a la papelera']);
     }
 
     /**
@@ -356,7 +342,7 @@ class DatosFPController extends Controller
         }
 
         $familia->delete();
-        return response()->json(['message' => 'Familia eliminada']);
+        return response()->json(['message' => 'Familia movida a la papelera']);
     }
 
     // ==========================================
@@ -427,7 +413,7 @@ class DatosFPController extends Controller
         }
 
         $ciclo->delete();
-        return response()->json(['message' => 'Ciclo eliminado']);
+        return response()->json(['message' => 'Ciclo movido a la papelera']);
     }
 
     // ==========================================
@@ -548,7 +534,8 @@ class DatosFPController extends Controller
 
     /**
      * DELETE /empresas/{id}
-     * Elimina una empresa y sus relaciones pivot.
+     * Mueve la empresa a la papelera (soft delete). Las relaciones pivot y los microretos
+     * asociados no se tocan para que una restauración recupere todo el estado original.
      */
     public function eliminarEmpresa($id)
     {
@@ -558,11 +545,9 @@ class DatosFPController extends Controller
             return response()->json(['error' => 'Empresa no encontrada'], 404);
         }
 
-        DB::table('empresa_familia')->where('empresa_id', $id)->delete();
-        DB::table('microretos')->where('empresa_id', $id)->update(['empresa_id' => null]);
         $empresa->delete();
 
-        return response()->json(['message' => 'Empresa eliminada correctamente']);
+        return response()->json(['message' => 'Empresa movida a la papelera']);
     }
 
     public function actualizarEmpresa(Request $request, $id)
