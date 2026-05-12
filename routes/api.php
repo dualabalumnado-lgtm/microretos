@@ -10,6 +10,7 @@ use App\Http\Controllers\MicroproyectoController;
 use App\Http\Controllers\SesionController;
 use App\Http\Controllers\EmpresaContactoController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\PapeleraController;
 
 /*
 |--------------------------------------------------------------------------
@@ -138,6 +139,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // StartUp Day — IA: sugerencia de RA/CE
     Route::middleware('throttle:10,1')
         ->post('/startup/sugerir-ra-ce', [MicroproyectoController::class, 'sugerirRaCe']);
+
+    // Papelera — gestión de elementos borrados (soft delete)
+    Route::prefix('papelera')->group(function () {
+        Route::get('/',                         [PapeleraController::class, 'index']);
+        Route::delete('/',                      [PapeleraController::class, 'vaciar']);
+        Route::patch('/{tipo}/{id}/restaurar',  [PapeleraController::class, 'restaurar']);
+        Route::delete('/{tipo}/{id}',           [PapeleraController::class, 'destruir']);
+    });
 
 });
 
