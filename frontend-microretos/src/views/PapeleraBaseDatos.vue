@@ -5,7 +5,7 @@ import api from '../api.js'
 // ─── Estado ───────────────────────────────────────────────────────────────────
 const cargando    = ref(true)
 const error       = ref('')
-const items       = ref({ empresas: [], microretos: [], ciclos: [], familias: [], centros: [] })
+const items       = ref({ empresas: [], microretos: [], ciclos: [], familias: [], centros: [], proyectos: [], sesiones: [] })
 const total       = ref(0)
 const filtroActivo = ref('todos')
 
@@ -35,8 +35,8 @@ const TIPOS = {
     borderColor: 'border-[#00A859]/20',
   },
   microretos: {
-    label: 'Microreto',
-    labelPlural: 'Microretos',
+    label: 'Reto',
+    labelPlural: 'Retos',
     color: '#6366f1',
     bgLight: 'bg-indigo-50',
     textColor: 'text-indigo-600',
@@ -66,6 +66,22 @@ const TIPOS = {
     textColor: 'text-blue-600',
     borderColor: 'border-blue-200',
   },
+  proyectos: {
+    label: 'Proyecto',
+    labelPlural: 'Proyectos',
+    color: '#8b5cf6',
+    bgLight: 'bg-violet-50',
+    textColor: 'text-violet-600',
+    borderColor: 'border-violet-200',
+  },
+  sesiones: {
+    label: 'Sesión',
+    labelPlural: 'Sesiones',
+    color: '#ec4899',
+    bgLight: 'bg-pink-50',
+    textColor: 'text-pink-600',
+    borderColor: 'border-pink-200',
+  },
 }
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
@@ -90,7 +106,7 @@ async function cargarPapelera() {
   error.value = ''
   try {
     const res = await api.get('/papelera')
-    items.value = res.data.items
+    items.value = { ...items.value, ...res.data.items }
     total.value = res.data.total
   } catch (e) {
     error.value = 'No se pudo cargar la papelera. Comprueba la conexión.'
@@ -355,12 +371,26 @@ onMounted(cargarPapelera)
                 d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
             </svg>
             <!-- Centro -->
-            <svg v-else
+            <svg v-else-if="item.tipo === 'centros'"
                  class="w-4.5 h-4.5" :class="TIPOS[item.tipo]?.textColor"
                  fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <rect x="2" y="7" width="20" height="15" rx="2" stroke-linecap="round"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M16 21V7a4 4 0 00-8 0v14"/>
               <line x1="12" y1="7" x2="12" y2="21"/>
+            </svg>
+            <!-- Proyecto -->
+            <svg v-else-if="item.tipo === 'proyectos'"
+                 class="w-4.5 h-4.5" :class="TIPOS[item.tipo]?.textColor"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+            </svg>
+            <!-- Sesión -->
+            <svg v-else
+                 class="w-4.5 h-4.5" :class="TIPOS[item.tipo]?.textColor"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
           </div>
 
