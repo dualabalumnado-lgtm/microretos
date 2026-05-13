@@ -56,7 +56,35 @@ class MicroproyectoController extends Controller
             'paso_actual', 'estado',
         ];
 
-        $proyecto->update($request->only($allowed));
+        $data = $request->only($allowed);
+
+        // Si el proyecto está validado y se modifica un campo relevante para la empresa, se invalida la validación
+        if ($proyecto->empresa_validado) {
+            $camposCriticos = [
+                'titulo', 'empresa_id', 'datos_empresa', 'datos_centro', 'equipo',
+                'modulos_seleccionados', 'ra_ce', 'fundamentacion', 'diseno_reto',
+                'diseno_microproyecto', 'resumen', 'objetivos', 'kpis',
+            ];
+
+            foreach ($camposCriticos as $campo) {
+                if (!array_key_exists($campo, $data)) continue;
+
+                $anterior = is_array($proyecto->$campo)
+                    ? json_encode($proyecto->$campo)
+                    : (string) ($proyecto->$campo ?? '');
+                $nuevo = is_array($data[$campo])
+                    ? json_encode($data[$campo])
+                    : (string) ($data[$campo] ?? '');
+
+                if ($anterior !== $nuevo) {
+                    $data['empresa_validado']   = false;
+                    $data['validacion_empresa'] = null;
+                    break;
+                }
+            }
+        }
+
+        $proyecto->update($data);
 
         return response()->json($this->formatProyecto($proyecto->fresh()));
     }
