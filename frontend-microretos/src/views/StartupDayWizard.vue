@@ -15,6 +15,7 @@ watch(paso, (v) => { if (v > pasoMaxAlcanzado.value) pasoMaxAlcanzado.value = v 
 const guardando         = ref(false);
 const cargando          = ref(false);
 const cargandoProyecto  = ref(false);
+const proyectoValidado  = ref(false);
 const uuid           = ref(route.params.uuid || null);
 const isLoaded       = ref(false);
 const errorMsg       = ref('');
@@ -531,6 +532,7 @@ async function cargarProyecto() {
     const p = proyRes.data;
     paso.value = p.paso_actual || 1;
     pasoMaxAlcanzado.value = p.paso_actual || 1;
+    proyectoValidado.value = !!p.empresa_validado;
     Object.assign(form.value, {
       titulo: p.titulo || '', empresa_id: p.empresa_id || '',
       centro_id: p.centro_id || '', familia_id: p.familia_id || '',
@@ -595,7 +597,8 @@ async function guardar(siguientePaso) {
   try {
     const payload = { ...form.value, paso_actual: siguientePaso };
     if (uuid.value) {
-      await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      const res = await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      proyectoValidado.value = !!res.data.empresa_validado;
     } else {
       const res = await api.post('/startup/proyectos', {
         titulo:        form.value.titulo,
@@ -603,7 +606,8 @@ async function guardar(siguientePaso) {
         sesion_id:     form.value.sesion_id || null,
       });
       uuid.value = res.data.uuid;
-      await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      const upd = await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      proyectoValidado.value = !!upd.data.empresa_validado;
       router.replace({ name: 'startup-day-editar', params: { uuid: uuid.value } });
     }
     paso.value = siguientePaso;
@@ -729,6 +733,18 @@ onUnmounted(() => { tourActivo.value = false; });
                   ]">
             {{ p.label }}
           </button>
+        </div>
+
+        <!-- Aviso: proyecto validado por empresa -->
+        <div v-if="proyectoValidado"
+             class="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+          <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+          <p class="text-[10px] font-bold text-amber-700 leading-tight">
+            Este proyecto ya ha sido validado por la empresa. Modificar el contenido requerirá una nueva validación.
+          </p>
         </div>
       </div>
     </div>
