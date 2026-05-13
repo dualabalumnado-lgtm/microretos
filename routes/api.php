@@ -11,6 +11,7 @@ use App\Http\Controllers\SesionController;
 use App\Http\Controllers\EmpresaContactoController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\PapeleraController;
+use App\Http\Controllers\AdminUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -139,6 +140,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // StartUp Day — IA: sugerencia de RA/CE
     Route::middleware('throttle:10,1')
         ->post('/startup/sugerir-ra-ce', [MicroproyectoController::class, 'sugerirRaCe']);
+
+    // ── Gestión de usuarios (solo admin) ─────────────────────────────
+    Route::middleware('admin')->prefix('admin/usuarios')->group(function () {
+        Route::get('/',                       [AdminUserController::class, 'index']);
+        Route::post('/',                      [AdminUserController::class, 'store']);
+        Route::get('/papelera',               [AdminUserController::class, 'papelera']);
+        Route::patch('/{user}/activar',       [AdminUserController::class, 'activar']);
+        Route::patch('/{user}/bloquear',      [AdminUserController::class, 'toggleBloquear']);
+        Route::delete('/{user}',              [AdminUserController::class, 'destroy']);
+        Route::post('/{id}/restaurar',        [AdminUserController::class, 'restaurar']);
+        Route::delete('/{id}/destruir',       [AdminUserController::class, 'destruir']);
+        Route::patch('/{user}/centro',        [AdminUserController::class, 'asociarCentro']);
+    });
 
     // Papelera — gestión de elementos borrados (soft delete)
     Route::prefix('papelera')->group(function () {

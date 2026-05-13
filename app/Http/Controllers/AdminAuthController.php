@@ -26,6 +26,22 @@ class AdminAuthController extends Controller
 
         $user = Auth::user();
 
+        if ($user->is_blocked) {
+            Auth::logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta cuenta está bloqueada. Contacta con el administrador.',
+            ], 403);
+        }
+
+        if (!$user->isAdmin() && $user->email_verified_at === null) {
+            Auth::logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta cuenta aún no ha sido activada. Contacta con el administrador.',
+            ], 403);
+        }
+
         // Limitar a 10 tokens concurrentes: si se supera, borrar los más antiguos
         $count = $user->tokens()->count();
         if ($count >= 10) {
@@ -35,9 +51,11 @@ class AdminAuthController extends Controller
         $token = $user->createToken('admin-token')->plainTextToken;
 
         return response()->json([
-            'success' => true,
-            'token'   => $token,
-            'message' => 'Acceso concedido.',
+            'success'  => true,
+            'token'    => $token,
+            'role'     => $user->role,
+            'name'     => $user->name,
+            'message'  => 'Acceso concedido.',
         ]);
     }
 

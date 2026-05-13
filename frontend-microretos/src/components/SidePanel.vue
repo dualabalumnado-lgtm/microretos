@@ -3,7 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'
 import api from '../api.js'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth'
 import { useUIState } from '../composables/useUIState.js'
 
 const authStore = useAuthStore()
@@ -15,7 +15,22 @@ const router    = useRouter()
 
 const showLogin        = ref(false)
 const cargandoOut      = ref(false)
-const destinoTrasLogin = ref('/microretos')
+const destinoTrasLogin = ref('/')
+
+// ─── Toast de bienvenida ──────────────────────────────────
+const showWelcome  = ref(false)
+const welcomeRole  = ref(null)
+let welcomeTimer   = null
+
+const welcomeName = ref('')
+
+function triggerWelcome(role) {
+  clearTimeout(welcomeTimer)
+  welcomeRole.value  = role
+  welcomeName.value  = authStore.userName?.split(' ')[0] ?? ''
+  showWelcome.value  = true
+  welcomeTimer = setTimeout(() => { showWelcome.value = false }, 5000)
+}
 
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
@@ -55,10 +70,21 @@ const irA = (ruta) => {
   }
 }
 
-const onLoginSuccess = () => {
-  const destino = destinoTrasLogin.value || '/'
+const onLoginSuccess = (data) => {
+  const role    = data?.role ?? authStore.userRole
+  const destino = destinoTrasLogin.value || rolHome(role)
+  destinoTrasLogin.value = '/'
   isOpen.value = false
-  router.push(destino)
+  // Esperar a que la navegación final termine (incluyendo posibles redirects
+  // del guard de roles) antes de mostrar el toast, para evitar que una
+  // doble navegación lo descarte antes de que el usuario lo vea.
+  router.push(destino).finally(() => triggerWelcome(role))
+}
+
+function rolHome(role) {
+  if (role === ROLE_DOCENTE) return '/biblioteca'
+  if (role === ROLE_EMPRESA) return '/microretos'
+  return '/microretos'
 }
 
 const cerrarSesion = async () => {
@@ -145,10 +171,16 @@ defineExpose({ isOpen, toggle, close })
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 
         <!-- ═══ GRUPO: MICRORETOS + TALLER DE IDEAS ═══ -->
-        <div class="rounded-2xl border border-[#00A859]/20 bg-[#00A859]/5 px-2 pt-2 pb-2 space-y-1">
+        <div
+          v-if="authStore.canAccess('microretos') || authStore.canAccess('biblioteca') || authStore.canAccess('dashboard-docente') || authStore.canAccess('startup-day')"
+          class="rounded-2xl border border-[#00A859]/20 bg-[#00A859]/5 px-2 pt-2 pb-2 space-y-1"
+        >
 
           <!-- FASE 1: MICRORETOS -->
-          <div class="group/tip relative">
+          <div
+            v-if="authStore.canAccess('microretos') || authStore.canAccess('biblioteca')"
+            class="group/tip relative"
+          >
             <div class="w-full flex items-center gap-2 px-3 mb-1
                      text-[9px] font-black uppercase tracking-[0.2em]
                      text-[#00A859]/70 select-none">
@@ -164,7 +196,7 @@ defineExpose({ isOpen, toggle, close })
           <div class="space-y-0.5">
 
               <!-- Generador de microretos -->
-              <div class="group/tip relative">
+              <div v-if="authStore.canAccess('microretos')" class="group/tip relative">
                 <button
                   @click="irA('/microretos')"
                   title="Genera retos con IA a partir de una empresa y los criterios del ciclo"
@@ -181,7 +213,7 @@ defineExpose({ isOpen, toggle, close })
               </div>
 
               <!-- Biblioteca de microretos -->
-              <div class="group/tip relative">
+              <div v-if="authStore.canAccess('biblioteca')" class="group/tip relative">
                 <button
                   @click="irA('/biblioteca')"
                   title="Consulta todos los retos guardados y comparte el QR con el alumnado"
@@ -202,10 +234,17 @@ defineExpose({ isOpen, toggle, close })
 
           </div>
 
-          <div class="border-t border-[#00A859]/15 mx-1 my-1" />
+          <!-- Separador FASE 2 solo si hay items de ambas fases -->
+          <div
+            v-if="(authStore.canAccess('microretos') || authStore.canAccess('biblioteca')) && (authStore.canAccess('dashboard-docente') || authStore.canAccess('startup-day'))"
+            class="border-t border-[#00A859]/15 mx-1 my-1"
+          />
 
           <!-- FASE 2: TALLER DE IDEAS -->
-          <div class="group/tip relative">
+          <div
+            v-if="authStore.canAccess('dashboard-docente') || authStore.canAccess('startup-day')"
+            class="group/tip relative"
+          >
             <div class="w-full flex items-center gap-2 px-3 mb-1
                      text-[9px] font-black uppercase tracking-[0.2em]
                      text-[#00A859]/70 select-none">
@@ -221,7 +260,7 @@ defineExpose({ isOpen, toggle, close })
           <div class="space-y-0.5">
 
               <!-- Dashboard docentes -->
-              <div class="group/tip relative">
+              <div v-if="authStore.canAccess('dashboard-docente')" class="group/tip relative">
                 <button
                   @click="irA('/dashboard')"
                   title="Registra sesiones de trabajo con retos"
@@ -240,7 +279,7 @@ defineExpose({ isOpen, toggle, close })
               </div>
 
               <!-- Microproyectos -->
-              <div class="group/tip relative">
+              <div v-if="authStore.canAccess('startup-day')" class="group/tip relative">
                 <button
                   @click="irA('/startup-day')"
                   title="Crea y gestiona proyectos para el Taller de Ideas"
@@ -262,103 +301,123 @@ defineExpose({ isOpen, toggle, close })
 
         </div>
 
-        <div class="my-2 border-t border-white/10" />
-
         <!-- ═══════════════ EMPRESAS ════════════════════ -->
-        <div class="group/tip relative">
-          <div class="w-full flex items-center gap-2 px-3 mb-1
-                   text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 select-none">
-            <span class="flex-1 text-left flex items-center gap-1.5">
-              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
-                           bg-blue-400/20 text-blue-400 text-[8px] font-black shrink-0">E</span>
-              Empresas
-              <!-- Candado: indica que requiere contraseña especial -->
-              <svg class="w-3 h-3 text-white/30 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"/>
-              </svg>
-            </span>
-          </div>
-          <div class="sp-tooltip">Módulo Empresas — Contacto directo y envío de enlaces de validación (requiere contraseña especial)<div class="sp-tooltip-arrow"/></div>
-        </div>
+        <template v-if="authStore.canAccess('empresas')">
+          <div class="my-2 border-t border-white/10" />
 
-        <div class="space-y-0.5">
-
-            <!-- Directorio empresas -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/empresas')"
-                title="Consulta y contacta con las empresas de la base de datos (requiere contraseña especial)"
-                class="nav-item w-full text-left"
-                :class="isActive('/empresas') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                  <polyline points="9 22 9 12 15 12 15 22"/>
+          <div class="group/tip relative">
+            <div class="w-full flex items-center gap-2 px-3 mb-1
+                     text-[9px] font-black uppercase tracking-[0.2em]
+                     text-white/40 select-none">
+              <span class="flex-1 text-left flex items-center gap-1.5">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full
+                             bg-blue-400/20 text-blue-400 text-[8px] font-black shrink-0">E</span>
+                Empresas
+                <!-- Candado: indica que requiere contraseña especial -->
+                <svg class="w-3 h-3 text-white/30 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>
-                <span>Directorio empresas</span>
-              </button>
-              <div class="sp-tooltip">Consulta y contacta con las empresas de la base de datos<div class="sp-tooltip-arrow"/></div>
+              </span>
             </div>
+            <div class="sp-tooltip">Módulo Empresas — Contacto directo y envío de enlaces de validación (requiere contraseña especial)<div class="sp-tooltip-arrow"/></div>
+          </div>
 
-        </div>
-
-        <div class="my-2 border-t border-white/10" />
+          <div class="space-y-0.5">
+              <div class="group/tip relative">
+                <button
+                  @click="irA('/empresas')"
+                  title="Consulta y contacta con las empresas de la base de datos (requiere contraseña especial)"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/empresas') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span>Directorio empresas</span>
+                </button>
+                <div class="sp-tooltip">Consulta y contacta con las empresas de la base de datos<div class="sp-tooltip-arrow"/></div>
+              </div>
+          </div>
+        </template>
 
         <!-- ═══════════════ ADMINISTRACIÓN ═════════════ -->
-        <div class="group/tip relative">
-          <div class="w-full flex items-center gap-2 px-3 mb-1
-                   text-[9px] font-black uppercase tracking-[0.2em]
-                   text-white/40 select-none">
-            <span class="flex-1 text-left">Administración</span>
+        <template v-if="authStore.canAccess('base-datos') || authStore.canAccess('papelera') || authStore.canAccess('gestion-usuarios')">
+          <div class="my-2 border-t border-white/10" />
+
+          <div class="group/tip relative">
+            <div class="w-full flex items-center gap-2 px-3 mb-1
+                     text-[9px] font-black uppercase tracking-[0.2em]
+                     text-white/40 select-none">
+              <span class="flex-1 text-left">Administración</span>
+            </div>
+            <div class="sp-tooltip">Gestión de datos de la plataforma<div class="sp-tooltip-arrow"/></div>
           </div>
-          <div class="sp-tooltip">Gestión de datos de la plataforma<div class="sp-tooltip-arrow"/></div>
-        </div>
 
-        <div class="space-y-0.5">
+          <div class="space-y-0.5">
 
-            <!-- Base de datos -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/base-datos')"
-                title="Empresas, centros educativos, familias y ciclos del ecosistema DuaLab"
-                class="nav-item w-full text-left"
-                :class="isActive('/base-datos') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                  <path d="M21 12c0 1.657-4.03 3-9 3S3 13.657 3 12"/>
-                  <path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/>
-                </svg>
-                <span>Base de datos</span>
-              </button>
-              <div class="sp-tooltip">Empresas, centros educativos, familias y ciclos del ecosistema DuaLab<div class="sp-tooltip-arrow"/></div>
-            </div>
+              <!-- Gestión de usuarios -->
+              <div v-if="authStore.canAccess('gestion-usuarios')" class="group/tip relative">
+                <button
+                  @click="irA('/admin/usuarios')"
+                  title="Gestiona las cuentas de docentes y empresas"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/admin/usuarios') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                  </svg>
+                  <span>Usuarios</span>
+                </button>
+                <div class="sp-tooltip">Gestiona las cuentas de docentes y empresas<div class="sp-tooltip-arrow"/></div>
+              </div>
 
-            <!-- Papelera -->
-            <div class="group/tip relative">
-              <button
-                @click="irA('/papelera')"
-                title="Elementos eliminados — restáuralos o bórralos definitivamente"
-                class="nav-item w-full text-left"
-                :class="isActive('/papelera') ? 'nav-item--active' : 'nav-item--idle'"
-              >
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                  <path d="M10 11v6M14 11v6"/>
-                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-                </svg>
-                <span>Papelera</span>
-              </button>
-              <div class="sp-tooltip">Elementos eliminados — restáuralos o bórralos definitivamente<div class="sp-tooltip-arrow"/></div>
-            </div>
+              <!-- Base de datos -->
+              <div v-if="authStore.canAccess('base-datos')" class="group/tip relative">
+                <button
+                  @click="irA('/base-datos')"
+                  title="Empresas, centros educativos, familias y ciclos del ecosistema DuaLab"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/base-datos') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.657-4.03 3-9 3S3 13.657 3 12"/>
+                    <path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/>
+                  </svg>
+                  <span>Base de datos</span>
+                </button>
+                <div class="sp-tooltip">Empresas, centros educativos, familias y ciclos del ecosistema DuaLab<div class="sp-tooltip-arrow"/></div>
+              </div>
 
-        </div>
+              <!-- Papelera -->
+              <div v-if="authStore.canAccess('papelera')" class="group/tip relative">
+                <button
+                  @click="irA('/papelera')"
+                  title="Elementos eliminados — restáuralos o bórralos definitivamente"
+                  class="nav-item w-full text-left"
+                  :class="isActive('/papelera') ? 'nav-item--active' : 'nav-item--idle'"
+                >
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                  </svg>
+                  <span>Papelera</span>
+                </button>
+                <div class="sp-tooltip">Elementos eliminados — restáuralos o bórralos definitivamente<div class="sp-tooltip-arrow"/></div>
+              </div>
+
+          </div>
+        </template>
 
       </nav>
 
@@ -392,7 +451,8 @@ defineExpose({ isOpen, toggle, close })
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-[9px] font-black uppercase tracking-widest text-white/30">Sesión activa</p>
-              <p class="text-xs font-bold text-white truncate">Administrador</p>
+              <p class="text-xs font-bold text-white truncate">{{ authStore.roleLabel }}</p>
+              <p class="text-[10px] text-white/30 truncate">{{ authStore.userName }}</p>
             </div>
           </div>
 
@@ -562,6 +622,81 @@ defineExpose({ isOpen, toggle, close })
   </Transition>
 
   <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
+
+  <!-- ── Modal de bienvenida por rol ── -->
+  <Transition name="welcome-overlay">
+    <div
+      v-if="showWelcome"
+      class="fixed inset-0 z-[10000] flex items-center justify-center p-6
+             bg-black/75 backdrop-blur-sm"
+      @click.self="showWelcome = false"
+    >
+      <Transition name="welcome-card" appear>
+        <div
+          v-if="showWelcome"
+          class="relative rounded-3xl p-10 max-w-sm w-full text-center
+                 bg-[#1F2937] border border-[#333333]
+                 shadow-[0_24px_64px_rgba(0,0,0,0.7)]"
+        >
+          <!-- Icono -->
+          <div class="mx-auto mb-6 w-16 h-16 rounded-2xl
+                      bg-[#00A859]/15 border border-[#00A859]/30
+                      flex items-center justify-center">
+            <svg class="w-8 h-8 text-[#00A859]" fill="none" stroke="currentColor"
+                 viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+
+          <!-- Etiqueta -->
+          <p class="text-[#00A859] text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+            Sesión iniciada
+          </p>
+
+          <!-- Mensaje principal -->
+          <h2 class="text-white text-xl font-bold leading-snug">
+            ¡Te damos la bienvenida<br>a DuaLab para
+          </h2>
+          <p class="text-[#00A859] text-4xl font-black tracking-tight mt-2 mb-1">
+            {{ welcomeRole === ROLE_DOCENTE ? 'docentes' : welcomeRole === ROLE_EMPRESA ? 'empresas' : 'admin' }}
+          </p>
+          <p class="text-white text-xl font-bold">!</p>
+
+          <!-- Nombre de usuario -->
+          <p v-if="welcomeName" class="mt-3 text-white/50 text-sm">
+            {{ welcomeName }}
+          </p>
+
+          <!-- Separador -->
+          <div class="mt-8 border-t border-[#333333]" />
+
+          <!-- Botón cerrar -->
+          <button
+            @click="showWelcome = false"
+            class="mt-6 w-full py-3 rounded-xl bg-[#00A859] text-white
+                   font-black text-xs uppercase tracking-widest
+                   hover:bg-[#009950] transition-colors duration-200"
+          >
+            Continuar
+          </button>
+
+          <!-- X esquina -->
+          <button
+            @click="showWelcome = false"
+            class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/5
+                   hover:bg-white/10 flex items-center justify-center
+                   text-white/40 hover:text-white transition-all"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </Transition>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -617,4 +752,16 @@ nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 .sp-fade-leave-active  { transition: opacity 250ms ease; }
 .sp-fade-enter-from,
 .sp-fade-leave-to      { opacity: 0; }
+
+/* Modal de bienvenida — overlay */
+.welcome-overlay-enter-active,
+.welcome-overlay-leave-active { transition: opacity 0.25s ease; }
+.welcome-overlay-enter-from,
+.welcome-overlay-leave-to     { opacity: 0; }
+
+/* Modal de bienvenida — tarjeta */
+.welcome-card-enter-active { transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.welcome-card-leave-active { transition: all 0.2s ease; }
+.welcome-card-enter-from   { opacity: 0; transform: scale(0.85) translateY(24px); }
+.welcome-card-leave-to     { opacity: 0; transform: scale(0.95) translateY(8px); }
 </style>

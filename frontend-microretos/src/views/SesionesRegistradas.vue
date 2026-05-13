@@ -82,21 +82,34 @@ const hayFiltrosActivos = computed(() =>
 
 function limpiarFiltros() {
   filtros.value = { titulo: '', desde: '', hasta: '', curso: '', grupo: '', ciclo: '', centro: '' }
-  pagina.value  = 1
 }
 
-// ─── Paginación ───────────────────────────────────────────────────────────────
-const pagina           = ref(1)
-const POR_PAGINA       = 12
+// ─── Acordeón por centro educativo ───────────────────────────────────────────
+const centrosExpandidos = ref(new Set())
 
-const sesionesVisibles = computed(() => {
-  const start = (pagina.value - 1) * POR_PAGINA
-  return sesionesFiltradas.value.slice(start, start + POR_PAGINA)
+const sesionesAgrupadas = computed(() => {
+  const mapa = {}
+  for (const s of sesionesFiltradas.value) {
+    const centro = s.centro_educativo || '— Sin centro asignado —'
+    if (!mapa[centro]) mapa[centro] = []
+    mapa[centro].push(s)
+  }
+  return mapa
 })
 
-const totalPaginas = computed(() =>
-  Math.ceil(sesionesFiltradas.value.length / POR_PAGINA)
+const centrosOrdenados = computed(() =>
+  Object.keys(sesionesAgrupadas.value).sort((a, b) => {
+    if (a === '— Sin centro asignado —') return 1
+    if (b === '— Sin centro asignado —') return -1
+    return a.localeCompare(b)
+  })
 )
+
+function toggleCentro(centro) {
+  centrosExpandidos.value.has(centro)
+    ? centrosExpandidos.value.delete(centro)
+    : centrosExpandidos.value.add(centro)
+}
 
 // ─── Modal sesión ─────────────────────────────────────────────────────────────
 const sesionAbierta = ref(null)
@@ -131,16 +144,6 @@ function formatFecha(isoDate) {
   if (!isoDate) return ''
   const d = new Date(isoDate + 'T12:00:00')
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function irPaginaAnterior() {
-  pagina.value--
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function irPaginaSiguiente() {
-  pagina.value++
-  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 </script>
 
@@ -225,15 +228,14 @@ function irPaginaSiguiente() {
               </svg>
               <input v-model="filtros.titulo" type="text"
                      placeholder="Buscar por título..."
-                     class="field-input pl-10"
-                     @input="pagina = 1" />
+                     class="field-input pl-10" />
             </div>
           </div>
 
           <!-- Centro -->
           <div>
             <label class="field-label">Centro educativo</label>
-            <select v-model="filtros.centro" class="field-input" @change="pagina = 1">
+            <select v-model="filtros.centro" class="field-input">
               <option value="">Todos los centros</option>
               <option v-for="c in sesionesUnicas.centros" :key="c" :value="c">{{ c }}</option>
             </select>
@@ -242,13 +244,13 @@ function irPaginaSiguiente() {
           <!-- Fecha desde -->
           <div>
             <label class="field-label">Desde</label>
-            <input v-model="filtros.desde" type="date" class="field-input" @change="pagina = 1" />
+            <input v-model="filtros.desde" type="date" class="field-input" />
           </div>
 
           <!-- Fecha hasta -->
           <div>
             <label class="field-label">Hasta</label>
-            <input v-model="filtros.hasta" type="date" class="field-input" @change="pagina = 1" />
+            <input v-model="filtros.hasta" type="date" class="field-input" />
           </div>
 
           <!-- Ciclo -->
@@ -256,8 +258,7 @@ function irPaginaSiguiente() {
             <label class="field-label">Ciclo formativo</label>
             <input v-model="filtros.ciclo" type="text"
                    placeholder="Filtrar por ciclo..."
-                   class="field-input"
-                   @input="pagina = 1" />
+                   class="field-input" />
           </div>
 
           <!-- Curso -->
@@ -265,7 +266,7 @@ function irPaginaSiguiente() {
             <label class="field-label">Curso</label>
             <div class="flex gap-2 mt-1">
               <button v-for="c in ['', '1º', '2º']" :key="c"
-                      @click="filtros.curso = c; pagina = 1"
+                      @click="filtros.curso = c"
                       class="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all"
                       :class="filtros.curso === c
                         ? 'bg-[#00A859] border-[#00A859] text-white'
@@ -280,7 +281,7 @@ function irPaginaSiguiente() {
             <label class="field-label">Grupo</label>
             <div class="flex gap-1.5 mt-1">
               <button v-for="g in ['', 'A', 'B', 'C', 'D']" :key="g"
-                      @click="filtros.grupo = g; pagina = 1"
+                      @click="filtros.grupo = g"
                       class="flex-1 py-2 rounded-xl text-xs font-black uppercase border transition-all"
                       :class="filtros.grupo === g
                         ? 'bg-[#99CC33] border-[#99CC33] text-white'
@@ -345,123 +346,116 @@ function irPaginaSiguiente() {
         </button>
       </div>
 
-      <!-- Grid de cards -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div v-for="s in sesionesVisibles" :key="s.id"
-             class="bg-white rounded-[1.25rem] border border-gray-100 shadow-sm overflow-hidden
-                    hover:border-[#00A859]/30 hover:shadow-md transition-all group cursor-pointer"
-             @click="verSesion(s)">
+      <!-- Acordeón por centro educativo -->
+      <div v-else class="space-y-3">
+        <div v-for="centro in centrosOrdenados" :key="centro"
+             class="bg-white rounded-[1.75rem] border border-gray-100 shadow-sm overflow-hidden">
 
-          <!-- Card header -->
-          <div class="px-5 pt-5 pb-4 border-b border-gray-50">
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-black text-[#1F2937] leading-snug line-clamp-2
-                          group-hover:text-[#00A859] transition-colors">
-                  {{ s.microreto_titulo || '(sin título)' }}
-                </p>
-                <p class="text-[10px] font-bold text-[#00A859] mt-1">
-                  {{ formatFecha(s.fecha) }}
-                </p>
-              </div>
-              <!-- Acciones en hover -->
-              <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                <!-- Trabajar microreto → crear microproyecto -->
-                <button @click.stop="crearMicroproyecto(s.id)"
-                        class="p-1.5 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 transition-all"
-                        title="Trabajar reto (crear proyecto)">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
-                  </svg>
-                </button>
-                <button v-if="s.microreto_id"
-                        @click.stop="abrirMicroretoModal(s.microreto_id)"
-                        class="p-1.5 rounded-lg bg-[#00A859]/10 text-[#00A859] hover:bg-[#00A859]/20 transition-all"
-                        title="Ver ficha del reto">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
-                             a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                </button>
-                <button @click.stop="eliminarSesion(s.id)"
-                        class="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
-                        title="Eliminar sesión">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                          d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
+          <!-- Cabecera del centro -->
+          <button @click="toggleCentro(centro)"
+                  class="w-full flex items-center gap-4 px-6 py-5
+                         hover:bg-gray-50/80 transition-colors duration-150 text-left">
+            <div class="w-10 h-10 rounded-2xl bg-[#1F2937] flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="font-black text-base text-[#1F2937] truncate">{{ centro }}</h2>
+              <p class="text-xs text-gray-400 font-medium mt-0.5">
+                {{ sesionesAgrupadas[centro].length }}
+                {{ sesionesAgrupadas[centro].length === 1 ? 'sesión' : 'sesiones' }}
+              </p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0"
+                 :class="centrosExpandidos.has(centro) ? 'rotate-180' : ''"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <!-- Sesiones del centro -->
+          <div v-if="centrosExpandidos.has(centro)"
+               class="border-t border-gray-100 px-5 py-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="s in sesionesAgrupadas[centro]" :key="s.id"
+                   class="bg-[#F8FAFC] rounded-[1.25rem] border border-gray-100
+                          hover:border-[#00A859]/30 hover:shadow-sm transition-all group cursor-pointer"
+                   @click="verSesion(s)">
+
+                <!-- Card header -->
+                <div class="px-5 pt-5 pb-4 border-b border-gray-100">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-black text-[#1F2937] leading-snug line-clamp-2
+                                group-hover:text-[#00A859] transition-colors">
+                        {{ s.microreto_titulo || '(sin título)' }}
+                      </p>
+                      <p class="text-[10px] font-bold text-[#00A859] mt-1">
+                        {{ formatFecha(s.fecha) }}
+                      </p>
+                    </div>
+                    <!-- Acciones en hover -->
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                      <button @click.stop="crearMicroproyecto(s.id)"
+                              class="p-1.5 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 transition-all"
+                              title="Trabajar reto (crear proyecto)">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 2L2 7l10 5 10-5-10-5z"/>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 17l10 5 10-5"/>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12l10 5 10-5"/>
+                        </svg>
+                      </button>
+                      <button v-if="s.microreto_id"
+                              @click.stop="abrirMicroretoModal(s.microreto_id)"
+                              class="p-1.5 rounded-lg bg-[#00A859]/10 text-[#00A859] hover:bg-[#00A859]/20 transition-all"
+                              title="Ver ficha del reto">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
+                                   a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                      </button>
+                      <button @click.stop="eliminarSesion(s.id)"
+                              class="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
+                              title="Eliminar sesión">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card body -->
+                <div class="px-5 py-4 space-y-2">
+                  <div class="flex flex-wrap gap-1.5">
+                    <span v-if="s.curso"       class="tag tag-green">{{ s.curso }}</span>
+                    <span v-if="s.grupo"       class="tag tag-lime">Grupo {{ s.grupo }}</span>
+                    <span v-if="s.num_alumnos" class="tag tag-gray">{{ s.num_alumnos }} alumnos</span>
+                  </div>
+                  <div class="space-y-1">
+                    <p v-if="s.ciclo_formativo" class="text-[10px] text-gray-500 flex items-center gap-1.5">
+                      <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                      </svg>
+                      <span class="truncate">{{ s.ciclo_formativo }}</span>
+                    </p>
+                    <p v-if="s.notas" class="text-[10px] text-gray-400 leading-relaxed line-clamp-2 italic">
+                      "{{ s.notas }}"
+                    </p>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
 
-          <!-- Card body -->
-          <div class="px-5 py-4 space-y-2">
-            <!-- Tags -->
-            <div class="flex flex-wrap gap-1.5">
-              <span v-if="s.curso"       class="tag tag-green">{{ s.curso }}</span>
-              <span v-if="s.grupo"       class="tag tag-lime">Grupo {{ s.grupo }}</span>
-              <span v-if="s.num_alumnos" class="tag tag-gray">{{ s.num_alumnos }} alumnos</span>
-            </div>
-            <!-- Info secundaria -->
-            <div class="space-y-1">
-              <p v-if="s.centro_educativo" class="text-[10px] text-gray-500 flex items-center gap-1.5">
-                <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                </svg>
-                {{ s.centro_educativo }}
-              </p>
-              <p v-if="s.ciclo_formativo" class="text-[10px] text-gray-500 flex items-center gap-1.5">
-                <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                </svg>
-                <span class="truncate">{{ s.ciclo_formativo }}</span>
-              </p>
-              <p v-if="s.notas" class="text-[10px] text-gray-400 leading-relaxed line-clamp-2 italic">
-                "{{ s.notas }}"
-              </p>
-            </div>
-          </div>
         </div>
-      </div>
-
-      <!-- ─── Paginación ────────────────────────────────────────────────────── -->
-      <div v-if="totalPaginas > 1"
-           class="mt-8 flex items-center justify-center gap-3">
-        <button @click="irPaginaAnterior"
-                :disabled="pagina === 1"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200
-                       text-xs font-black uppercase tracking-widest text-gray-500
-                       hover:border-[#00A859] hover:text-[#00A859]
-                       disabled:opacity-30 disabled:cursor-not-allowed transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-          </svg>
-          Anterior
-        </button>
-
-        <span class="px-4 py-2 bg-white border border-gray-200 rounded-xl
-                     text-xs font-black text-gray-500 uppercase tracking-widest">
-          {{ pagina }} / {{ totalPaginas }}
-        </span>
-
-        <button @click="irPaginaSiguiente"
-                :disabled="pagina === totalPaginas"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200
-                       text-xs font-black uppercase tracking-widest text-gray-500
-                       hover:border-[#00A859] hover:text-[#00A859]
-                       disabled:opacity-30 disabled:cursor-not-allowed transition-all">
-          Siguiente
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-          </svg>
-        </button>
       </div>
 
     </div>
