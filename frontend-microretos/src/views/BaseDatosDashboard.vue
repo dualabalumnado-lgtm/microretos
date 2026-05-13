@@ -10,11 +10,14 @@ import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
 import GestionFamiliasCiclosModal from '../components/GestionFamiliasCiclosModal.vue'
 import CatalogoBoeModal from '../components/CatalogoBoeModal.vue'
 import CatalogoBoeIntroModal from '../components/CatalogoBoeIntroModal.vue'
+import DbSecurityModal from '../components/DbSecurityModal.vue'
 import { useUIState } from '../composables/useUIState.js'
+import { useDbSecurity } from '../composables/useDbSecurity.js'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const { tourActivo } = useUIState()
+const dbSecurity = useDbSecurity()
 
 // ─── Aviso de expiración de sesión ───────────────────────
 const minutosRestantes = ref(authStore.minutosRestantes)
@@ -108,7 +111,10 @@ const centroAEditar       = ref(null)   // { id, nombre, ciclos[] }
 
 // ─── Confirmación NUEVO CENTRO ────────────────────────────
 const mostrarConfirmNuevoCentro = ref(false)
-function pedirNuevoCentro() { mostrarConfirmNuevoCentro.value = true }
+async function pedirNuevoCentro() {
+  if (!await dbSecurity.requireDbSecurity()) return
+  mostrarConfirmNuevoCentro.value = true
+}
 function confirmarNuevoCentro() { mostrarConfirmNuevoCentro.value = false; mostrarNuevoCentro.value = true }
 
 // ─── Confirmación EDITAR CENTRO ───────────────────────────
@@ -120,7 +126,8 @@ function onCentroCreado(centro) {
   cargarDatos()
 }
 
-function pedirEditarCentro(centroNombre) {
+async function pedirEditarCentro(centroNombre) {
+  if (!await dbSecurity.requireDbSecurity()) return
   const datos = centros.value.find(c => c.nombre === centroNombre)
   if (!datos?.id) return
   centroEditarTemp.value           = datos
@@ -143,7 +150,8 @@ function onCentroGuardado(centro) {
 const mostrarEliminarCentro = ref(false)
 const centroAEliminar       = ref(null)   // { id, nombre, numEmpresas, numCiclos }
 
-function pedirEliminarCentro(centroNombre) {
+async function pedirEliminarCentro(centroNombre) {
+  if (!await dbSecurity.requireDbSecurity()) return
   const datos = centros.value.find(c => c.nombre === centroNombre)
   if (!datos?.id) return   // solo centros del catálogo (con id real)
   const numEmpresas = Object.values(datosPorCentro.value[centroNombre]?.familias ?? {})
@@ -171,7 +179,10 @@ const mostrarNuevaEmpresa = ref(false)
 
 // ─── Confirmación NUEVA EMPRESA ───────────────────────────
 const mostrarConfirmNuevaEmpresa = ref(false)
-function pedirNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = true }
+async function pedirNuevaEmpresa() {
+  if (!await dbSecurity.requireDbSecurity()) return
+  mostrarConfirmNuevaEmpresa.value = true
+}
 function confirmarNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = false; mostrarNuevaEmpresa.value = true }
 
 // ─── Modal EDITAR ─────────────────────────────────────────
@@ -494,7 +505,8 @@ watch(busqueda, (q) => {
 // ═══════════════════════════════════════════════════════════
 //  FLUJO EDITAR
 // ═══════════════════════════════════════════════════════════
-function pedirEdicion(empresa) {
+async function pedirEdicion(empresa) {
+  if (!await dbSecurity.requireDbSecurity()) return
   empresaEditTemp.value    = empresa
   mostrarConfirmEdit.value = true
 }
@@ -518,7 +530,8 @@ function onEmpresaActualizada(empresaActualizada) {
 // ═══════════════════════════════════════════════════════════
 //  FLUJO ELIMINAR
 // ═══════════════════════════════════════════════════════════
-function pedirEliminacion(empresa) {
+async function pedirEliminacion(empresa) {
+  if (!await dbSecurity.requireDbSecurity()) return
   empresaParaEliminar.value    = empresa
   mostrarEliminarEmpresa.value = true
 }
@@ -2136,6 +2149,13 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
         </div>
       </div>
     </Transition>
+
+    <!-- ════════════ MODAL: VERIFICACIÓN DE SEGURIDAD BD ════════ -->
+    <DbSecurityModal
+      :visible="dbSecurity.modalVisible.value"
+      @verified="dbSecurity.onVerified"
+      @cancelled="dbSecurity.onCancelled"
+    />
 
     <!-- ════════════ MODAL: CATÁLOGO FAMILIAS Y CICLOS ═══════ -->
     <GestionFamiliasCiclosModal
