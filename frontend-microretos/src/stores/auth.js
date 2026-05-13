@@ -74,6 +74,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('admin_token_created_at', String(Date.now()))
     localStorage.setItem('user_role', String(role))
     localStorage.setItem('user_name', name)
+    // Inicializar el timer de seguridad de BD: el login cuenta como verificación
+    sessionStorage.setItem('db_security_verified_at', String(Date.now()))
     isAuthenticated.value = true
     userRole.value        = role
     userName.value        = name

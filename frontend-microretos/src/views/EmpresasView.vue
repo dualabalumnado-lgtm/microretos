@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../api.js'
 import AccesoEmpresasModal from '../components/AccesoEmpresasModal.vue'
+
+const router = useRouter()
 
 // ─── Estado de acceso ─────────────────────────────────────────────────────────
 const desbloqueado = ref(sessionStorage.getItem('empresas_module_unlocked') === 'true')
@@ -10,6 +12,10 @@ const desbloqueado = ref(sessionStorage.getItem('empresas_module_unlocked') === 
 async function onDesbloqueado() {
   desbloqueado.value = true
   await cargarDatos()
+}
+
+function onCerrarAcceso() {
+  router.go(-1)
 }
 
 // ─── Datos ────────────────────────────────────────────────────────────────────
@@ -311,7 +317,7 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
     <!-- ══════════════════════════════════════════════════════
          GATE: Modal oscuro de contraseña
     ═════════════════════════════════════════════════════════ -->
-    <AccesoEmpresasModal v-if="!desbloqueado" @desbloqueado="onDesbloqueado" />
+    <AccesoEmpresasModal v-if="!desbloqueado" @desbloqueado="onDesbloqueado" @cerrar="onCerrarAcceso" />
 
     <!-- ══════════════════════════════════════════════════════
          MODAL BIENVENIDA: ¿Qué necesitas?
