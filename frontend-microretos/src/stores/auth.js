@@ -5,9 +5,25 @@ import api from '../api.js'
 // Duración del token en minutos (debe coincidir con config/sanctum.php → expiration)
 const TOKEN_DURATION_MINUTES = 1440
 
+export const ROLE_ADMIN   = 1
+export const ROLE_DOCENTE = 2
+export const ROLE_EMPRESA = 3
+
+// Rutas permitidas por rol (nombre de ruta de Vue Router)
+export const ROLE_ROUTES = {
+  [ROLE_ADMIN]:   ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
+                   'sesiones-registradas', 'startup-day', 'startup-day-crear',
+                   'startup-day-editar', 'startup-day-detalle', 'base-datos', 'papelera',
+                   'empresas', 'gestion-usuarios'],
+  [ROLE_DOCENTE]: ['biblioteca', 'detalle-microreto', 'dashboard-docente',
+                   'sesiones-registradas', 'startup-day', 'startup-day-crear',
+                   'startup-day-editar', 'startup-day-detalle', 'empresas'],
+  [ROLE_EMPRESA]: ['microretos', 'biblioteca', 'detalle-microreto',
+                   'startup-day', 'startup-day-crear', 'startup-day-editar', 'startup-day-detalle'],
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  // Limpiar token caducado o sin timestamp al inicializar la store,
-  // evitando que un token antiguo en localStorage supere el guard de navegación.
+  // Limpiar token caducado o sin timestamp al inicializar la store
   const _initToken     = localStorage.getItem('admin_token')
   const _initCreatedAt = Number(localStorage.getItem('admin_token_created_at') || 0)
   const _isExpiredOnLoad = _initToken && (!_initCreatedAt ||
@@ -15,20 +31,22 @@ export const useAuthStore = defineStore('auth', () => {
   if (_isExpiredOnLoad) {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_token_created_at')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_name')
   }
 
   const isAuthenticated = ref(!!localStorage.getItem('admin_token'))
-  const refreshing = ref(false)
+  const userRole        = ref(Number(localStorage.getItem('user_role') || ROLE_ADMIN))
+  const userName        = ref(localStorage.getItem('user_name') || 'Administrador')
+  const refreshing      = ref(false)
 
-  // Reloj reactivo: se actualiza cada minuto para que minutosRestantes recalcule solo
+  // Reloj reactivo: se actualiza cada minuto
   const now = ref(Date.now())
   setInterval(() => { now.value = Date.now() }, 60_000)
 
-  // Sincronizar si el interceptor de api.js limpia el token por 401
   const onTokenExpired = () => { isAuthenticated.value = false }
   window.addEventListener('auth:token-expired', onTokenExpired)
 
-  // Minutos restantes antes de que expire el token (-1 = no hay sesión)
   const minutosRestantes = computed(() => {
     const createdAt = localStorage.getItem('admin_token_created_at')
     if (!createdAt || !isAuthenticated.value) return -1
@@ -36,29 +54,58 @@ export const useAuthStore = defineStore('auth', () => {
     return Math.max(0, Math.floor(TOKEN_DURATION_MINUTES - elapsed))
   })
 
-  const login = (token) => {
+  const isAdmin   = computed(() => userRole.value === ROLE_ADMIN)
+  const isDocente = computed(() => userRole.value === ROLE_DOCENTE)
+  const isEmpresa = computed(() => userRole.value === ROLE_EMPRESA)
+
+  const roleLabel = computed(() => {
+    if (userRole.value === ROLE_DOCENTE) return 'Docente'
+    if (userRole.value === ROLE_EMPRESA) return 'Empresa'
+    return 'Administrador'
+  })
+
+  const canAccess = (routeName) => {
+    const allowed = ROLE_ROUTES[userRole.value] ?? []
+    return allowed.includes(routeName)
+  }
+
+  const login = (token, role = ROLE_ADMIN, name = 'Administrador') => {
     localStorage.setItem('admin_token', token)
     localStorage.setItem('admin_token_created_at', String(Date.now()))
+    localStorage.setItem('user_role', String(role))
+    localStorage.setItem('user_name', name)
     isAuthenticated.value = true
+    userRole.value        = role
+    userName.value        = name
   }
 
   const logout = () => {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_token_created_at')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_name')
     isAuthenticated.value = false
+    userRole.value        = ROLE_ADMIN
+    userName.value        = 'Administrador'
   }
 
-  // Rota el token actual por uno nuevo sin pedir contraseña
   const refresh = async () => {
     if (refreshing.value) return
     refreshing.value = true
     try {
       const { data } = await api.post('/admin/refresh')
-      login(data.token)
+      // refresh solo rota el token, mantiene el mismo rol/nombre
+      localStorage.setItem('admin_token', data.token)
+      localStorage.setItem('admin_token_created_at', String(Date.now()))
+      isAuthenticated.value = true
     } finally {
       refreshing.value = false
     }
   }
 
-  return { isAuthenticated, minutosRestantes, refreshing, login, logout, refresh }
+  return {
+    isAuthenticated, userRole, userName, refreshing,
+    isAdmin, isDocente, isEmpresa, roleLabel,
+    minutosRestantes, login, logout, refresh, canAccess,
+  }
 })

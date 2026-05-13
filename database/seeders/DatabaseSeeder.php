@@ -51,12 +51,33 @@ class DatabaseSeeder extends Seeder
         'ALTER TABLE microretos ADD UNIQUE INDEX microretos_uuid_unique (uuid)'
     );
 
-    // Create admin user (credentials from .env — see .env.example)
+    // Admin — credenciales desde .env
     \App\Models\User::updateOrCreate(
         ['email' => config('services.admin.email')],
         [
             'name'     => 'Administrador DuaLab',
             'password' => bcrypt(config('services.admin.password')),
+            'role'     => \App\Models\User::ROLE_ADMIN,
+        ]
+    );
+
+    // Docente de prueba
+    \App\Models\User::updateOrCreate(
+        ['email' => 'docente@dualab.es'],
+        [
+            'name'     => 'Docente DuaLab',
+            'password' => bcrypt('Docente2024!'),
+            'role'     => \App\Models\User::ROLE_DOCENTE,
+        ]
+    );
+
+    // Empresa de prueba
+    \App\Models\User::updateOrCreate(
+        ['email' => 'empresa@dualab.com'],
+        [
+            'name'     => 'Empresa DuaLab',
+            'password' => bcrypt('Empresa2024!'),
+            'role'     => \App\Models\User::ROLE_EMPRESA,
         ]
     );
 
