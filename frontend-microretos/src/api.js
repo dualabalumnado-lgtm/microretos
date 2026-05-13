@@ -31,7 +31,11 @@ api.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       const url = error.config?.url || ''
-      if (!url.includes('/empresas/verificar-acceso')) {
+      // Estas rutas devuelven 401 por contraseña de módulo incorrecta, no por sesión expirada.
+      // Excluirlas evita que un error de contraseña cierre la sesión del usuario.
+      const esVerificacionLocal = url.includes('/empresas/verificar-acceso') ||
+                                   url.includes('/admin/verify-password')
+      if (!esVerificacionLocal) {
         localStorage.removeItem('admin_token');
         localStorage.removeItem('admin_token_created_at');
         // Notificar a los componentes que escuchen este evento

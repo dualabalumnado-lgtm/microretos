@@ -12,12 +12,7 @@
  *   @cerrar
  */
 import { ref, reactive, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 import api from '../api.js'
-
-const router    = useRouter()
-const authStore = useAuthStore()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -164,8 +159,7 @@ async function guardar() {
     }
   } catch (e) {
     if (e.response?.status === 401) {
-      authStore.logout()
-      router.push('/')
+      errorGlobal.value = 'Tu sesión ha expirado. Recarga la página e inicia sesión de nuevo.'
       return
     }
     if (e.response?.status === 422) {

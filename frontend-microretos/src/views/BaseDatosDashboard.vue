@@ -10,11 +10,14 @@ import EliminarEmpresaModal from '../components/EliminarEmpresaModal.vue'
 import GestionFamiliasCiclosModal from '../components/GestionFamiliasCiclosModal.vue'
 import CatalogoBoeModal from '../components/CatalogoBoeModal.vue'
 import CatalogoBoeIntroModal from '../components/CatalogoBoeIntroModal.vue'
+import DbSecurityModal from '../components/DbSecurityModal.vue'
 import { useUIState } from '../composables/useUIState.js'
+import { useDbSecurity } from '../composables/useDbSecurity.js'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const { tourActivo } = useUIState()
+const dbSecurity = useDbSecurity()
 
 // ─── Aviso de expiración de sesión ───────────────────────
 const minutosRestantes = ref(authStore.minutosRestantes)
@@ -108,7 +111,10 @@ const centroAEditar       = ref(null)   // { id, nombre, ciclos[] }
 
 // ─── Confirmación NUEVO CENTRO ────────────────────────────
 const mostrarConfirmNuevoCentro = ref(false)
-function pedirNuevoCentro() { mostrarConfirmNuevoCentro.value = true }
+async function pedirNuevoCentro() {
+  if (!await dbSecurity.requireDbSecurity()) return
+  mostrarConfirmNuevoCentro.value = true
+}
 function confirmarNuevoCentro() { mostrarConfirmNuevoCentro.value = false; mostrarNuevoCentro.value = true }
 
 // ─── Confirmación EDITAR CENTRO ───────────────────────────
@@ -120,7 +126,8 @@ function onCentroCreado(centro) {
   cargarDatos()
 }
 
-function pedirEditarCentro(centroNombre) {
+async function pedirEditarCentro(centroNombre) {
+  if (!await dbSecurity.requireDbSecurity()) return
   const datos = centros.value.find(c => c.nombre === centroNombre)
   if (!datos?.id) return
   centroEditarTemp.value           = datos
@@ -143,7 +150,8 @@ function onCentroGuardado(centro) {
 const mostrarEliminarCentro = ref(false)
 const centroAEliminar       = ref(null)   // { id, nombre, numEmpresas, numCiclos }
 
-function pedirEliminarCentro(centroNombre) {
+async function pedirEliminarCentro(centroNombre) {
+  if (!await dbSecurity.requireDbSecurity()) return
   const datos = centros.value.find(c => c.nombre === centroNombre)
   if (!datos?.id) return   // solo centros del catálogo (con id real)
   const numEmpresas = Object.values(datosPorCentro.value[centroNombre]?.familias ?? {})
@@ -159,7 +167,10 @@ function pedirEliminarCentro(centroNombre) {
 
 function onCentroEliminado(centro) {
   mostrarEliminarCentro.value = false
-  mostrarSnack(`Centro "${centro.nombre}" eliminado correctamente.`, 'ok')
+  mostrarSnack(`Centro "${centro.nombre}" movido a la papelera.`, 'ok', {
+    label: 'Ir a la papelera',
+    fn: () => router.push({ name: 'papelera' }),
+  })
   cargarDatos()
 }
 
@@ -168,7 +179,10 @@ const mostrarNuevaEmpresa = ref(false)
 
 // ─── Confirmación NUEVA EMPRESA ───────────────────────────
 const mostrarConfirmNuevaEmpresa = ref(false)
-function pedirNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = true }
+async function pedirNuevaEmpresa() {
+  if (!await dbSecurity.requireDbSecurity()) return
+  mostrarConfirmNuevaEmpresa.value = true
+}
 function confirmarNuevaEmpresa() { mostrarConfirmNuevaEmpresa.value = false; mostrarNuevaEmpresa.value = true }
 
 // ─── Modal EDITAR ─────────────────────────────────────────
@@ -184,10 +198,10 @@ const mostrarEliminarEmpresa = ref(false)
 const empresaParaEliminar    = ref(null)
 
 // ─── Snackbar de feedback ─────────────────────────────────
-const snackbar = ref({ visible: false, mensaje: '', tipo: 'ok' })
-function mostrarSnack(mensaje, tipo = 'ok') {
-  snackbar.value = { visible: true, mensaje, tipo }
-  setTimeout(() => { snackbar.value.visible = false }, 3500)
+const snackbar = ref({ visible: false, mensaje: '', tipo: 'ok', accion: null })
+function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
+  snackbar.value = { visible: true, mensaje, tipo, accion }
+  setTimeout(() => { snackbar.value.visible = false }, 5000)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -491,7 +505,8 @@ watch(busqueda, (q) => {
 // ═══════════════════════════════════════════════════════════
 //  FLUJO EDITAR
 // ═══════════════════════════════════════════════════════════
-function pedirEdicion(empresa) {
+async function pedirEdicion(empresa) {
+  if (!await dbSecurity.requireDbSecurity()) return
   empresaEditTemp.value    = empresa
   mostrarConfirmEdit.value = true
 }
@@ -515,14 +530,18 @@ function onEmpresaActualizada(empresaActualizada) {
 // ═══════════════════════════════════════════════════════════
 //  FLUJO ELIMINAR
 // ═══════════════════════════════════════════════════════════
-function pedirEliminacion(empresa) {
+async function pedirEliminacion(empresa) {
+  if (!await dbSecurity.requireDbSecurity()) return
   empresaParaEliminar.value    = empresa
   mostrarEliminarEmpresa.value = true
 }
 
 function onEmpresaEliminada(data) {
   mostrarEliminarEmpresa.value = false
-  mostrarSnack(`"${data.nombre}" eliminada correctamente.`, 'ok')
+  mostrarSnack(`"${data.nombre}" movida a la papelera.`, 'ok', {
+    label: 'Ir a la papelera',
+    fn: () => router.push({ name: 'papelera' }),
+  })
   cargarDatos()
 }
 
@@ -977,6 +996,21 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             Activar Guía
+          </button>
+
+          <!-- Botón Papelera -->
+          <button
+            @click="router.push({ name: 'papelera' })"
+            class="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-200
+                   shadow-sm text-amber-600 text-xs font-black uppercase tracking-wider
+                   hover:bg-amber-100 hover:border-amber-300 transition-all"
+            title="Ver elementos eliminados en la papelera"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Papelera
           </button>
         </div>
       </header>
@@ -2116,6 +2150,13 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
       </div>
     </Transition>
 
+    <!-- ════════════ MODAL: VERIFICACIÓN DE SEGURIDAD BD ════════ -->
+    <DbSecurityModal
+      :visible="dbSecurity.modalVisible.value"
+      @verified="dbSecurity.onVerified"
+      @cancelled="dbSecurity.onCancelled"
+    />
+
     <!-- ════════════ MODAL: CATÁLOGO FAMILIAS Y CICLOS ═══════ -->
     <GestionFamiliasCiclosModal
       :visible="mostrarCatalogo"
@@ -2224,15 +2265,27 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
           ? 'bg-[#1F2937] text-white border border-[#333333]'
           : 'bg-red-600 text-white border border-red-500'"
       >
-        <svg v-if="snackbar.tipo === 'ok'" class="w-4 h-4 text-[#00A859] shrink-0"
+        <svg v-if="snackbar.tipo === 'ok' && !snackbar.accion" class="w-4 h-4 text-[#00A859] shrink-0"
              fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+        </svg>
+        <svg v-else-if="snackbar.tipo === 'ok' && snackbar.accion" class="w-4 h-4 text-amber-400 shrink-0"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
         </svg>
         <svg v-else class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        {{ snackbar.mensaje }}
+        <span class="flex-1">{{ snackbar.mensaje }}</span>
+        <button
+          v-if="snackbar.accion"
+          @click="snackbar.accion.fn(); snackbar.visible = false"
+          class="ml-1 shrink-0 px-3 py-1.5 rounded-xl bg-amber-400 text-[#1F2937] text-[10px] font-black uppercase tracking-widest hover:bg-amber-300 transition-all"
+        >
+          {{ snackbar.accion.label }}
+        </button>
       </div>
     </Transition>
 

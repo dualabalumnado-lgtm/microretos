@@ -54,6 +54,18 @@ async function copiarUrl() {
 
 const { descargarPDF } = useMicroproyectoPdfExport();
 
+const raCeBlocks = computed(() => {
+  const texto = proyecto.value?.ra_ce
+  if (!texto?.trim()) return []
+  return texto.split('\n\n').map(block => {
+    const lines = block.split('\n')
+    const modulo = lines[0]?.replace(/^\[|\]$/g, '').trim() || ''
+    const ra     = lines[1]?.replace(/^RA:\s*/, '').trim() || ''
+    const ces    = lines.slice(3).map(l => l.replace(/^\s*•\s*/, '').trim()).filter(Boolean)
+    return { modulo, ra, ces }
+  }).filter(b => b.modulo)
+})
+
 async function archivar() {
   if (!confirm('¿Archivar este proyecto?')) return;
   await api.put(`/startup/proyectos/${proyecto.value.uuid}`, { estado: 'archivado' });
@@ -204,6 +216,28 @@ async function archivar() {
             </div>
           </div>
 
+          <!-- Docente responsable -->
+          <div v-if="proyecto.datos_centro?.docente_nombre" class="card-section">
+            <p class="section-label">Docente responsable</p>
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-[#00A859]/10 border border-[#00A859]/20
+                          flex items-center justify-center shrink-0 text-[#00A859] font-black text-sm">
+                {{ proyecto.datos_centro.docente_nombre.charAt(0).toUpperCase() }}
+              </div>
+              <div>
+                <p class="text-sm font-bold text-[#1F2937]">{{ proyecto.datos_centro.docente_nombre }}</p>
+                <a v-if="proyecto.datos_centro.docente_email"
+                   :href="`mailto:${proyecto.datos_centro.docente_email}`"
+                   class="text-xs text-[#00A859] hover:underline">
+                  {{ proyecto.datos_centro.docente_email }}
+                </a>
+              </div>
+            </div>
+            <div v-if="proyecto.datos_centro.nombre" class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
+              {{ proyecto.datos_centro.nombre }}<span v-if="proyecto.datos_centro.municipio"> · {{ proyecto.datos_centro.municipio }}</span>
+            </div>
+          </div>
+
           <!-- Equipo -->
           <div v-if="proyecto.equipo?.alumnos?.length" class="card-section">
             <p class="section-label">Equipo ({{ proyecto.equipo.alumnos.length }} personas)</p>
@@ -238,6 +272,28 @@ async function archivar() {
                 {{ m.nombre }}
               </span>
             </div>
+          </div>
+
+          <!-- RA/CE -->
+          <div v-if="raCeBlocks.length" class="card-section sm:col-span-2">
+            <p class="section-label">Resultados de Aprendizaje y Criterios de Evaluación</p>
+            <div class="space-y-4">
+              <div v-for="(block, i) in raCeBlocks" :key="i" class="border border-gray-100 rounded-xl p-3.5">
+                <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-1">{{ block.modulo }}</p>
+                <p class="text-sm font-semibold text-[#1F2937] mb-2">{{ block.ra }}</p>
+                <ul v-if="block.ces.length" class="space-y-1 pl-1">
+                  <li v-for="(ce, j) in block.ces" :key="j"
+                      class="flex items-start gap-2 text-xs text-gray-500">
+                    <span class="text-amber-400 shrink-0 font-bold mt-0.5">•</span>{{ ce }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <!-- Si ra_ce es texto libre sin formato estructurado -->
+          <div v-else-if="proyecto.ra_ce?.trim()" class="card-section sm:col-span-2">
+            <p class="section-label">Resultados de Aprendizaje y Criterios de Evaluación</p>
+            <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ proyecto.ra_ce }}</p>
           </div>
 
           <!-- Fases -->

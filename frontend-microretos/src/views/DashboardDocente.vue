@@ -4,6 +4,7 @@ import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router'
 import api from '../api.js'
 import MicroretoModal from '../components/MicroretoModal.vue'
 import BienvenidaModal from '../components/BienvenidaModal_DashboardDocente.vue'
+import EliminarSesionModal from '../components/EliminarSesionModal.vue'
 import { useUIState } from '../composables/useUIState.js'
 
 const { tourActivo } = useUIState()
@@ -267,15 +268,36 @@ async function guardarSesion() {
   }
 }
 
-// ─── Eliminar sesión ──────────────────────────────────────────────────────────
-async function eliminarSesion(id) {
+// ─── Eliminar sesión (modal dos fases) ───────────────────────────────────────
+const modalEliminarVisible = ref(false)
+const sesionAEliminar      = ref(null)
+const snackbar = ref({ visible: false, mensaje: '', accion: null })
+let   snackTimer = null
+
+function mostrarSnack(mensaje, accion = null) {
+  clearTimeout(snackTimer)
+  snackbar.value = { visible: true, mensaje, accion }
+  snackTimer = setTimeout(() => { snackbar.value.visible = false }, 5000)
+}
+
+function abrirModalEliminar(sesion) {
+  sesionAEliminar.value = sesion
+  modalEliminarVisible.value = true
+}
+
+function cerrarModalEliminar() {
+  modalEliminarVisible.value = false
+  sesionAEliminar.value = null
+}
+
+function onSesionEliminada({ id, titulo }) {
   sesiones.value = sesiones.value.filter(s => s.id !== id)
-  try {
-    await api.delete(`/sesiones/${id}`)
-  } catch (e) {
-    console.error('Error eliminando sesión:', e)
-    await cargarSesiones() // revertir si falla
-  }
+  cerrarSesionModal()
+  cerrarModalEliminar()
+  mostrarSnack(
+    `"${titulo}" movida a la papelera.`,
+    { label: 'Ir a la papelera', fn: () => router.push({ name: 'papelera' }) }
+  )
 }
 
 // ─── Filtros y paginación del panel de sesiones ───────────────────────────────
@@ -1280,7 +1302,7 @@ function formatFecha(isoDate) {
                     </div>
                   </div>
                   <div class="flex flex-col items-end gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                    <button @click.stop="eliminarSesion(s.id)"
+                    <button @click.stop="abrirModalEliminar(s)"
                             class="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-all"
                             title="Eliminar">
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1411,7 +1433,7 @@ function formatFecha(isoDate) {
 
           <!-- Pie -->
           <div class="px-7 py-4 bg-[#F8FAFC] border-t border-gray-100 flex items-center justify-between gap-4">
-            <button @click="eliminarSesion(sesionAbierta.id); cerrarSesionModal()"
+            <button @click="abrirModalEliminar(sesionAbierta)"
                     class="text-xs text-gray-400 hover:text-red-400 font-black uppercase
                            tracking-widest transition-colors">
               Eliminar sesión
@@ -1452,6 +1474,39 @@ function formatFecha(isoDate) {
     :microreto-id="microretoModalId"
     @close="cerrarMicroretoModal"
   />
+
+  <!-- Modal eliminar sesión -->
+  <EliminarSesionModal
+    :visible="modalEliminarVisible"
+    :sesion="sesionAEliminar"
+    @sesion-eliminada="onSesionEliminada"
+    @cerrar="cerrarModalEliminar"
+  />
+
+  <!-- Snackbar papelera -->
+  <Teleport to="body">
+    <Transition name="dd-snack">
+      <div v-if="snackbar.visible"
+           class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]
+                  flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl
+                  bg-[#1F2937] text-white text-sm font-medium">
+        <svg v-if="snackbar.accion" class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        <svg v-else class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span>{{ snackbar.mensaje }}</span>
+        <button v-if="snackbar.accion"
+                @click="snackbar.accion.fn(); snackbar.visible = false"
+                class="ml-2 px-3 py-1 rounded-lg bg-amber-400 text-amber-900
+                       text-xs font-black uppercase tracking-wider hover:bg-amber-300 transition-colors">
+          {{ snackbar.accion.label }}
+        </button>
+      </div>
+    </Transition>
+  </Teleport>
 
 </template>
 
@@ -1518,6 +1573,10 @@ select.field-input { cursor: pointer; }
 /* sp-fade transition (overlay y bocadillo) */
 .sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
 .sp-fade-enter-from, .sp-fade-leave-to { opacity: 0; }
+
+/* snackbar */
+.dd-snack-enter-active, .dd-snack-leave-active { transition: opacity 250ms ease, transform 250ms ease; }
+.dd-snack-enter-from, .dd-snack-leave-to { opacity: 0; transform: translateX(-50%) translateY(12px); }
 
 /* Modal animation */
 .modal-fade-enter-active,

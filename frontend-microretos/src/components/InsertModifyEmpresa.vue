@@ -12,7 +12,7 @@
  *     this.$refs.modalesRef.abrirTrasLogin(accion)
  *  4. Este componente abre el modal correspondiente
  */
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import api from '../api.js'
 import CentroEducativoModal from './CentroEducativoModal.vue'
 
@@ -100,7 +100,22 @@ watch(() => nuevaForm.centro_educativo, (val) => {
   if (val === '__nuevo__') {
     nuevaForm.centro_educativo = ''
     mostrarModalCentro.value = true
+    return
   }
+  // Resetear familia si ya no pertenece al centro seleccionado
+  if (nuevaForm.familia && familiasFiltradas.value.length &&
+      !familiasFiltradas.value.some(f => (f.nombre ?? f) === nuevaForm.familia)) {
+    nuevaForm.familia = ''
+  }
+})
+
+const familiasFiltradas = computed(() => {
+  const centroNombre = nuevaForm.centro_educativo
+  if (!centroNombre) return props.familiasProfesionales
+  const centro = centrosInternos.value.find(c => c.nombre === centroNombre)
+  if (!centro?.ciclos?.length) return props.familiasProfesionales
+  const ids = new Set(centro.ciclos.map(c => c.familia_id).filter(Boolean))
+  return props.familiasProfesionales.filter(f => ids.has(f.id))
 })
 
 const nuevaConfirmando = ref(false)
@@ -510,9 +525,10 @@ defineExpose({ abrirTrasLogin })
                 </div>
                 <div>
                   <label class="ime-label">Familia Profesional *</label>
-                  <select v-model="nuevaForm.familia" class="ime-input" :class="{'ime-input-err': nuevaErrors.familia}">
-                    <option value="">Selecciona familia...</option>
-                    <option v-for="f in familiasProfesionales" :key="f.id ?? f" :value="f.nombre ?? f">{{ f.nombre ?? f }}</option>
+                  <select v-model="nuevaForm.familia" class="ime-input" :class="{'ime-input-err': nuevaErrors.familia}"
+                          :disabled="!nuevaForm.centro_educativo">
+                    <option value="">{{ nuevaForm.centro_educativo ? 'Selecciona familia...' : 'Primero elige un centro' }}</option>
+                    <option v-for="f in familiasFiltradas" :key="f.id ?? f" :value="f.nombre ?? f">{{ f.nombre ?? f }}</option>
                   </select>
                   <p v-if="nuevaErrors.familia" class="ime-err">{{ nuevaErrors.familia }}</p>
                 </div>

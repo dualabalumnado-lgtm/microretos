@@ -8,16 +8,20 @@ use App\Models\Microreto;
 use App\Models\CicloFormativo;
 use App\Models\Familia;
 use App\Models\CentroEducativo;
+use App\Models\Microproyecto;
+use App\Models\Sesion;
 
 class PapeleraController extends Controller
 {
     // Mapa tipo → modelo y etiqueta legible
     private array $tipos = [
-        'empresas'  => Empresa::class,
-        'microretos' => Microreto::class,
-        'ciclos'    => CicloFormativo::class,
-        'familias'  => Familia::class,
-        'centros'   => CentroEducativo::class,
+        'empresas'    => Empresa::class,
+        'microretos'  => Microreto::class,
+        'ciclos'      => CicloFormativo::class,
+        'familias'    => Familia::class,
+        'centros'     => CentroEducativo::class,
+        'proyectos'   => Microproyecto::class,
+        'sesiones'    => Sesion::class,
     ];
 
     /**
@@ -158,6 +162,8 @@ class PapeleraController extends Controller
             'ciclos'     => $item->nombre            ?? "Ciclo #{$item->id}",
             'familias'   => $item->nombre            ?? "Familia #{$item->id}",
             'centros'    => $item->nombre            ?? "Centro #{$item->id}",
+            'proyectos'  => $item->titulo            ?? "Proyecto #{$item->id}",
+            'sesiones'   => $item->microreto_titulo  ?? "Sesión #{$item->id}",
             default      => "#{$item->id}",
         };
     }
@@ -169,9 +175,11 @@ class PapeleraController extends Controller
     private function limpiarRelaciones($item, string $tipo): void
     {
         match ($tipo) {
-            'empresas' => $this->limpiarEmpresa($item),
-            'centros'  => $this->limpiarCentro($item),
-            default    => null,
+            'empresas'  => $this->limpiarEmpresa($item),
+            'centros'   => $this->limpiarCentro($item),
+            'proyectos' => $this->limpiarProyecto($item),
+            'sesiones'  => $this->limpiarSesion($item),
+            default     => null,
         };
     }
 
@@ -196,5 +204,18 @@ class PapeleraController extends Controller
         \Illuminate\Support\Facades\DB::table('centro_ciclo')
             ->where('centro_id', $centro->id)
             ->delete();
+    }
+
+    private function limpiarProyecto(Microproyecto $proyecto): void
+    {
+        // Elimina los recursos asociados al proyecto antes del borrado permanente
+        $proyecto->recursos()->forceDelete();
+    }
+
+    private function limpiarSesion(Sesion $sesion): void
+    {
+        // Desvincula microproyectos de la sesión antes del borrado permanente
+        Microproyecto::where('sesion_id', $sesion->id)
+            ->update(['sesion_id' => null]);
     }
 }
