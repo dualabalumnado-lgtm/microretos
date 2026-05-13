@@ -136,6 +136,8 @@ async function cargarDatos() {
     empresas.value  = empRes.data
     familias.value  = famRes.data
     proyectos.value = proRes.data.filter(p => p.estado === 'publicado')
+    // Inicializar todos los centros cerrados por defecto
+    centrosCerrados.value = new Set(empRes.data.map(e => e.centro_educativo || SIN_CENTRO))
   } finally {
     cargando.value = false
   }
@@ -281,6 +283,21 @@ const centrosOrdenados = computed(() => {
     .sort((a, b) => a.localeCompare(b, 'es'))
     .concat(keys.includes(SIN_CENTRO) ? [SIN_CENTRO] : [])
 })
+
+// ─── Estadísticas de contacto ─────────────────────────────────────────────────
+const estadisticasContacto = computed(() => {
+  const counts = {}
+  for (const e of empresas.value) {
+    const est = e.estado_contacto || 'Sin contactar'
+    counts[est] = (counts[est] || 0) + 1
+  }
+  return counts
+})
+
+const totalActivas     = computed(() => estadisticasContacto.value['Activo'] || 0)
+const totalContactadas = computed(() => estadisticasContacto.value['Contactado'] || 0)
+const totalReunion     = computed(() => estadisticasContacto.value['Reunión fijada'] || 0)
+
 
 </script>
 
@@ -647,6 +664,80 @@ const centrosOrdenados = computed(() => {
         </button>
       </div>
 
+      <!-- Stats chips -->
+      <div v-if="!cargando && empresas.length"
+           class="mb-5 flex flex-wrap gap-3 items-center">
+        <div class="flex flex-wrap gap-2 items-center
+                    bg-white/70 rounded-[1.4rem] border border-gray-100 shadow-sm
+                    px-2 py-1.5">
+
+          <!-- Total empresas -->
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+            </svg>
+            <span class="font-black text-xl text-[#1F2937]">{{ empresas.length }}</span>
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">empresas</span>
+          </div>
+
+          <!-- Total centros -->
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+            </svg>
+            <span class="font-black text-xl text-[#1F2937]">{{ centrosOrdenados.length }}</span>
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">centros</span>
+          </div>
+
+          <!-- Activas -->
+          <div v-if="totalActivas > 0"
+               class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-2xl border border-emerald-100 shadow-sm">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span class="font-black text-xl text-emerald-700">{{ totalActivas }}</span>
+            <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">activas</span>
+          </div>
+
+          <!-- Contactadas -->
+          <div v-if="totalContactadas > 0"
+               class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm">
+            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            <span class="font-black text-xl text-blue-700">{{ totalContactadas }}</span>
+            <span class="text-xs font-semibold text-blue-600 uppercase tracking-wider">contactadas</span>
+          </div>
+
+          <!-- Reunión fijada -->
+          <div v-if="totalReunion > 0"
+               class="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-2xl border border-amber-100 shadow-sm">
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <span class="font-black text-xl text-amber-700">{{ totalReunion }}</span>
+            <span class="text-xs font-semibold text-amber-600 uppercase tracking-wider">reunión</span>
+          </div>
+
+          <!-- Filtrado activo -->
+          <div v-if="empresasFiltradas.length !== empresas.length"
+               class="flex items-center gap-2 px-3 py-1.5 bg-violet-50 rounded-2xl border border-violet-100 shadow-sm">
+            <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+            <span class="font-black text-xl text-violet-700">{{ empresasFiltradas.length }}</span>
+            <span class="text-xs font-semibold text-violet-600 uppercase tracking-wider">mostrando</span>
+          </div>
+
+        </div>
+      </div>
+
       <!-- Filtros -->
       <div class="mb-5 rounded-[2rem] bg-white border border-gray-100 shadow-sm p-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -733,34 +824,60 @@ const centrosOrdenados = computed(() => {
         <div v-for="centro in centrosOrdenados" :key="centro">
 
           <!-- Cabecera del centro (desplegable) -->
-          <div class="rounded-[2rem] border bg-white overflow-hidden shadow-sm transition-all"
-               :class="!centrosCerrados.has(centro) ? 'border-gray-200' : 'border-gray-100'">
+          <div class="bg-white rounded-[1.75rem] border shadow-sm overflow-hidden transition-all duration-300"
+               :class="!centrosCerrados.has(centro) ? 'border-[#00A859]/25 shadow-md' : 'border-gray-100'">
 
             <button @click="toggleCentro(centro)"
-                    class="w-full flex items-center gap-3 px-5 py-3.5 text-left">
-              <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-                   :class="!centrosCerrados.has(centro) ? 'bg-[#00A859]/10' : 'bg-gray-100'">
-                <svg class="w-4 h-4 transition-colors"
-                     :class="!centrosCerrados.has(centro) ? 'text-[#00A859]' : 'text-gray-400'"
+                    class="w-full flex items-center gap-4 px-6 py-5 text-left hover:bg-gray-50/70 transition-colors duration-150">
+              <!-- Icono centro -->
+              <div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200"
+                   :class="!centrosCerrados.has(centro) ? 'bg-[#1F2937]' : 'bg-gray-100'">
+                <svg class="w-5 h-5 transition-colors duration-200"
+                     :class="!centrosCerrados.has(centro) ? 'text-[#99CC33]' : 'text-gray-400'"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4z"/>
+                    d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
                 </svg>
               </div>
+              <!-- Info -->
               <div class="flex-1 min-w-0">
-                <span class="font-bold text-sm"
-                      :class="centro === SIN_CENTRO ? 'text-gray-400 italic' : 'text-[#121212]'">
+                <h2 class="font-black text-base truncate"
+                    :class="centro === SIN_CENTRO ? 'text-gray-400 italic' : 'text-[#1F2937]'">
                   {{ centro }}
-                </span>
-                <span class="ml-2 text-[10px] text-gray-400">
-                  {{ empresasPorCentro[centro].length }}
-                  empresa{{ empresasPorCentro[centro].length !== 1 ? 's' : '' }}
-                </span>
+                </h2>
+                <p class="text-xs text-gray-400 font-medium mt-0.5 flex flex-wrap items-center gap-x-1">
+                  <span>
+                    {{ empresasPorCentro[centro].length }}
+                    {{ empresasPorCentro[centro].length !== 1 ? 'empresas' : 'empresa' }}
+                  </span>
+                  <template v-if="empresasPorCentro[centro].filter(e => e.estado_contacto === 'Activo').length">
+                    <span class="text-gray-300">·</span>
+                    <span class="text-emerald-500 font-semibold">
+                      {{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Activo').length }}
+                      activa{{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Activo').length > 1 ? 's' : '' }}
+                    </span>
+                  </template>
+                  <template v-if="empresasPorCentro[centro].filter(e => e.estado_contacto === 'Reunión fijada').length">
+                    <span class="text-gray-300">·</span>
+                    <span class="text-amber-500 font-semibold">
+                      {{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Reunión fijada').length }}
+                      reunión{{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Reunión fijada').length > 1 ? 'es' : '' }}
+                    </span>
+                  </template>
+                  <template v-if="empresasPorCentro[centro].filter(e => e.estado_contacto === 'Contactado').length">
+                    <span class="text-gray-300">·</span>
+                    <span class="text-blue-400 font-semibold">
+                      {{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Contactado').length }}
+                      contactada{{ empresasPorCentro[centro].filter(e => e.estado_contacto === 'Contactado').length > 1 ? 's' : '' }}
+                    </span>
+                  </template>
+                </p>
               </div>
-              <svg class="w-4 h-4 text-gray-300 transition-transform duration-200 shrink-0"
+              <!-- Chevron -->
+              <svg class="w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0"
                    :class="!centrosCerrados.has(centro) ? 'rotate-180' : ''"
                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
 

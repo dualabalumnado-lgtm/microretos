@@ -652,6 +652,12 @@ function formatFecha(isoDate) {
         <!-- ─── COLUMNA IZQUIERDA: Formulario ───────────────────────────── -->
         <div class="lg:col-span-3 space-y-4">
 
+          <!-- Header sección izquierda -->
+          <div class="flex items-center gap-2.5">
+            <div class="w-1 h-5 rounded-full bg-[#00A859]" />
+            <h2 class="text-sm font-black uppercase tracking-[0.15em] text-[#1F2937]">Creación de sesión</h2>
+          </div>
+
           <!-- ══ SELECTOR DE MICRORETO ══════════════════════════════════════ -->
           <div ref="refMicroreto"
                class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden"
@@ -1124,6 +1130,13 @@ function formatFecha(isoDate) {
         <!-- ─── COLUMNA DERECHA: Historial ──────────────────────────────── -->
         <div class="lg:col-span-2 transition-all"
              :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'sesiones' }">
+
+          <!-- Header sección derecha -->
+          <div class="flex items-center gap-2.5 mb-4">
+            <div class="w-1 h-5 rounded-full bg-[#99CC33]" />
+            <h2 class="text-sm font-black uppercase tracking-[0.15em] text-[#1F2937]">Resumen de sesiones creadas</h2>
+          </div>
+
           <div ref="refSesiones"
                class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6"
                :class="{ 'tour-active': tourTargetActivo === 'refSesiones' }">
@@ -1139,30 +1152,28 @@ function formatFecha(isoDate) {
                   {{ sesiones.length }}
                 </span>
               </div>
-              <!-- Botones de acción siempre visibles -->
-              <div class="grid grid-cols-2 gap-2">
-                <button @click="router.push('/dashboard/sesiones')"
-                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-                               bg-[#00A859]/8 border text-[#00A859]
-                               text-[9px] font-black uppercase tracking-widest
-                               hover:bg-[#00A859]/15 transition-all">
-                  <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                  </svg>
-                  Ver sesiones
-                </button>
-                <button @click="router.push({ name: 'startup-day-crear' })"
-                        class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-                               bg-[#99CC33]/10 border text-[#5a7a00]
-                               text-[9px] font-black uppercase tracking-widest
-                               hover:bg-[#99CC33]/20 transition-all">
-                  <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                  </svg>
-                  Nuevo proyecto
-                </button>
-              </div>
+              <!-- Botón Ver sesiones — prominente -->
+              <button @click="router.push('/dashboard/sesiones')"
+                      class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                             bg-[#00A859] text-white
+                             text-[10px] font-black uppercase tracking-widest
+                             hover:bg-[#00A859]/90 transition-all shadow-sm mb-2">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                Ver todas las sesiones
+              </button>
+              <button @click="router.push({ name: 'startup-day-crear' })"
+                      class="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                             bg-[#99CC33]/10 border border-[#99CC33]/20 text-[#5a7a00]
+                             text-[9px] font-black uppercase tracking-widest
+                             hover:bg-[#99CC33]/20 transition-all">
+                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Nuevo proyecto
+              </button>
             </div>
 
             <!-- Filtros compactos -->

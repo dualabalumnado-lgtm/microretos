@@ -8,12 +8,23 @@ use Illuminate\Http\Request;
 
 class SesionController extends Controller
 {
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
-        return Sesion::with([
+        $user  = $request->user();
+        $query = Sesion::with([
             'microreto.empresa.centroEducativo',
             'microreto.empresa.familias',
-        ])->orderBy('created_at', 'desc')->get();
+        ])->orderBy('created_at', 'desc');
+
+        // Docentes con centro asociado solo ven sesiones de su centro
+        if ($user?->isDocente() && $user->centro_educativo_id) {
+            $nombreCentro = $user->centroEducativo?->nombre;
+            if ($nombreCentro) {
+                $query->where('centro_educativo', $nombreCentro);
+            }
+        }
+
+        return $query->get();
     }
 
     public function store(Request $request)

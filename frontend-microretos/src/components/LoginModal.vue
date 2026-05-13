@@ -9,8 +9,8 @@
               <div class="logo-mark">
                 <span class="logo-icon">⬡</span>
               </div>
-              <h2 class="modal-title">Acceso Administrador</h2>
-              <p class="modal-subtitle">Panel de control exclusivo</p>
+              <h2 class="modal-title">Acceso DuaLab</h2>
+              <p class="modal-subtitle">Introduce tus credenciales</p>
             </div>
 
             <form class="modal-form" @submit.prevent="handleLogin">
@@ -124,8 +124,7 @@ async function handleLogin() {
     })
 
     if (response.data.success) {
-      authStore.login(response.data.token)
-      // localStorage.setItem('admin_token', response.data.token)
+      authStore.login(response.data.token, response.data.role, response.data.name)
       emit('login-success', response.data)
       emit('update:modelValue', false)
       form.email = ''
