@@ -7,8 +7,11 @@ import { useUIState } from '../composables/useUIState.js';
 const route  = useRoute();
 const router = useRouter();
 
-const paso       = ref(1);
+const paso              = ref(1);
+const pasoMaxAlcanzado  = ref(1);
 const totalPasos = 8;
+
+watch(paso, (v) => { if (v > pasoMaxAlcanzado.value) pasoMaxAlcanzado.value = v })
 const guardando         = ref(false);
 const cargando          = ref(false);
 const cargandoProyecto  = ref(false);
@@ -303,6 +306,25 @@ watch(modoRaCe, (modo) => {
   if (modo === 'manual' || modo === 'ia') cargarCatalogoRaCe()
 })
 
+watch(() => form.value.modulos_seleccionados, () => {
+  if (modoRaCe.value === 'manual' || modoRaCe.value === 'ia') cargarCatalogoRaCe()
+}, { deep: true })
+
+watch(ceChecked, () => {
+  if (modoRaCe.value !== 'manual') return
+  const partes = []
+  catalogoRaCe.value.forEach(mod => {
+    mod.ras.forEach(ra => {
+      const ces = ra.criterios.filter(ce => ceChecked.value[ce.id])
+      if (ces.length) {
+        const cesStr = ces.map(c => `  • ${c.descripcion}`).join('\n')
+        partes.push(`[${mod.modulo}]\nRA: ${ra.descripcion}\nCE:\n${cesStr}`)
+      }
+    })
+  })
+  form.value.ra_ce = partes.join('\n\n')
+}, { deep: true })
+
 const busquedaRaCe = ref('')
 
 const catalogoFiltrado = computed(() => {
@@ -508,6 +530,7 @@ async function cargarProyecto() {
     ]);
     const p = proyRes.data;
     paso.value = p.paso_actual || 1;
+    pasoMaxAlcanzado.value = p.paso_actual || 1;
     Object.assign(form.value, {
       titulo: p.titulo || '', empresa_id: p.empresa_id || '',
       centro_id: p.centro_id || '', familia_id: p.familia_id || '',
@@ -695,12 +718,12 @@ onUnmounted(() => { tourActivo.value = false; });
         <!-- Pasos mini -->
         <div class="flex gap-1 overflow-x-auto scrollbar-none">
           <button v-for="p in pasos" :key="p.num"
-                  @click="p.num < paso && (paso = p.num)"
+                  @click="p.num <= pasoMaxAlcanzado && (paso = p.num)"
                   :class="[
                     'flex-1 min-w-13 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                     p.num === paso
                       ? 'bg-[#00A859]/10 text-[#00A859] border border-[#00A859]/30'
-                      : p.num < paso
+                      : p.num <= pasoMaxAlcanzado
                         ? 'bg-gray-100 text-gray-500 hover:text-[#00A859] border border-gray-200 cursor-pointer'
                         : 'bg-transparent text-gray-300 border border-transparent cursor-default'
                   ]">
@@ -1447,7 +1470,7 @@ onUnmounted(() => { tourActivo.value = false; });
 
           <div class="flex justify-between mt-5">
             <button @click="paso = 3" class="btn-secondary">← Anterior</button>
-            <button @click="guardar(5)" :disabled="guardando" class="btn-primary">{{ guardando ? 'Guardando…' : 'Siguiente →' }}</button>
+            <button @click="() => { if (modoRaCe === 'manual' && totalCeSeleccionados > 0) aplicarSeleccionManual(); guardar(5); }" :disabled="guardando" class="btn-primary">{{ guardando ? 'Guardando…' : 'Siguiente →' }}</button>
           </div>
         </div>
 
