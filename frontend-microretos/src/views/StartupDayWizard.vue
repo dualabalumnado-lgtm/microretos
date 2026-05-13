@@ -7,11 +7,15 @@ import { useUIState } from '../composables/useUIState.js';
 const route  = useRoute();
 const router = useRouter();
 
-const paso       = ref(1);
+const paso              = ref(1);
+const pasoMaxAlcanzado  = ref(1);
 const totalPasos = 8;
+
+watch(paso, (v) => { if (v > pasoMaxAlcanzado.value) pasoMaxAlcanzado.value = v })
 const guardando         = ref(false);
 const cargando          = ref(false);
 const cargandoProyecto  = ref(false);
+const proyectoValidado  = ref(false);
 const uuid           = ref(route.params.uuid || null);
 const isLoaded       = ref(false);
 const errorMsg       = ref('');
@@ -303,6 +307,25 @@ watch(modoRaCe, (modo) => {
   if (modo === 'manual' || modo === 'ia') cargarCatalogoRaCe()
 })
 
+watch(() => form.value.modulos_seleccionados, () => {
+  if (modoRaCe.value === 'manual' || modoRaCe.value === 'ia') cargarCatalogoRaCe()
+}, { deep: true })
+
+watch(ceChecked, () => {
+  if (modoRaCe.value !== 'manual') return
+  const partes = []
+  catalogoRaCe.value.forEach(mod => {
+    mod.ras.forEach(ra => {
+      const ces = ra.criterios.filter(ce => ceChecked.value[ce.id])
+      if (ces.length) {
+        const cesStr = ces.map(c => `  • ${c.descripcion}`).join('\n')
+        partes.push(`[${mod.modulo}]\nRA: ${ra.descripcion}\nCE:\n${cesStr}`)
+      }
+    })
+  })
+  form.value.ra_ce = partes.join('\n\n')
+}, { deep: true })
+
 const busquedaRaCe = ref('')
 
 const catalogoFiltrado = computed(() => {
@@ -508,6 +531,8 @@ async function cargarProyecto() {
     ]);
     const p = proyRes.data;
     paso.value = p.paso_actual || 1;
+    pasoMaxAlcanzado.value = p.paso_actual || 1;
+    proyectoValidado.value = !!p.empresa_validado;
     Object.assign(form.value, {
       titulo: p.titulo || '', empresa_id: p.empresa_id || '',
       centro_id: p.centro_id || '', familia_id: p.familia_id || '',
@@ -572,7 +597,8 @@ async function guardar(siguientePaso) {
   try {
     const payload = { ...form.value, paso_actual: siguientePaso };
     if (uuid.value) {
-      await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      const res = await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      proyectoValidado.value = !!res.data.empresa_validado;
     } else {
       const res = await api.post('/startup/proyectos', {
         titulo:        form.value.titulo,
@@ -580,7 +606,8 @@ async function guardar(siguientePaso) {
         sesion_id:     form.value.sesion_id || null,
       });
       uuid.value = res.data.uuid;
-      await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      const upd = await api.put(`/startup/proyectos/${uuid.value}`, payload);
+      proyectoValidado.value = !!upd.data.empresa_validado;
       router.replace({ name: 'startup-day-editar', params: { uuid: uuid.value } });
     }
     paso.value = siguientePaso;
@@ -695,17 +722,29 @@ onUnmounted(() => { tourActivo.value = false; });
         <!-- Pasos mini -->
         <div class="flex gap-1 overflow-x-auto scrollbar-none">
           <button v-for="p in pasos" :key="p.num"
-                  @click="p.num < paso && (paso = p.num)"
+                  @click="p.num <= pasoMaxAlcanzado && (paso = p.num)"
                   :class="[
                     'flex-1 min-w-13 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
                     p.num === paso
                       ? 'bg-[#00A859]/10 text-[#00A859] border border-[#00A859]/30'
-                      : p.num < paso
+                      : p.num <= pasoMaxAlcanzado
                         ? 'bg-gray-100 text-gray-500 hover:text-[#00A859] border border-gray-200 cursor-pointer'
                         : 'bg-transparent text-gray-300 border border-transparent cursor-default'
                   ]">
             {{ p.label }}
           </button>
+        </div>
+
+        <!-- Aviso: proyecto validado por empresa -->
+        <div v-if="proyectoValidado"
+             class="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+          <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+          <p class="text-[10px] font-bold text-amber-700 leading-tight">
+            Este proyecto ya ha sido validado por la empresa. Modificar el contenido requerirá una nueva validación.
+          </p>
         </div>
       </div>
     </div>
@@ -1447,7 +1486,7 @@ onUnmounted(() => { tourActivo.value = false; });
 
           <div class="flex justify-between mt-5">
             <button @click="paso = 3" class="btn-secondary">← Anterior</button>
-            <button @click="guardar(5)" :disabled="guardando" class="btn-primary">{{ guardando ? 'Guardando…' : 'Siguiente →' }}</button>
+            <button @click="() => { if (modoRaCe === 'manual' && totalCeSeleccionados > 0) aplicarSeleccionManual(); guardar(5); }" :disabled="guardando" class="btn-primary">{{ guardando ? 'Guardando…' : 'Siguiente →' }}</button>
           </div>
         </div>
 

@@ -56,7 +56,35 @@ class MicroproyectoController extends Controller
             'paso_actual', 'estado',
         ];
 
-        $proyecto->update($request->only($allowed));
+        $data = $request->only($allowed);
+
+        // Si el proyecto está validado y se modifica un campo relevante para la empresa, se invalida la validación
+        if ($proyecto->empresa_validado) {
+            $camposCriticos = [
+                'titulo', 'empresa_id', 'datos_empresa', 'datos_centro', 'equipo',
+                'modulos_seleccionados', 'ra_ce', 'fundamentacion', 'diseno_reto',
+                'diseno_microproyecto', 'resumen', 'objetivos', 'kpis',
+            ];
+
+            foreach ($camposCriticos as $campo) {
+                if (!array_key_exists($campo, $data)) continue;
+
+                $anterior = is_array($proyecto->$campo)
+                    ? json_encode($proyecto->$campo)
+                    : (string) ($proyecto->$campo ?? '');
+                $nuevo = is_array($data[$campo])
+                    ? json_encode($data[$campo])
+                    : (string) ($data[$campo] ?? '');
+
+                if ($anterior !== $nuevo) {
+                    $data['empresa_validado']   = false;
+                    $data['validacion_empresa'] = null;
+                    break;
+                }
+            }
+        }
+
+        $proyecto->update($data);
 
         return response()->json($this->formatProyecto($proyecto->fresh()));
     }
@@ -73,7 +101,7 @@ class MicroproyectoController extends Controller
 
     public function showByToken($token)
     {
-        $proyecto = Microproyecto::with('recursos')
+        $proyecto = Microproyecto::with(['recursos', 'microreto'])
             ->where('token_empresa', $token)
             ->where('estado', 'publicado')
             ->firstOrFail();
@@ -86,17 +114,33 @@ class MicroproyectoController extends Controller
             'label'         => $r->label ?? '',
         ];
 
+        $mr = $proyecto->microreto;
+
         return response()->json([
-            'uuid'               => $proyecto->uuid,
-            'titulo'             => $proyecto->titulo,
-            'datos_empresa'      => $proyecto->datos_empresa,
-            'diseno_reto'        => $proyecto->diseno_reto,
-            'objetivos'          => $proyecto->objetivos,
-            'equipo'             => $proyecto->equipo,
-            'recursos'           => [
+            'uuid'                   => $proyecto->uuid,
+            'titulo'                 => $proyecto->titulo,
+            'datos_empresa'          => $proyecto->datos_empresa,
+            'datos_centro'           => $proyecto->datos_centro,
+            'fundamentacion'         => $proyecto->fundamentacion,
+            'diseno_reto'            => $proyecto->diseno_reto,
+            'diseno_microproyecto'   => $proyecto->diseno_microproyecto,
+            'objetivos'              => $proyecto->objetivos,
+            'kpis'                   => $proyecto->kpis,
+            'equipo'                 => $proyecto->equipo,
+            'modulos_seleccionados'  => $proyecto->modulos_seleccionados,
+            'ra_ce'                  => $proyecto->ra_ce,
+            'resumen'                => $proyecto->resumen,
+            'recursos'               => [
                 'videos'     => $proyecto->recursos->where('tipo', 'video')->map($formato)->values(),
                 'documentos' => $proyecto->recursos->where('tipo', 'documento')->map($formato)->values(),
             ],
+            'reto_origen'            => $mr ? [
+                'titulo'        => $mr->titulo,
+                'quien_es'      => $mr->quien_es,
+                'dia_a_dia'     => $mr->dia_a_dia,
+                'que_necesitan' => $mr->que_necesitan,
+                'dificultades'  => $mr->dificultades,
+            ] : null,
             'empresa_validado'   => $proyecto->empresa_validado,
             'validacion_empresa' => $proyecto->validacion_empresa,
         ]);

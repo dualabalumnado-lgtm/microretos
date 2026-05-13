@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use App\Models\MicroproyectoRecurso;
 
 class Microproyecto extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'uuid', 'microreto_id', 'sesion_id', 'empresa_id', 'centro_id', 'familia_id', 'ciclo_id',
         'titulo', 'curso',

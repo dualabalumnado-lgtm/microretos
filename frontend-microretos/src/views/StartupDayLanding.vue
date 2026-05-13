@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../api.js';
 
@@ -53,6 +53,18 @@ const preguntas = [
   { key: 'equipo_adecuado',     label: '¿El perfil del equipo de alumnos os parece adecuado para este reto?' },
   { key: 'viabilidad',          label: '¿Consideráis que el proyecto es viable en el contexto de vuestra empresa?' },
 ];
+
+const raCeBlocks = computed(() => {
+  const texto = proyecto.value?.ra_ce
+  if (!texto?.trim()) return []
+  return texto.split('\n\n').map(block => {
+    const lines = block.split('\n')
+    const modulo = lines[0]?.replace(/^\[|\]$/g, '').trim() || ''
+    const ra     = lines[1]?.replace(/^RA:\s*/, '').trim() || ''
+    const ces    = lines.slice(3).map(l => l.replace(/^\s*•\s*/, '').trim()).filter(Boolean)
+    return { modulo, ra, ces }
+  }).filter(b => b.modulo)
+})
 
 function youtubeId(url) {
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?/\s]+)/);
@@ -269,20 +281,62 @@ function youtubeId(url) {
           </div>
 
           <!-- Ficha del proyecto -->
-          <div class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Proyecto</p>
-            <h1 class="text-xl font-black text-[#121212] mb-5">{{ proyecto.titulo }}</h1>
+          <div class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5 space-y-6">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Proyecto</p>
+              <h1 class="text-xl font-black text-[#121212]">{{ proyecto.titulo }}</h1>
+            </div>
 
-            <div v-if="proyecto.diseno_reto?.descripcion" class="mb-5">
+            <!-- Resumen ejecutivo -->
+            <div v-if="proyecto.resumen?.texto">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Resumen ejecutivo</p>
+              <p class="text-sm text-gray-600 leading-relaxed">{{ proyecto.resumen.texto }}</p>
+            </div>
+
+            <!-- Contexto -->
+            <div v-if="proyecto.fundamentacion?.contexto">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Contexto del proyecto</p>
+              <p class="text-sm text-gray-600 leading-relaxed">{{ proyecto.fundamentacion.contexto }}</p>
+              <p v-if="proyecto.fundamentacion.justificacion" class="text-sm text-gray-600 leading-relaxed mt-2">{{ proyecto.fundamentacion.justificacion }}</p>
+              <div v-if="proyecto.fundamentacion.innovacion"
+                   class="mt-3 flex items-start gap-2 p-3 bg-[#99CC33]/8 border border-[#99CC33]/20 rounded-xl">
+                <span class="text-[10px] font-black uppercase tracking-widest text-[#99CC33] shrink-0 mt-0.5">Innovación</span>
+                <p class="text-xs text-gray-600">{{ proyecto.fundamentacion.innovacion }}</p>
+              </div>
+            </div>
+
+            <!-- El reto -->
+            <div v-if="proyecto.diseno_reto?.descripcion || proyecto.diseno_reto?.pregunta_reto">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">El reto</p>
               <p v-if="proyecto.diseno_reto.pregunta_reto"
                  class="text-sm font-bold text-[#00A859] italic mb-2">
                 "{{ proyecto.diseno_reto.pregunta_reto }}"
               </p>
-              <p class="text-sm text-gray-600 leading-relaxed">{{ proyecto.diseno_reto.descripcion }}</p>
+              <p v-if="proyecto.diseno_reto.descripcion"
+                 class="text-sm text-gray-600 leading-relaxed">{{ proyecto.diseno_reto.descripcion }}</p>
+              <div v-if="proyecto.diseno_reto.entregables" class="mt-3 pt-3 border-t border-gray-100">
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Entregables</p>
+                <p class="text-xs text-gray-500 leading-relaxed">{{ proyecto.diseno_reto.entregables }}</p>
+              </div>
             </div>
 
-            <div v-if="proyecto.objetivos?.lista?.length" class="mb-5">
+            <!-- Reto origen (microreto) -->
+            <div v-if="proyecto.reto_origen?.que_necesitan?.length || proyecto.reto_origen?.dificultades?.length">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Necesidades identificadas en la empresa</p>
+              <div class="space-y-1.5">
+                <div v-for="(item, i) in (proyecto.reto_origen.que_necesitan || [])" :key="'nec-'+i"
+                     class="flex items-start gap-2 text-sm text-gray-600">
+                  <span class="text-[#00A859] mt-0.5 shrink-0 font-bold">›</span>{{ item }}
+                </div>
+                <div v-for="(item, i) in (proyecto.reto_origen.dificultades || [])" :key="'dif-'+i"
+                     class="flex items-start gap-2 text-sm text-gray-500">
+                  <span class="text-amber-400 mt-0.5 shrink-0 font-bold">›</span>{{ item }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Objetivos -->
+            <div v-if="proyecto.objetivos?.lista?.length">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Objetivos</p>
               <ul class="space-y-1.5">
                 <li v-for="obj in proyecto.objetivos.lista" :key="obj"
@@ -292,6 +346,59 @@ function youtubeId(url) {
               </ul>
             </div>
 
+            <!-- Fases -->
+            <div v-if="proyecto.diseno_microproyecto?.fases?.length">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3">Fases del proyecto</p>
+              <ol class="space-y-2.5">
+                <li v-for="(f, i) in proyecto.diseno_microproyecto.fases" :key="i"
+                    class="flex items-start gap-3">
+                  <span class="w-5 h-5 rounded-full bg-[#00A859]/10 text-[#00A859] font-black text-[10px]
+                               flex items-center justify-center shrink-0 mt-0.5">{{ i + 1 }}</span>
+                  <div>
+                    <p class="text-sm font-bold text-[#1F2937]">{{ f.nombre }}
+                      <span v-if="f.duracion" class="text-gray-400 font-normal text-xs"> · {{ f.duracion }}</span>
+                    </p>
+                    <p v-if="f.descripcion" class="text-xs text-gray-400 mt-0.5 leading-snug">{{ f.descripcion }}</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <!-- KPIs -->
+            <div v-if="proyecto.kpis?.lista?.length">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Indicadores de éxito (KPIs)</p>
+              <ul class="space-y-1.5">
+                <li v-for="kpi in proyecto.kpis.lista" :key="kpi"
+                    class="flex items-start gap-2 text-sm text-gray-600">
+                  <span class="text-[#99CC33] mt-0.5 shrink-0">✓</span>{{ kpi }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Docente responsable -->
+            <div v-if="proyecto.datos_centro?.docente_nombre">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Docente responsable</p>
+              <div class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                <div class="w-8 h-8 rounded-full bg-[#00A859]/10 border border-[#00A859]/20
+                            flex items-center justify-center shrink-0 text-[#00A859] font-black text-sm">
+                  {{ proyecto.datos_centro.docente_nombre.charAt(0).toUpperCase() }}
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-[#1F2937]">{{ proyecto.datos_centro.docente_nombre }}</p>
+                  <a v-if="proyecto.datos_centro.docente_email"
+                     :href="`mailto:${proyecto.datos_centro.docente_email}`"
+                     class="text-xs text-[#00A859] hover:underline">
+                    {{ proyecto.datos_centro.docente_email }}
+                  </a>
+                </div>
+                <div v-if="proyecto.datos_centro.nombre" class="ml-auto text-right">
+                  <p class="text-xs text-gray-500">{{ proyecto.datos_centro.nombre }}</p>
+                  <p v-if="proyecto.datos_centro.municipio" class="text-[10px] text-gray-400">{{ proyecto.datos_centro.municipio }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Equipo -->
             <div v-if="proyecto.equipo?.alumnos?.length">
               <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Equipo</p>
               <div class="flex flex-wrap gap-2">
@@ -301,6 +408,41 @@ function youtubeId(url) {
                 </span>
               </div>
             </div>
+
+            <!-- Módulos FP -->
+            <div v-if="proyecto.modulos_seleccionados?.length">
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Módulos profesionales</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span v-for="m in proyecto.modulos_seleccionados" :key="m.id"
+                      class="text-xs bg-[#00A859]/8 border border-[#00A859]/15 text-[#00A859] px-2.5 py-1 rounded-full">
+                  {{ m.nombre }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RA/CE -->
+          <div v-if="raCeBlocks.length || proyecto.ra_ce?.trim()"
+               class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 mb-5">
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4">
+              Resultados de Aprendizaje y Criterios de Evaluación
+            </p>
+            <!-- Formato estructurado -->
+            <div v-if="raCeBlocks.length" class="space-y-4">
+              <div v-for="(block, i) in raCeBlocks" :key="i"
+                   class="border border-gray-100 rounded-xl p-3.5">
+                <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-1">{{ block.modulo }}</p>
+                <p class="text-sm font-semibold text-[#1F2937] mb-2">{{ block.ra }}</p>
+                <ul v-if="block.ces.length" class="space-y-1 pl-1">
+                  <li v-for="(ce, j) in block.ces" :key="j"
+                      class="flex items-start gap-2 text-xs text-gray-500">
+                    <span class="text-amber-400 shrink-0 font-bold mt-0.5">•</span>{{ ce }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <!-- Texto libre -->
+            <p v-else class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ proyecto.ra_ce }}</p>
           </div>
 
           <!-- ════ RECURSOS: vídeos y documentos ════ -->

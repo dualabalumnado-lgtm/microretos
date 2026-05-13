@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import api from '../api.js'
 
-const emit = defineEmits(['desbloqueado'])
+const emit = defineEmits(['desbloqueado', 'cerrar'])
 
 const passwordInput = ref('')
 const verificando   = ref(false)
@@ -35,6 +35,7 @@ async function verificarAcceso() {
     class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     :class="visible ? 'opacity-100' : 'opacity-0'"
     style="transition: opacity 0.4s ease"
+    @click.self="!exitoso && $emit('cerrar')"
   >
     <div class="relative bg-[#1a2332] border border-white/10 rounded-[2rem]
                 shadow-2xl max-w-sm w-full p-8 text-white">
@@ -123,6 +124,19 @@ async function verificarAcceso() {
                 <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
               </svg>
               {{ verificando ? 'Analizando credenciales...' : 'Desbloquear módulo' }}
+            </button>
+
+            <button
+              type="button"
+              @click="$emit('cerrar')"
+              class="w-full py-2.5 rounded-full bg-transparent text-white/40 font-bold text-xs
+                     uppercase tracking-widest transition-all border border-white/10
+                     hover:text-white/70 hover:border-white/20 flex items-center justify-center gap-2"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+              Volver
             </button>
           </form>
         </div>
