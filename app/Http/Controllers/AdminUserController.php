@@ -93,6 +93,38 @@ class AdminUserController extends Controller
         return response()->json(['success' => true, 'data' => $this->formatUser($user->fresh()->load('centroEducativo'))]);
     }
 
+    // Editar datos de un usuario (nombre, email, rol, contraseña opcional)
+    public function update(Request $request, User $user): JsonResponse
+    {
+        if ($user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'No se puede modificar una cuenta de administrador.'], 403);
+        }
+
+        $rules = [
+            'name'  => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'role'  => 'required|in:2,3',
+        ];
+
+        if ($request->filled('password')) {
+            $rules['password'] = ['string', Password::min(8)->mixedCase()->numbers()];
+        }
+
+        $data = $request->validate($rules);
+
+        $user->name  = $data['name'];
+        $user->email = $data['email'];
+        $user->role  = (int) $data['role'];
+
+        if ($request->filled('password')) {
+            $user->password = $data['password'];
+        }
+
+        $user->save();
+
+        return response()->json(['success' => true, 'data' => $this->formatUser($user->fresh()->load('centroEducativo'))]);
+    }
+
     // Soft delete — envía a la papelera
     public function destroy(User $user): JsonResponse
     {

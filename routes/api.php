@@ -146,6 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',                       [AdminUserController::class, 'index']);
         Route::post('/',                      [AdminUserController::class, 'store']);
         Route::get('/papelera',               [AdminUserController::class, 'papelera']);
+        Route::patch('/{user}',               [AdminUserController::class, 'update']);
         Route::patch('/{user}/activar',       [AdminUserController::class, 'activar']);
         Route::patch('/{user}/bloquear',      [AdminUserController::class, 'toggleBloquear']);
         Route::delete('/{user}',              [AdminUserController::class, 'destroy']);
