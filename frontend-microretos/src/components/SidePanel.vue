@@ -7,7 +7,7 @@ import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth'
 import { useUIState } from '../composables/useUIState.js'
 
 const authStore = useAuthStore()
-const { tourActivo } = useUIState()
+const { tourActivo, showWelcome, welcomeRole, welcomeName, triggerWelcome } = useUIState()
 const isOpen    = ref(false)
 const logoError = ref(false)
 const route     = useRoute()
@@ -16,21 +16,6 @@ const router    = useRouter()
 const showLogin        = ref(false)
 const cargandoOut      = ref(false)
 const destinoTrasLogin = ref('/')
-
-// ─── Toast de bienvenida ──────────────────────────────────
-const showWelcome  = ref(false)
-const welcomeRole  = ref(null)
-let welcomeTimer   = null
-
-const welcomeName = ref('')
-
-function triggerWelcome(role) {
-  clearTimeout(welcomeTimer)
-  welcomeRole.value  = role
-  welcomeName.value  = authStore.userName?.split(' ')[0] ?? ''
-  showWelcome.value  = true
-  welcomeTimer = setTimeout(() => { showWelcome.value = false }, 5000)
-}
 
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
@@ -78,7 +63,7 @@ const onLoginSuccess = (data) => {
   // Esperar a que la navegación final termine (incluyendo posibles redirects
   // del guard de roles) antes de mostrar el toast, para evitar que una
   // doble navegación lo descarte antes de que el usuario lo vea.
-  router.push(destino).finally(() => triggerWelcome(role))
+  router.push(destino).finally(() => triggerWelcome(role, authStore.userName))
 }
 
 function rolHome(role) {

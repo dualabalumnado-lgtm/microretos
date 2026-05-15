@@ -89,7 +89,7 @@ async function confirmarEliminacion() {
               </div>
               <div class="flex-1 min-w-0">
                 <h2 class="ecc-title">Eliminar centro educativo</h2>
-                <p class="ecc-sub">Esta acción es <span class="font-black text-red-500">permanente e irreversible</span></p>
+                <p class="ecc-sub">El centro se moverá a la <span class="font-black text-amber-600">papelera</span> y podrá restaurarse desde allí</p>
               </div>
             </div>
 
@@ -152,16 +152,16 @@ async function confirmarEliminacion() {
                   </div>
                 </div>
 
-                <div class="ecc-impact-row ecc-impact-danger mt-1">
-                  <div class="ecc-impact-icon bg-red-100">
-                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="ecc-impact-row ecc-impact-warn mt-1">
+                  <div class="ecc-impact-icon bg-amber-100">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12"/>
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="font-black text-sm text-red-700">El centro será eliminado permanentemente</p>
-                    <p class="text-xs text-red-500 mt-0.5">No podrás recuperarlo. Tendrás que volver a crearlo desde cero.</p>
+                    <p class="font-black text-sm text-amber-800">El centro se moverá a la papelera</p>
+                    <p class="text-xs text-amber-600 mt-0.5">Podrás recuperarlo desde la sección Papelera si lo necesitas.</p>
                   </div>
                 </div>
 
@@ -192,8 +192,7 @@ async function confirmarEliminacion() {
                     Confirmación final requerida
                   </p>
                   <p class="text-xs text-red-600">
-                    Para eliminar definitivamente el centro, escribe su nombre exacto en el campo de abajo.
-                    Esto garantiza que no sea un error accidental.
+                    Escribe el nombre exacto del centro para confirmar que no es un error accidental.
                   </p>
                 </div>
 
@@ -214,7 +213,7 @@ async function confirmarEliminacion() {
                     El nombre no coincide exactamente. Comprueba mayúsculas y espacios.
                   </p>
                   <p v-if="confirmNombre && nombreValido" class="ecc-hint-ok">
-                    Nombre confirmado. Ya puedes eliminar el centro.
+                    Nombre confirmado. Ya puedes mover el centro a la papelera.
                   </p>
                 </div>
 
@@ -248,7 +247,7 @@ async function confirmarEliminacion() {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
-                    {{ eliminando ? 'Eliminando...' : 'Eliminar definitivamente' }}
+                    {{ eliminando ? 'Moviendo a papelera...' : 'Mover a papelera' }}
                   </button>
                 </div>
               </div>

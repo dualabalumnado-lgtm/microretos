@@ -26,6 +26,51 @@ const activarBtns      = ref({})       // map id → el DOM del botón
 const tooltipStyle     = ref({})
 let   highlightTimer   = null
 
+// ── Modal: editar cuenta ────────────────────────────────────────────
+const modalEditar        = ref(false)
+const editando           = ref(false)
+const usuarioEditando    = ref(null)
+const formEditar         = ref({ name: '', email: '', password: '', role: '2' })
+const formEditarErrors   = ref({})
+const msgEditar          = ref('')
+
+function abrirModalEditar(usuario) {
+  usuarioEditando.value  = usuario
+  formEditar.value       = { name: usuario.name, email: usuario.email, password: '', role: String(usuario.role) }
+  formEditarErrors.value = {}
+  msgEditar.value        = ''
+  modalEditar.value      = true
+}
+
+async function guardarEdicion() {
+  formEditarErrors.value = {}
+  msgEditar.value        = ''
+  editando.value         = true
+  try {
+    const payload = {
+      name:  formEditar.value.name,
+      email: formEditar.value.email,
+      role:  formEditar.value.role,
+    }
+    if (formEditar.value.password) payload.password = formEditar.value.password
+    const { data } = await api.patch(`/admin/usuarios/${usuarioEditando.value.id}`, payload)
+    reemplazar(usuarios.value, data.data)
+    modalEditar.value = false
+    mostrarToast('Cuenta actualizada correctamente.')
+  } catch (e) {
+    if (e.response?.status === 422) {
+      const errs = e.response.data.errors ?? {}
+      formEditarErrors.value = Object.fromEntries(
+        Object.entries(errs).map(([k, v]) => [k, v[0]])
+      )
+    } else {
+      msgEditar.value = e.response?.data?.message ?? 'Error al actualizar la cuenta.'
+    }
+  } finally {
+    editando.value = false
+  }
+}
+
 // ── Modal: asociar centro ───────────────────────────────────────────
 const modalCentro       = ref(false)
 const usuarioCentro     = ref(null)    // usuario al que se asocia centro
@@ -510,6 +555,18 @@ onMounted(async () => {
                 </button>
               </div>
 
+              <!-- Editar -->
+              <button @click="abrirModalEditar(u)"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
+                       uppercase tracking-wider bg-white/5 text-white/50 border border-white/10
+                       hover:bg-white/10 hover:text-white/80 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Editar
+              </button>
+
               <!-- Bloquear / Desbloquear -->
               <button @click="toggleBloquear(u)"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
@@ -831,6 +888,109 @@ onMounted(async () => {
                 {{ centrosFiltrados.length }} centro{{ centrosFiltrados.length !== 1 ? 's' : '' }} encontrado{{ centrosFiltrados.length !== 1 ? 's' : '' }}
               </p>
             </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- ══ MODAL: Editar cuenta ══════════════════════════════════ -->
+    <Transition name="overlay">
+      <div v-if="modalEditar"
+           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+           @click.self="modalEditar = false">
+        <Transition name="modal-scale">
+          <div v-if="modalEditar"
+               class="relative bg-[#1a2332] border border-white/10 rounded-[1.75rem] shadow-2xl w-full max-w-md p-8">
+
+            <!-- Aviso de seguridad -->
+            <div class="mb-5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 flex items-start gap-3">
+              <svg class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              </svg>
+              <div>
+                <p class="text-xs font-black text-amber-300 uppercase tracking-wider mb-0.5">Edición de cuenta sensible</p>
+                <p class="text-xs text-white/50">Estás modificando los datos de <span class="text-white font-bold">{{ usuarioEditando?.name }}</span>. Cualquier cambio tendrá efecto inmediato.</p>
+              </div>
+            </div>
+
+            <button @click="modalEditar = false"
+              class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10
+                     flex items-center justify-center text-white/40 hover:text-white transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+
+            <h2 class="text-lg font-black mb-1">Editar cuenta</h2>
+            <p class="text-xs text-white/40 mb-6">Modifica los datos de la cuenta. Deja la contraseña en blanco para no cambiarla.</p>
+
+            <form @submit.prevent="guardarEdicion" class="space-y-4">
+              <!-- Nombre -->
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-1.5">Nombre</label>
+                <input v-model="formEditar.name" type="text" placeholder="Nombre completo"
+                  class="w-full bg-white/5 border rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formEditarErrors.name ? 'border-red-500/50' : 'border-white/10'" />
+                <p v-if="formEditarErrors.name" class="text-[10px] text-red-400 mt-1">{{ formEditarErrors.name }}</p>
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-1.5">Correo electrónico</label>
+                <input v-model="formEditar.email" type="email" placeholder="correo@ejemplo.com"
+                  class="w-full bg-white/5 border rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formEditarErrors.email ? 'border-red-500/50' : 'border-white/10'" />
+                <p v-if="formEditarErrors.email" class="text-[10px] text-red-400 mt-1">{{ formEditarErrors.email }}</p>
+              </div>
+
+              <!-- Nueva contraseña (opcional) -->
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-1.5">Nueva contraseña <span class="normal-case text-white/25 font-normal">(opcional)</span></label>
+                <input v-model="formEditar.password" type="password" placeholder="Dejar en blanco para no cambiar"
+                  class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formEditarErrors.password ? 'border-red-500/50' : 'border-white/10'" />
+                <p v-if="formEditarErrors.password" class="text-[10px] text-red-400 mt-1">{{ formEditarErrors.password }}</p>
+              </div>
+
+              <!-- Rol -->
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Rol</label>
+                <div class="flex gap-3">
+                  <button type="button" @click="formEditar.role = '2'"
+                    :class="formEditar.role === '2' ? 'bg-blue-500/20 border-blue-500/50 text-blue-300' : 'bg-white/5 border-white/10 text-white/50 hover:text-white/80'"
+                    class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 3h6v4H9V3z"/>
+                    </svg>
+                    Docente
+                  </button>
+                  <button type="button" @click="formEditar.role = '3'"
+                    :class="formEditar.role === '3' ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-white/5 border-white/10 text-white/50 hover:text-white/80'"
+                    class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Empresa
+                  </button>
+                </div>
+              </div>
+
+              <p v-if="msgEditar" class="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {{ msgEditar }}
+              </p>
+
+              <button type="submit" :disabled="editando"
+                class="w-full py-3 rounded-xl bg-[#00A859] hover:bg-[#009950] text-white font-black
+                       text-xs uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2">
+                {{ editando ? 'Guardando...' : 'Guardar cambios' }}
+              </button>
+            </form>
           </div>
         </Transition>
       </div>
