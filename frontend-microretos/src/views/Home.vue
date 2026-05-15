@@ -3,10 +3,12 @@ import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import LoginModal from '../components/LoginModal.vue';
+import { useUIState } from '../composables/useUIState.js';
 
 const router = useRouter();
 const route  = useRoute();
 const authStore = useAuthStore();
+const { triggerWelcome } = useUIState();
 const isLoaded = ref(false);
 const showLogin = ref(false); // 👈 controla el modal
 
@@ -35,12 +37,10 @@ const irAGenerador = () => {
 // Destino tras login (generador o biblioteca según desde dónde se abrió el modal)
 const destinoTrasLogin = ref('microretos')
 
-const onLoginSuccess = () => {
-  if (redirectTrasLogin.value) {
-    router.push(redirectTrasLogin.value);
-  } else {
-    router.push({ name: destinoTrasLogin.value });
-  }
+const onLoginSuccess = (data) => {
+  const role = data?.role ?? authStore.userRole
+  const destino = redirectTrasLogin.value ?? { name: destinoTrasLogin.value }
+  router.push(destino).finally(() => triggerWelcome(role, authStore.userName))
 };
 
 const irABiblioteca = () => {

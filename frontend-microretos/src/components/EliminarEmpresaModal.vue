@@ -83,7 +83,7 @@ async function confirmarEliminacion() {
               </div>
               <div class="flex-1 min-w-0">
                 <h2 class="eem-title">Eliminar empresa</h2>
-                <p class="eem-sub">Esta acción es <span class="font-black text-red-500">permanente e irreversible</span></p>
+                <p class="eem-sub">La empresa se moverá a la <span class="font-black text-amber-600">papelera</span> y podrá restaurarse desde allí</p>
               </div>
             </div>
 
@@ -105,17 +105,17 @@ async function confirmarEliminacion() {
 
                 <p class="text-sm font-semibold text-gray-600">Al eliminar esta empresa ocurrirá lo siguiente:</p>
 
-                <!-- Impacto datos -->
-                <div class="eem-impact-row eem-impact-danger">
-                  <div class="eem-impact-icon bg-red-100">
-                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Movido a papelera -->
+                <div class="eem-impact-row eem-impact-warn">
+                  <div class="eem-impact-icon bg-amber-100">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                   </div>
                   <div class="flex-1">
-                    <p class="font-black text-sm text-red-700">Todos sus datos serán eliminados permanentemente</p>
-                    <p class="text-xs text-red-500 mt-0.5">Datos de contacto, ubicación, CIF, sector, actividad y toda la información registrada.</p>
+                    <p class="font-black text-sm text-amber-800">La empresa se moverá a la papelera</p>
+                    <p class="text-xs text-amber-600 mt-0.5">Podrás recuperarla desde la sección Papelera. Sus datos (CIF, contacto, sector, etc.) se preservarán.</p>
                   </div>
                 </div>
 
@@ -196,7 +196,7 @@ async function confirmarEliminacion() {
                     El nombre no coincide. Comprueba mayúsculas, espacios y caracteres especiales.
                   </p>
                   <p v-if="confirmNombre && nombreValido" class="eem-hint-ok">
-                    Nombre confirmado. Ya puedes eliminar la empresa.
+                    Nombre confirmado. Ya puedes mover la empresa a la papelera.
                   </p>
                 </div>
 
@@ -230,7 +230,7 @@ async function confirmarEliminacion() {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
-                    {{ eliminando ? 'Eliminando...' : 'Eliminar definitivamente' }}
+                    {{ eliminando ? 'Moviendo a papelera...' : 'Mover a papelera' }}
                   </button>
                 </div>
               </div>
