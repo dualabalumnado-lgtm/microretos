@@ -86,15 +86,18 @@ jobs:
       - name: Export SonarQube results
         if: always()
         run: |
-          TASK_ID=$(curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
-            "http://localhost:9000/api/ce/component?component=dualab" | \
-            python3 -c "import sys,json; print(json.load(sys.stdin)['current']['id'])")
+          TASK_ID=$(grep '^ceTaskId=' .scannerwork/report-task.txt | cut -d'=' -f2)
+
+          if [ -z "$TASK_ID" ]; then
+            echo "No se pudo obtener ceTaskId desde .scannerwork/report-task.txt"
+            exit 1
+          fi
 
           echo "Esperando a que SonarQube termine de procesar..."
           for i in $(seq 1 60); do
             STATUS=$(curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
               "http://localhost:9000/api/ce/task?id=$TASK_ID" | \
-              python3 -c "import sys,json; d=json.load(sys.stdin); print(d['task']['status'])")
+              python3 -c "import sys,json; print(json.load(sys.stdin)['task']['status'])")
             echo "Estado: $STATUS"
             if [ "$STATUS" = "SUCCESS" ]; then
               break
