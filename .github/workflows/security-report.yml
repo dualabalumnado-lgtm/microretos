@@ -83,7 +83,7 @@ jobs:
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
         continue-on-error: true
 
-            - name: Export SonarQube results
+      - name: Export SonarQube results
         if: always()
         run: |
           curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
