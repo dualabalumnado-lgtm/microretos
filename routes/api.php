@@ -85,14 +85,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/ciclos/{id}',        [DatosFPController::class, 'updateCiclo']);
     Route::delete('/ciclos/{id}',     [DatosFPController::class, 'destroyCiclo']);
 
-    // Empresas — datos completos solo para usuarios autenticados
+    // Empresas — lectura para usuarios autenticados, escritura/borrado solo admin
     Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);
     Route::get('/empresas/dashboard',      [DatosFPController::class, 'getDashboardEmpresas']);
     Route::get('/empresas/{id}/familias',  [DatosFPController::class, 'getFamiliasPorEmpresa']);
-    Route::post('/empresas',               [DatosFPController::class, 'guardarEmpresa']);
-    Route::put('/empresas/{id}',           [DatosFPController::class, 'actualizarEmpresa']);
-    Route::patch('/empresas/{id}/estado',  [DatosFPController::class, 'actualizarEstadoEmpresa']);
-    Route::delete('/empresas/{id}',        [DatosFPController::class, 'eliminarEmpresa']);
+    Route::middleware('admin')->group(function () {
+        Route::post('/empresas',               [DatosFPController::class, 'guardarEmpresa']);
+        Route::put('/empresas/{id}',           [DatosFPController::class, 'actualizarEmpresa']);
+        Route::patch('/empresas/{id}/estado',  [DatosFPController::class, 'actualizarEstadoEmpresa']);
+        Route::delete('/empresas/{id}',        [DatosFPController::class, 'eliminarEmpresa']);
+    });
 
     // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
     Route::middleware('throttle:5,1')->group(function () {

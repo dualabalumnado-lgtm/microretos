@@ -11,6 +11,9 @@ const authStore = useAuthStore();
 const router = useRouter();
 const showLogin = ref(false);
 
+// Para docentes: identifica si el usuario es docente (oculta funciones de admin)
+const esDocente = computed(() => authStore.isDocente);
+
 const familias = ref([]); 
 const ciclos = ref([]);
 const modulos = ref([]);
@@ -426,6 +429,10 @@ onMounted(async () => {
     showLogin.value = true;
   } else {
     await cargarEmpresas();
+    // Docentes: fijar automáticamente el centro educativo (no editable)
+    if (authStore.isDocente && authStore.userCentroNombre) {
+      centroFiltro.value = authStore.userCentroNombre;
+    }
     await nextTick();
     pasoGuia.value = 1;
     modoGuia.value = true;
@@ -737,9 +744,18 @@ const guiaPasos3 = [
 ]
 
 const guiaPasosActual = computed(() => {
-  if (pasoActual.value === 1) return guiaPasos1
+  const docente = authStore.isDocente
+  if (pasoActual.value === 1) {
+    return docente
+      ? guiaPasos1.filter(s => !['refBaseDatos', 'refInsertarEmpresa'].includes(s.ref))
+      : guiaPasos1
+  }
   if (pasoActual.value === 2) return guiaPasos2
-  if (pasoActual.value === 3) return guiaPasos3
+  if (pasoActual.value === 3) {
+    return docente
+      ? guiaPasos3.filter(s => s.ref !== 'refGuardarEmpresa')
+      : guiaPasos3
+  }
   return []
 })
 
@@ -1134,8 +1150,9 @@ async function guardarEstadoGen(nuevoEstado) {
                   <!-- Separador vertical -->
                   <span class="hidden sm:block w-px h-6 bg-gray-200 mx-1 rounded-full" />
 
-                  <!-- Ver base de datos -->
+                  <!-- Ver base de datos — solo admin -->
                   <RouterLink
+                    v-if="!esDocente"
                     ref="refBaseDatos"
                     to="/base-datos"
                     class="px-5 py-2.5 rounded-full font-bold text-xs tracking-widest uppercase transition-all flex items-center gap-2 border bg-white text-gray-600 hover:bg-gray-50 border-gray-200 hover:border-gray-400 shadow-sm"
@@ -1150,8 +1167,8 @@ async function guardarEstadoGen(nuevoEstado) {
                     Base de datos
                   </RouterLink>
 
-                  <!-- Insertar / Modificar empresa -->
-                  <button ref="refInsertarEmpresa" @click="abrirModalEmpresa"
+                  <!-- Insertar / Modificar empresa — solo admin -->
+                  <button v-if="!esDocente" ref="refInsertarEmpresa" @click="abrirModalEmpresa"
                     :class="[
                       seleccion.empresaId
                         ? 'bg-[#00A859] text-white border-[#00A859] hover:bg-[#007a42] shadow-md'
@@ -1197,6 +1214,13 @@ async function guardarEstadoGen(nuevoEstado) {
                     {{ !centroFiltro && !esModoDemo ? '① Centro Educativo *' : 'Centro Educativo *' }}
                   </label>
                   <input v-if="esModoDemo" type="text" value="IES DEMO" disabled class="input-style opacity-70 cursor-not-allowed bg-gray-50" />
+                  <input v-else-if="esDocente && authStore.userCentroNombre"
+                    type="text"
+                    :value="authStore.userCentroNombre"
+                    disabled
+                    class="input-style opacity-80 cursor-not-allowed bg-gray-50"
+                    title="Tu centro educativo está fijado según tu cuenta"
+                  />
                   <select v-else v-model="centroFiltro" class="input-style">
                     <option value="">Selecciona tu centro...</option>
                     <option v-for="centro in centrosDisponibles" :key="centro" :value="centro">{{ centro }}</option>
@@ -1315,8 +1339,8 @@ async function guardarEstadoGen(nuevoEstado) {
               </div>
             </div>
               
-              <!-- Estado de contacto (editable inline) -->
-              <div v-if="!esModoDemo" class="mb-6">
+              <!-- Estado de contacto (editable inline) — solo admin -->
+              <div v-if="!esModoDemo && !esDocente" class="mb-6">
                 <div class="flex items-center gap-3 mb-3 flex-wrap">
                   <h3 class="font-black text-[#1F2937] uppercase tracking-widest text-sm">Estado de Contacto</h3>
 
@@ -1853,7 +1877,8 @@ async function guardarEstadoGen(nuevoEstado) {
 
       <div class="mt-16 flex flex-col items-center gap-6">
         
-        <div v-if="pasoActual === totalPasos && !crmActualizado" class="bg-yellow-50 border border-yellow-200 shadow-sm rounded-2xl p-5 flex items-start md:items-center gap-4 w-full max-w-4xl animate-in slide-in-from-bottom-2">
+        <!-- Aviso de guardar empresa — solo admin (docentes no pueden editar empresas) -->
+        <div v-if="!esDocente && pasoActual === totalPasos && !crmActualizado" class="bg-yellow-50 border border-yellow-200 shadow-sm rounded-2xl p-5 flex items-start md:items-center gap-4 w-full max-w-4xl animate-in slide-in-from-bottom-2">
           <div class="bg-yellow-400 text-white p-2 rounded-full shrink-0">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
@@ -1874,7 +1899,8 @@ async function guardarEstadoGen(nuevoEstado) {
             SIGUIENTE PASO
           </button>
 
-          <button ref="refGuardarEmpresa" v-if="pasoActual === totalPasos" @click="guardarInfoEmpresa" :disabled="actualizandoCRM || crmActualizado"
+          <!-- Guardar/Actualizar empresa — solo admin -->
+          <button ref="refGuardarEmpresa" v-if="pasoActual === totalPasos && !esDocente" @click="guardarInfoEmpresa" :disabled="actualizandoCRM || crmActualizado"
             class="flex-1 min-w-[200px] px-6 py-6 border-2 text-[#1F2937] bg-white border-gray-200 hover:border-[#00A859] hover:text-[#00A859] rounded-full font-black text-xs tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
             :class="[crmActualizado ? '!border-[#00A859] !bg-[#00A859]/5 !text-[#00A859]' : '', tourTargetActivo === 'refGuardarEmpresa' ? 'tour-active' : '']">
             <template v-if="actualizandoCRM">

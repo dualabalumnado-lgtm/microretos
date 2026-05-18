@@ -19,16 +19,27 @@ class DatosFPController extends Controller
 
     /**
      * GET /empresas
-     * Devuelve todas las empresas con su familia asociada.
+     * Devuelve las empresas disponibles. Para docentes, solo las de su centro.
      */
-    public function getEmpresas()
+    public function getEmpresas(Request $request)
     {
         // Sin 'centroEducativo' en with(): la columna centro_educativo (string) y la relación
         // tienen el mismo nombre JSON → la relación machaca el string y rompe el frontend.
         // El string legacy es suficiente para el selector de centros.
-        return response()->json(
-            Empresa::orderBy('nombre_comercial')->get()
-        );
+        $user  = $request->user();
+        $query = Empresa::orderBy('nombre_comercial');
+
+        if ($user && $user->isDocente() && $user->centro_educativo_id) {
+            $centroNombre = $user->centroEducativo?->nombre;
+            $query->where(function ($q) use ($user, $centroNombre) {
+                $q->where('centro_id', $user->centro_educativo_id);
+                if ($centroNombre) {
+                    $q->orWhere('centro_educativo', $centroNombre);
+                }
+            });
+        }
+
+        return response()->json($query->get());
     }
 
     /**

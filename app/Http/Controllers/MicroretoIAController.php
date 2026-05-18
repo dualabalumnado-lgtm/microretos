@@ -24,13 +24,27 @@ class MicroretoIAController extends Controller
             ->groupBy('idcicloformativo');
         $ciclosPorNombre = CicloFormativo::pluck('id', 'nombre');
 
-        $microretos = Microreto::with([
+        $user  = $request->user();
+        $query = Microreto::with([
             'empresa.centroEducativo',
             'empresa.familias',
         ])
         ->orderByDesc('created_at')
-        ->limit($limit)
-        ->get()
+        ->limit($limit);
+
+        // Docentes solo ven microretos de su centro educativo
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $centroId     = $user->centro_educativo_id;
+            $centroNombre = $user->centroEducativo?->nombre;
+            $query->whereHas('empresa', function ($q) use ($centroId, $centroNombre) {
+                $q->where('centro_id', $centroId);
+                if ($centroNombre) {
+                    $q->orWhere('centro_educativo', $centroNombre);
+                }
+            });
+        }
+
+        $microretos = $query->get()
         ->map(function ($reto) use ($modulosPorCiclo, $ciclosPorNombre) {
 
             $reto->es_simulado = (bool) $reto->es_simulado;
@@ -262,6 +276,19 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
             'familia'          => 'nullable|string',
         ]);
 
+        // Docentes solo pueden generar retos con empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $empresa      = Empresa::find($request->empresa_id);
+            $centroNombre = $user->centroEducativo?->nombre;
+            $perteneceAlCentro = $empresa &&
+                ($empresa->centro_id === $user->centro_educativo_id ||
+                 ($centroNombre && $empresa->centro_educativo === $centroNombre));
+            if (!$perteneceAlCentro) {
+                return response()->json(['error' => 'No autorizado: la empresa no pertenece a tu centro educativo.'], 403);
+            }
+        }
+
         $consecuencias = implode(", ", $request->consecuencias ?? []);
 
         $query = Modulo::with(['ras.criteriosEvaluacion']);
@@ -396,6 +423,19 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
 
     public function guardarEnBD(Request $request)
     {
+        // Docentes solo pueden guardar microretos de empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id && !empty($request->empresa_id)) {
+            $empresa      = Empresa::find($request->empresa_id);
+            $centroNombre = $user->centroEducativo?->nombre;
+            $perteneceAlCentro = $empresa &&
+                ($empresa->centro_id === $user->centro_educativo_id ||
+                 ($centroNombre && $empresa->centro_educativo === $centroNombre));
+            if (!$perteneceAlCentro) {
+                return response()->json(['error' => 'No autorizado: la empresa no pertenece a tu centro educativo.'], 403);
+            }
+        }
+
         try {
             $datos = $request->except(['_ui_guardado', '_ui_guardando']);
 
@@ -419,6 +459,25 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
         $request->validate([
             'microretos' => 'required|array',
         ]);
+
+        // Docentes solo pueden guardar microretos de empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $centroId     = $user->centro_educativo_id;
+            $centroNombre = $user->centroEducativo?->nombre;
+            foreach ($request->microretos as $retoData) {
+                $empresaId = $retoData['empresa_id'] ?? null;
+                if ($empresaId) {
+                    $empresa = Empresa::find($empresaId);
+                    $perteneceAlCentro = $empresa &&
+                        ($empresa->centro_id === $centroId ||
+                         ($centroNombre && $empresa->centro_educativo === $centroNombre));
+                    if (!$perteneceAlCentro) {
+                        return response()->json(['error' => 'No autorizado: alguna empresa no pertenece a tu centro educativo.'], 403);
+                    }
+                }
+            }
+        }
 
         try {
             $insertados = [];

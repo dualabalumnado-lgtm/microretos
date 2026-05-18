@@ -124,7 +124,13 @@ async function handleLogin() {
     })
 
     if (response.data.success) {
-      authStore.login(response.data.token, response.data.role, response.data.name)
+      authStore.login(
+        response.data.token,
+        response.data.role,
+        response.data.name,
+        response.data.centro_educativo_id ?? null,
+        response.data.centro_nombre ?? ''
+      )
       emit('login-success', response.data)
       emit('update:modelValue', false)
       form.email = ''
