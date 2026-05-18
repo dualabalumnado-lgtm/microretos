@@ -83,6 +83,20 @@ jobs:
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
         continue-on-error: true
 
+      - name: Export SonarQube results
+        if: always()
+        run: |
+          curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
+            "http://localhost:9000/api/issues/search?projectKeys=dualab&types=VULNERABILITY,BUG,CODE_SMELL" \
+            > sonar-results.json
+
+      - name: Upload SonarQube results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sonar-results
+          path: sonar-results.json
+
       # ─── 5. OWASP DEPENDENCY CHECK ─────────────────────────────────────────
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
