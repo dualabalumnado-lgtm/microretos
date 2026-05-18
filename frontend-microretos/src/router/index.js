@@ -28,7 +28,7 @@ const router = createRouter({
       path: '/microretos',
       name: 'microretos',
       component: GeneradorMicroretos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_EMPRESA, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
     },
     {
       path: '/biblioteca',
@@ -88,13 +88,13 @@ const router = createRouter({
       path: '/startup-day/crear',
       name: 'startup-day-crear',
       component: StartupDayWizard,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
     },
     {
       path: '/startup-day/:uuid/editar',
       name: 'startup-day-editar',
       component: StartupDayWizard,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
     },
     {
       path: '/startup-day/:uuid',

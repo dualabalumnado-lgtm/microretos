@@ -5,9 +5,11 @@ import api from '../api.js';
 import BienvenidaStartupDayModal from '../components/BienvenidaStartupDayModal.vue';
 import EliminarProyectoModal from '../components/EliminarProyectoModal.vue';
 import { useUIState } from '../composables/useUIState.js';
+import { useAuthStore } from '../stores/auth.js';
 
 const router = useRouter();
 const { tourActivo } = useUIState();
+const authStore = useAuthStore();
 
 // ── Datos ───────────────────────────────────────────────────────────────────
 const proyectos    = ref([]);
@@ -31,13 +33,17 @@ const refBtnGuia  = ref(null);
 
 const tourRefs = { refBusqueda, refFiltros, refGrid, refBtnNuevo, refBtnGuia };
 
-const guiaPasosData = [
+const guiaPasosDataBase = [
   { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar proyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
   { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Todos, Borrador (aún en edición), Propuesta (enviada a empresa, pendiente de validación), Proyecto (validado por empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
-  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los proyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo o seguir editándola.' },
+  { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los proyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo.' },
   { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo proyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al reto correspondiente.' },
   { ref: 'refBtnGuia',  seccion: null,        texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
 ];
+
+const guiaPasosData = authStore.isEmpresa
+  ? guiaPasosDataBase.filter(p => p.ref !== 'refBtnNuevo')
+  : guiaPasosDataBase;
 
 const pasoActual    = computed(() => guiaPasosData[pasoGuia.value - 1]);
 const seccionActiva = computed(() => modoGuia.value ? (pasoActual.value?.seccion ?? null) : null);
@@ -277,10 +283,10 @@ function mostrarSnack(mensaje, accion = null) {
             <span class="text-[10px] font-black uppercase tracking-widest text-amber-500">Startup Day · Fase 2</span>
           </div>
           <h1 class="text-3xl md:text-4xl font-black tracking-tight text-[#121212]">
-            Micro<span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">proyectos</span>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">Proyectos</span>
           </h1>
           <p class="text-gray-500 text-sm mt-1">
-            Aquí se trabajan los retos para convertirlos en proyectos de empresa reales.
+            Aquí se trabajan los retos para convertirlos en proyectos de empresa.
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
             <!-- Botón Guía -->
@@ -299,6 +305,7 @@ function mostrarSnack(mensaje, accion = null) {
             </button>
             <!-- Botón Papelera -->
             <button
+              v-if="!authStore.isEmpresa"
               @click="router.push({ name: 'papelera' })"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-full
                      bg-amber-400/10 border border-amber-400/20 text-amber-600
@@ -316,6 +323,7 @@ function mostrarSnack(mensaje, accion = null) {
 
         <!-- Nuevo microproyecto -->
         <button
+          v-if="!authStore.isEmpresa"
           ref="refBtnNuevo"
           @click="router.push({ name: 'startup-day-crear' })"
           :class="{
@@ -411,7 +419,7 @@ function mostrarSnack(mensaje, accion = null) {
           <p class="text-gray-400 text-sm mb-6">
             {{ busqueda || filtroEstado !== 'todos' ? 'Prueba con otros filtros' : 'Crea tu primer proyecto StartUp Day' }}
           </p>
-          <button v-if="!busqueda && filtroEstado === 'todos'"
+          <button v-if="!busqueda && filtroEstado === 'todos' && !authStore.isEmpresa"
                   @click="router.push({ name: 'startup-day-crear' })"
                   class="inline-flex items-center gap-2 px-6 py-3 bg-[#00A859] text-white rounded-full
                          text-xs font-black uppercase tracking-widest shadow-sm hover:bg-[#00A859]/90
@@ -470,7 +478,7 @@ function mostrarSnack(mensaje, accion = null) {
             </div>
 
             <!-- Acciones -->
-            <div class="px-5 pb-4 flex gap-2 border-t border-gray-50 pt-3" @click.stop>
+            <div v-if="!authStore.isEmpresa" class="px-5 pb-4 flex gap-2 border-t border-gray-50 pt-3" @click.stop>
               <button
                 @click="router.push({ name: 'startup-day-editar', params: { uuid: p.uuid } })"
                 class="flex-1 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-black
