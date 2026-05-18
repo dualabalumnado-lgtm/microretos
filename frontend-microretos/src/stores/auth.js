@@ -18,8 +18,8 @@ export const ROLE_ROUTES = {
   [ROLE_DOCENTE]: ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
                    'sesiones-registradas', 'startup-day', 'startup-day-crear',
                    'startup-day-editar', 'startup-day-detalle', 'empresas'],
-  [ROLE_EMPRESA]: ['microretos', 'biblioteca', 'detalle-microreto',
-                   'startup-day', 'startup-day-crear', 'startup-day-editar', 'startup-day-detalle'],
+  [ROLE_EMPRESA]: ['biblioteca', 'detalle-microreto',
+                   'startup-day', 'startup-day-detalle'],
 }
 
 export const useAuthStore = defineStore('auth', () => {

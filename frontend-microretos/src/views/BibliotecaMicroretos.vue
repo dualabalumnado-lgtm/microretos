@@ -419,6 +419,7 @@ function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
 
                 <!-- Acceso directo a la papelera -->
                 <button
+                  v-if="!authStore.isEmpresa"
                   @click="router.push({ name: 'papelera' })"
                   class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-widest border border-gray-200 text-gray-500 bg-gray-50 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50 transition-all duration-200"
                   title="Ver elementos eliminados en la papelera">
@@ -1022,7 +1023,8 @@ function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
 
                 <div class="p-5 pb-0 flex items-start justify-between gap-2">
                   <!-- Papelera -->
-                  <button @click.prevent="abrirModalEliminar(reto)"
+                  <button v-if="!authStore.isEmpresa"
+                    @click.prevent="abrirModalEliminar(reto)"
                     class="shrink-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm transition-all duration-300 hover:bg-red-50 hover:border-red-300 active:scale-95"
                     title="Eliminar reto">
                     <svg class="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
