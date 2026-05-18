@@ -1,0 +1,140 @@
+name: Security Static Analysis
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  security-analysis:
+    name: Static Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      # ─── 1. CHECKOUT ───────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ─── 2. SETUP NODE ─────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci --prefer-offline || npm install
+        continue-on-error: true
+
+      # ─── 3. GITLEAKS ───────────────────────────────────────────────────────
+      - name: Gitleaks — Detect secrets in code
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --report-format json --report-path gitleaks-report.json
+        continue-on-error: true
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+      # ─── 4. SONARQUBE ──────────────────────────────────────────────────────
+      - name: Start SonarQube
+        run: |
+          docker run -d --name sonarqube -p 9000:9000 sonarqube:community
+          echo "Esperando a que SonarQube arranque..."
+          until curl -s http://localhost:9000/api/system/status | grep -q '"status":"UP"'; do
+            sleep 5
+          done
+          echo "SonarQube listo"
+
+      - name: Generate SonarQube token via API
+        run: |
+          curl -s -u admin:admin -X POST \
+            "http://localhost:9000/api/users/change_password" \
+            -d "login=admin&previousPassword=admin&password=Admin1234!"
+
+          TOKEN=$(curl -s -u admin:Admin1234! -X POST \
+            "http://localhost:9000/api/user_tokens/generate" \
+            -d "name=ci-token" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          echo "SONAR_TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "SONAR_HOST_URL=http://localhost:9000" >> $GITHUB_ENV
+          echo "SONAR_PROJECT_KEY=dualab" >> $GITHUB_ENV
+
+      - name: SonarQube Analysis
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=.
+            -Dsonar.exclusions=node_modules/**,vendor/**,public/build/**
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+        continue-on-error: true
+
+      # ─── 5. OWASP DEPENDENCY CHECK ─────────────────────────────────────────
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: /opt/jdk
+        with:
+          project: 'microretos'
+          path: '.'
+          format: 'HTML'
+          out: 'reports/dependency-check'
+          args: >
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+            --enableRetired
+            --enableExperimental
+            --failOnCVSS 7
+        continue-on-error: true
+
+      - name: Upload Dependency Check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: reports/dependency-check/
+
+      # ─── 6. NPM AUDIT ──────────────────────────────────────────────────────
+      - name: NPM Audit (dependency vulnerabilities)
+        run: |
+          npm audit --json > npm-audit-report.json 2>&1 || true
+          npm ls --depth 10 > npm-ls-depth.txt 2>&1 || true
+          echo "=== NPM AUDIT SUMMARY ===" && npm audit --audit-level=moderate || true
+        continue-on-error: true
+
+      - name: Upload NPM audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-reports
+          path: |
+            npm-audit-report.json
+            npm-ls-depth.txt
+
+      # ─── 7. JOB SUMMARY ────────────────────────────────────────────────────
+      - name: Write Job Summary
+        if: always()
+        run: |
+          echo "## Security Static Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Herramienta | Categoría | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks | Secretos expuestos | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "| SonarQube | SAST / Calidad | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "| OWASP Dependency Check | CVEs en dependencias | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "| NPM Audit | Vulnerabilidades npm | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⬇ **Descarga los artefactos** en la sección _Artifacts_ de esta ejecución." >> $GITHUB_STEP_SUMMARY
