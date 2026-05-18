@@ -15,7 +15,7 @@ export const ROLE_ROUTES = {
                    'sesiones-registradas', 'startup-day', 'startup-day-crear',
                    'startup-day-editar', 'startup-day-detalle', 'base-datos', 'papelera',
                    'empresas', 'gestion-usuarios'],
-  [ROLE_DOCENTE]: ['biblioteca', 'detalle-microreto', 'dashboard-docente',
+  [ROLE_DOCENTE]: ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
                    'sesiones-registradas', 'startup-day', 'startup-day-crear',
                    'startup-day-editar', 'startup-day-detalle', 'empresas'],
   [ROLE_EMPRESA]: ['microretos', 'biblioteca', 'detalle-microreto',
@@ -33,12 +33,16 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('admin_token_created_at')
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_name')
+    localStorage.removeItem('user_centro_id')
+    localStorage.removeItem('user_centro_nombre')
   }
 
-  const isAuthenticated = ref(!!localStorage.getItem('admin_token'))
-  const userRole        = ref(Number(localStorage.getItem('user_role') || ROLE_ADMIN))
-  const userName        = ref(localStorage.getItem('user_name') || 'Administrador')
-  const refreshing      = ref(false)
+  const isAuthenticated  = ref(!!localStorage.getItem('admin_token'))
+  const userRole         = ref(Number(localStorage.getItem('user_role') || ROLE_ADMIN))
+  const userName         = ref(localStorage.getItem('user_name') || 'Administrador')
+  const userCentroId     = ref(Number(localStorage.getItem('user_centro_id') || 0) || null)
+  const userCentroNombre = ref(localStorage.getItem('user_centro_nombre') || '')
+  const refreshing       = ref(false)
 
   // Reloj reactivo: se actualiza cada minuto
   const now = ref(Date.now())
@@ -69,16 +73,22 @@ export const useAuthStore = defineStore('auth', () => {
     return allowed.includes(routeName)
   }
 
-  const login = (token, role = ROLE_ADMIN, name = 'Administrador') => {
+  const login = (token, role = ROLE_ADMIN, name = 'Administrador', centroId = null, centroNombre = '') => {
     localStorage.setItem('admin_token', token)
     localStorage.setItem('admin_token_created_at', String(Date.now()))
     localStorage.setItem('user_role', String(role))
     localStorage.setItem('user_name', name)
+    if (centroId) localStorage.setItem('user_centro_id', String(centroId))
+    else          localStorage.removeItem('user_centro_id')
+    if (centroNombre) localStorage.setItem('user_centro_nombre', centroNombre)
+    else              localStorage.removeItem('user_centro_nombre')
     // Inicializar el timer de seguridad de BD: el login cuenta como verificación
     sessionStorage.setItem('db_security_verified_at', String(Date.now()))
-    isAuthenticated.value = true
-    userRole.value        = role
-    userName.value        = name
+    isAuthenticated.value  = true
+    userRole.value         = role
+    userName.value         = name
+    userCentroId.value     = centroId
+    userCentroNombre.value = centroNombre || ''
   }
 
   const logout = () => {
@@ -86,9 +96,13 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('admin_token_created_at')
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_name')
-    isAuthenticated.value = false
-    userRole.value        = ROLE_ADMIN
-    userName.value        = 'Administrador'
+    localStorage.removeItem('user_centro_id')
+    localStorage.removeItem('user_centro_nombre')
+    isAuthenticated.value  = false
+    userRole.value         = ROLE_ADMIN
+    userName.value         = 'Administrador'
+    userCentroId.value     = null
+    userCentroNombre.value = ''
   }
 
   const refresh = async () => {
@@ -106,7 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    isAuthenticated, userRole, userName, refreshing,
+    isAuthenticated, userRole, userName, userCentroId, userCentroNombre, refreshing,
     isAdmin, isDocente, isEmpresa, roleLabel,
     minutosRestantes, login, logout, refresh, canAccess,
   }

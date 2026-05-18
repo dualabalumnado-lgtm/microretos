@@ -51,11 +51,13 @@ class AdminAuthController extends Controller
         $token = $user->createToken('admin-token')->plainTextToken;
 
         return response()->json([
-            'success'  => true,
-            'token'    => $token,
-            'role'     => $user->role,
-            'name'     => $user->name,
-            'message'  => 'Acceso concedido.',
+            'success'             => true,
+            'token'               => $token,
+            'role'                => $user->role,
+            'name'                => $user->name,
+            'centro_educativo_id' => $user->centro_educativo_id,
+            'centro_nombre'       => $user->centroEducativo?->nombre,
+            'message'             => 'Acceso concedido.',
         ]);
     }
 
