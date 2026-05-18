@@ -60,9 +60,9 @@ jobs:
         run: |
           curl -s -u admin:admin -X POST \
             "http://localhost:9000/api/users/change_password" \
-            -d "login=admin&previousPassword=admin&password=Admin1234!"
+            -d "login=admin&previousPassword=admin&password=${{ secrets.SONAR_ADMIN_PASSWORD }}"
 
-          TOKEN=$(curl -s -u admin:Admin1234! -X POST \
+          TOKEN=$(curl -s -u "admin:${{ secrets.SONAR_ADMIN_PASSWORD }}" -X POST \
             "http://localhost:9000/api/user_tokens/generate" \
             -d "name=ci-token" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
