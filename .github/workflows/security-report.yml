@@ -86,16 +86,84 @@ jobs:
       - name: Export SonarQube results
         if: always()
         run: |
+          # Issues con ubicación exacta de archivo y línea
           curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
-            "http://localhost:9000/api/issues/search?projectKeys=dualab&types=VULNERABILITY,BUG,CODE_SMELL" \
-            > sonar-results.json
+            "http://localhost:9000/api/issues/search?projectKeys=dualab&types=VULNERABILITY,BUG,CODE_SMELL&ps=500&additionalFields=comments,rules,transitions" \
+            > sonar-issues.json
 
-      - name: Upload SonarQube results
+          # Métricas generales del proyecto
+          curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
+            "http://localhost:9000/api/measures/component?component=dualab&metricKeys=bugs,vulnerabilities,code_smells,security_hotspots,coverage,duplicated_lines_density,ncloc,sqale_rating,reliability_rating,security_rating" \
+            > sonar-metrics.json
+
+          # Security hotspots
+          curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" \
+            "http://localhost:9000/api/hotspots/search?projectKey=dualab&ps=500" \
+            > sonar-hotspots.json
+
+          # Generar informe legible en texto plano
+          python3 << 'EOF'
+      import json
+
+      print("=" * 60)
+      print("SONARQUBE ANALYSIS REPORT")
+      print("=" * 60)
+
+      # Métricas
+      try:
+        m = json.load(open("sonar-metrics.json"))
+        measures = {x["metric"]: x.get("value","N/A") for x in m.get("component",{}).get("measures",[])}
+        print("\n MÉTRICAS GENERALES:")
+        print(f"  Bugs:              {measures.get('bugs','N/A')}")
+        print(f"  Vulnerabilidades:  {measures.get('vulnerabilities','N/A')}")
+        print(f"  Code Smells:       {measures.get('code_smells','N/A')}")
+        print(f"  Security Hotspots: {measures.get('security_hotspots','N/A')}")
+        print(f"  Cobertura:         {measures.get('coverage','N/A')}%")
+        print(f"  Duplicaciones:     {measures.get('duplicated_lines_density','N/A')}%")
+        print(f"  Líneas de código:  {measures.get('ncloc','N/A')}")
+      except: print("  No se pudieron leer las métricas")
+
+      # Issues
+      try:
+        issues = json.load(open("sonar-issues.json")).get("issues", [])
+        print(f"\n ISSUES ENCONTRADOS ({len(issues)} total):")
+        for i in issues:
+          severity = i.get("severity","")
+          itype    = i.get("type","")
+          msg      = i.get("message","")
+          comp     = i.get("component","").replace("dualab:","")
+          line     = i.get("line","?")
+          print(f"\n  [{severity}] {itype}")
+          print(f"  Archivo: {comp} — Línea: {line}")
+          print(f"  Mensaje: {msg}")
+      except: print("  No se pudieron leer los issues")
+
+      # Hotspots
+      try:
+        hotspots = json.load(open("sonar-hotspots.json")).get("hotspots", [])
+        print(f"\n SECURITY HOTSPOTS ({len(hotspots)} total):")
+        for h in hotspots:
+          comp = h.get("component","").replace("dualab:","")
+          line = h.get("line","?")
+          msg  = h.get("message","")
+          print(f"\n  Archivo: {comp} — Línea: {line}")
+          print(f"  Mensaje: {msg}")
+      except: print("  No se pudieron leer los hotspots")
+
+      print("\n" + "=" * 60)
+      EOF
+          } > sonar-full-report.txt 2>&1 || true
+
+      - name: Upload SonarQube full report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sonar-results
-          path: sonar-results.json
+          name: sonar-full-report
+          path: |
+            sonar-full-report.txt
+            sonar-issues.json
+            sonar-metrics.json
+            sonar-hotspots.json
 
       # ─── 5. OWASP DEPENDENCY CHECK ─────────────────────────────────────────
       - name: OWASP Dependency Check
