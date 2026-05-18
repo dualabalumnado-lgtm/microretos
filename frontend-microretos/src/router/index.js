@@ -28,7 +28,7 @@ const router = createRouter({
       path: '/microretos',
       name: 'microretos',
       component: GeneradorMicroretos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_EMPRESA, ROLE_DOCENTE] }
     },
     {
       path: '/biblioteca',
