@@ -58,11 +58,11 @@ jobs:
 
       - name: Generate SonarQube token via API
         run: |
-          curl -s -u admin:admin -X POST \
+          curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_DEFAULT }}" -X POST \
             "http://localhost:9000/api/users/change_password" \
-            -d "login=admin&previousPassword=admin&password=${{ secrets.SONAR_ADMIN_PASSWORD }}"
+            -d "login=${{ secrets.SONAR_ADMIN_DEFAULT }}&previousPassword=${{ secrets.SONAR_ADMIN_DEFAULT }}&password=${{ secrets.SONAR_ADMIN_PASSWORD }}"
 
-          TOKEN=$(curl -s -u "admin:${{ secrets.SONAR_ADMIN_PASSWORD }}" -X POST \
+          TOKEN=$(curl -s -u "${{ secrets.SONAR_ADMIN_DEFAULT }}:${{ secrets.SONAR_ADMIN_PASSWORD }}" -X POST \
             "http://localhost:9000/api/user_tokens/generate" \
             -d "name=ci-token" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
