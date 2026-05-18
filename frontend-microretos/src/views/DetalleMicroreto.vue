@@ -217,8 +217,8 @@ async function copiarUrl() {
           Descargar PDF
         </button>
 
-        <!-- Botón QR — solo visible para admins -->
-        <button v-if="reto && authStore.isAuthenticated" @click="abrirQR"
+        <!-- Botón QR — oculto para empresa -->
+        <button v-if="reto && authStore.isAuthenticated && !authStore.isEmpresa" @click="abrirQR"
                 class="inline-flex items-center gap-2 px-5 py-2.5
                        bg-white border border-gray-200 rounded-full
                        text-xs font-black uppercase tracking-widest text-[#1F2937]
@@ -234,7 +234,7 @@ async function copiarUrl() {
           Generar QR
         </button>
 
-        <button v-if="reto && authStore.isAuthenticated" @click="trabajarMicroreto"
+        <button v-if="reto && authStore.isAuthenticated && !authStore.isEmpresa" @click="trabajarMicroreto"
                 class="inline-flex items-center gap-2 px-5 py-2.5
                        bg-[#00A859] border border-[#00A859] rounded-full
                        text-xs font-black uppercase tracking-widest text-white

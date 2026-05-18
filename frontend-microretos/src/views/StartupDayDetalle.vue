@@ -3,9 +3,11 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api.js';
 import { useMicroproyectoPdfExport } from '../composables/useMicroproyectoPdfExport.js';
+import { useAuthStore } from '../stores/auth.js';
 
-const route  = useRoute();
-const router = useRouter();
+const route     = useRoute();
+const router    = useRouter();
+const authStore = useAuthStore();
 const proyecto = ref(null);
 const cargando = ref(true);
 const error    = ref(false);
@@ -144,6 +146,7 @@ async function archivar() {
               PDF
             </button>
             <button
+              v-if="!authStore.isEmpresa"
               @click="router.push({ name: 'startup-day-editar', params: { uuid: proyecto.uuid } })"
               class="px-4 py-2 bg-white border border-gray-200 rounded-full text-xs font-black
                      uppercase tracking-widest text-gray-500 shadow-sm
@@ -151,7 +154,7 @@ async function archivar() {
             >
               Editar
             </button>
-            <button v-if="proyecto.estado !== 'archivado'"
+            <button v-if="proyecto.estado !== 'archivado' && !authStore.isEmpresa"
                     @click="archivar"
                     class="px-4 py-2 bg-white border border-gray-200 rounded-full text-xs font-black
                            uppercase tracking-widest text-gray-400 shadow-sm
