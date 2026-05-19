@@ -364,8 +364,8 @@ async function toggleBoeModulo(cicloId, moduloId) {
             </div>
           </div>
           <button @click="cerrar"
-                  class="px-5 py-2 rounded-xl bg-[#1F2937] text-white text-xs font-black
-                         uppercase tracking-widest hover:bg-[#374151] transition-all">
+                  class="px-5 py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-black
+                         uppercase tracking-widest hover:bg-gray-200 transition-all">
             Cerrar
           </button>
         </div>

@@ -622,8 +622,8 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
           <!-- Footer -->
           <div class="px-6 py-5">
             <button @click="mostrarEjemplo = false"
-                    class="w-full py-3 rounded-full bg-[#1F2937] text-white text-xs font-black
-                           uppercase tracking-widest transition-all hover:bg-[#121212]">
+                    class="w-full py-3 rounded-full bg-[#00A859] text-white text-xs font-black
+                           uppercase tracking-widest transition-all hover:bg-[#009950]">
               Entendido, ir al listado
             </button>
           </div>
