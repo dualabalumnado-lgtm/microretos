@@ -623,7 +623,7 @@ function formatFecha(isoDate) {
       v-if="snackbar.visible"
       class="fixed bottom-6 right-6 z-[60] flex items-center gap-3
              px-5 py-3.5 rounded-2xl shadow-xl text-sm font-bold
-             max-w-sm bg-[#1F2937] text-white border border-[#333333]"
+             max-w-sm bg-white text-[#1F2937] border border-gray-200 shadow-lg"
     >
       <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

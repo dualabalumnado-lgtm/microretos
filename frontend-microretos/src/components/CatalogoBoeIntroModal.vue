@@ -16,18 +16,18 @@ function siguiente() { emit('update:show', false); emit('siguiente') }
 
         <!-- Cabecera -->
         <div class="px-8 pt-8 pb-6 flex flex-col items-center text-center">
-          <div class="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200
+          <div class="w-14 h-14 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/25
                       flex items-center justify-center mb-5">
-            <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-7 h-7 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
             </svg>
           </div>
 
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full
-                      bg-indigo-50 border border-indigo-100 mb-4">
-            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            <span class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Solo lectura</span>
+                      bg-[#00A859]/10 border border-[#00A859]/20 mb-4">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#00A859]" />
+            <span class="text-[10px] font-black text-[#00A859] uppercase tracking-widest">Solo lectura</span>
           </div>
 
           <h2 class="font-black text-2xl text-[#1F2937] mb-3 leading-tight">
@@ -93,8 +93,8 @@ function siguiente() { emit('update:show', false); emit('siguiente') }
             Cancelar
           </button>
           <button @click="siguiente"
-                  class="flex-1 px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-black
-                         uppercase tracking-widest hover:bg-indigo-700 transition-all
+                  class="flex-1 px-5 py-3 rounded-xl bg-[#00A859] text-white text-sm font-black
+                         uppercase tracking-widest hover:bg-[#009950] transition-all
                          flex items-center justify-center gap-2">
             Siguiente
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
