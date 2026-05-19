@@ -2,7 +2,7 @@ name: Security DAST — OWASP ZAP
 
 on:
   push:
-    branches: ['**']   # se ejecuta en cualquier rama
+    branches: ['**']
   workflow_dispatch:
   schedule:
     - cron: '0 3 * * 1'
@@ -15,32 +15,44 @@ jobs:
       contents: read
 
     steps:
+      # ─── 1. CHECKOUT ───────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ─── 2. SETUP NODE ─────────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         run: npm ci --prefer-offline || npm install
 
-      # ─── Arrancar la app ───────────────────────────────────────
-      # Opción A: si usas docker-compose
-      - name: Build & start application
-        run: docker compose up -d --build
+      # ─── 3. SETUP PHP ──────────────────────────────────────────────────────
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
 
-      # Opción B: si arranca directamente con node
-      # - name: Start application
-      #   run: npm start &
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # ─── 4. PREPARAR ENTORNO ───────────────────────────────────────────────
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # ─── 5. ARRANCAR APP ───────────────────────────────────────────────────
+      - name: Start application
+        run: php artisan serve --port=8000 &
 
       - name: Wait for app to be ready
         run: |
           echo "Esperando a que la app esté disponible..."
           for i in $(seq 1 30); do
-            if curl -s http://localhost:3000 > /dev/null; then
+            if curl -s http://localhost:8000 > /dev/null; then
               echo "App lista"
               exit 0
             fi
@@ -50,14 +62,14 @@ jobs:
           echo "Timeout: la app no arrancó"
           exit 1
 
-      # ─── ZAP Scan ─────────────────────────────────────────────
+      # ─── 6. ZAP SCAN ───────────────────────────────────────────────────────
       - name: OWASP ZAP Baseline Scan
         run: |
           docker run --network host \
             -v $(pwd):/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
-            -t http://localhost:3000 \
+            -t http://localhost:8000 \
             -r /zap/wrk/zap-report.html \
             -J /zap/wrk/zap-report.json \
             -I
@@ -72,11 +84,7 @@ jobs:
             zap-report.html
             zap-report.json
 
-      # ─── Limpieza ─────────────────────────────────────────────
-      - name: Teardown application
-        if: always()
-        run: docker-compose down || true
-
+      # ─── 7. JOB SUMMARY ────────────────────────────────────────────────────
       - name: Write Job Summary
         if: always()
         run: |
