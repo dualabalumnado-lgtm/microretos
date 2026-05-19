@@ -219,6 +219,26 @@ jobs:
             npm-audit-report.json
             npm-ls-depth.txt
 
+      # ─── 6. TRIVY ──────────────────────────────────────────────────────────────
+      - name: Trivy — Infra & filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-report.json'
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln,config,secret'
+          ignore-unfixed: true
+        continue-on-error: true
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
       # ─── 7. JOB SUMMARY ────────────────────────────────────────────────────
       - name: Write Job Summary
         if: always()
@@ -231,5 +251,6 @@ jobs:
           echo "| SonarQube | SAST / Calidad | Completado |" >> $GITHUB_STEP_SUMMARY
           echo "| OWASP Dependency Check | CVEs en dependencias | Completado |" >> $GITHUB_STEP_SUMMARY
           echo "| NPM Audit | Vulnerabilidades npm | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy | Infra / Misconfigs / Secretos | Completado |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⬇ **Descarga los artefactos** en la sección _Artifacts_ de esta ejecución." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,88 @@
+name: Security DAST — OWASP ZAP
+
+on:
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 3 * * 1'   # Cada lunes a las 3am
+  workflow_dispatch:
+
+jobs:
+  dast:
+    name: DAST Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline || npm install
+
+      # ─── Arrancar la app ───────────────────────────────────────
+      # Opción A: si usas docker-compose
+      - name: Build & start application
+        run: docker-compose up -d --build
+
+      # Opción B: si arranca directamente con node
+      # - name: Start application
+      #   run: npm start &
+
+      - name: Wait for app to be ready
+        run: |
+          echo "Esperando a que la app esté disponible..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3000 > /dev/null; then
+              echo "App lista"
+              exit 0
+            fi
+            echo "Intento $i..."
+            sleep 3
+          done
+          echo "Timeout: la app no arrancó"
+          exit 1
+
+      # ─── ZAP Scan ─────────────────────────────────────────────
+      - name: OWASP ZAP Baseline Scan
+        run: |
+          docker run --network host \
+            -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:3000 \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -I
+        continue-on-error: true
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-dast-report
+          path: |
+            zap-report.html
+            zap-report.json
+
+      # ─── Limpieza ─────────────────────────────────────────────
+      - name: Teardown application
+        if: always()
+        run: docker-compose down || true
+
+      - name: Write Job Summary
+        if: always()
+        run: |
+          echo "## DAST — OWASP ZAP Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Herramienta | Categoría | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| OWASP ZAP Baseline | DAST / Runtime | Completado |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⬇ Descarga el reporte HTML en la sección _Artifacts_." >> $GITHUB_STEP_SUMMARY
