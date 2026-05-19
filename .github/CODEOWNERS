@@ -1,0 +1,5 @@
+# Code owners — required reviewers for protected files
+/.github/CODEOWNERS                                        @CynthiaMartel
+/frontend-microretos/src/components/AppCredit.vue          @CynthiaMartel
+/frontend-microretos/src/config/app.js                     @CynthiaMartel
+/frontend-microretos/src/utils/tokens.js                   @CynthiaMartel

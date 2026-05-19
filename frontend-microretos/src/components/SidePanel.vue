@@ -2,19 +2,26 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'
-import api from '../api.js'
 import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth'
 import { useUIState } from '../composables/useUIState.js'
+import { useCredits } from '../composables/useCredits.js'
 
 const authStore = useAuthStore()
 const { tourActivo, showWelcome, welcomeRole, welcomeName, triggerWelcome } = useUIState()
+const { abrirCreditos } = useCredits()
+
+// Mostrar autoría una vez tras cerrar el modal de bienvenida
+let _welShown = false
+watch(showWelcome, (val) => {
+  if (val) { _welShown = true }
+  else if (_welShown) { _welShown = false; setTimeout(abrirCreditos, 450) }
+})
 const isOpen    = ref(false)
 const logoError = ref(false)
 const route     = useRoute()
 const router    = useRouter()
 
 const showLogin        = ref(false)
-const cargandoOut      = ref(false)
 const destinoTrasLogin = ref('/')
 
 // ─── Modal de información ─────────────────────────────────
@@ -72,20 +79,6 @@ function rolHome(role) {
   return '/microretos'
 }
 
-const cerrarSesion = async () => {
-  cargandoOut.value = true
-  try {
-    await api.post('/admin/logout')
-  } catch (e) {
-    console.warn('Error al revocar token en servidor:', e)
-  } finally {
-    authStore.logout()
-    cargandoOut.value = false
-    isOpen.value = false
-    router.push('/')
-  }
-}
-
 defineExpose({ isOpen, toggle, close })
 </script>
 
@@ -107,6 +100,44 @@ defineExpose({ isOpen, toggle, close })
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
+      <!-- ── Cabecera: DuaLab → home + botón cerrar ── -->
+      <div class="flex items-center border-b border-white/10 shrink-0">
+        <RouterLink
+          to="/"
+          @click="close"
+          class="flex items-center gap-3 px-5 pt-4 pb-4 flex-1 min-w-0
+                 hover:opacity-80 transition-opacity duration-150"
+        >
+          <img
+            src="../assets/logo.png"
+            alt="DuaLab Logo"
+            class="h-9 w-auto object-contain"
+            @error="logoError = true"
+            v-if="!logoError"
+          />
+          <div v-else
+               class="w-9 h-9 rounded-xl bg-[#00A859] flex items-center justify-center font-black text-white text-sm shrink-0">
+            D
+          </div>
+          <span class="ml-4 font-black text-xl tracking-tighter text-white uppercase select-none">
+            Dua<span class="text-[#00A859]">Lab</span>
+          </span>
+        </RouterLink>
+
+        <!-- Botón cerrar panel -->
+        <button
+          @click="close"
+          aria-label="Cerrar menú"
+          class="mr-3 w-8 h-8 rounded-xl flex items-center justify-center
+                 text-white/40 hover:text-white hover:bg-white/10
+                 transition-all duration-150 shrink-0"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
       <!-- ── Navegación ── -->
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 
@@ -364,6 +395,22 @@ defineExpose({ isOpen, toggle, close })
       <!-- ── Footer: sesión + info + sistema ── -->
       <div class="px-4 py-3 border-t border-white/10 space-y-2 shrink-0">
 
+        <!-- Acerca de — equipo de desarrollo -->
+        <button
+          @click="abrirCreditos"
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-xl
+                 bg-white/5 border border-white/10 text-white/40
+                 hover:text-white/70 hover:bg-white/8 hover:border-white/20
+                 font-bold text-[10px] uppercase tracking-widest
+                 transition-all duration-150"
+        >
+          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+          Acerca de
+        </button>
+
         <!-- Botón de información -->
         <button
           @click="mostrarInfo = true"
@@ -380,78 +427,9 @@ defineExpose({ isOpen, toggle, close })
           ¿Qué es DuaLab?
         </button>
 
-        <!-- Sesión activa -->
-        <div v-if="authStore.isAuthenticated" class="px-3 py-2 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-          <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-full bg-[#00A859]/20 border border-[#00A859]/30 flex items-center justify-center shrink-0">
-              <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-[9px] font-black uppercase tracking-widest text-white/30">Sesión activa</p>
-              <p class="text-xs font-bold text-white truncate">{{ authStore.roleLabel }}</p>
-              <p class="text-[10px] text-white/30 truncate">{{ authStore.userName }}</p>
-            </div>
-          </div>
-
-          <!-- Aviso de expiración inminente -->
-          <Transition name="sp-fade">
-            <div v-if="authStore.minutosRestantes >= 0 && authStore.minutosRestantes <= 120"
-              class="rounded-xl px-3 py-2 text-[10px] font-bold space-y-2"
-              :class="authStore.minutosRestantes <= 30
-                ? 'bg-red-500/15 border border-red-500/30 text-red-300'
-                : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'">
-              <div class="flex items-center gap-1.5">
-                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span>
-                  {{ authStore.minutosRestantes <= 0
-                    ? 'Sesión a punto de expirar'
-                    : authStore.minutosRestantes >= 60
-                      ? `Sesión expira en ${Math.floor(authStore.minutosRestantes / 60)}h ${authStore.minutosRestantes % 60}min`
-                      : `Sesión expira en ${authStore.minutosRestantes} min` }}
-                </span>
-              </div>
-              <button
-                @click="authStore.refresh()"
-                :disabled="authStore.refreshing"
-                class="w-full py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest
-                       transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="authStore.minutosRestantes <= 30
-                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200'
-                  : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'">
-                {{ authStore.refreshing ? 'Renovando...' : 'Extender sesión' }}
-              </button>
-            </div>
-          </Transition>
-
-          <button
-            @click="cerrarSesion"
-            :disabled="cargandoOut"
-            class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl
-                   bg-red-500/10 border border-red-500/20 text-red-400
-                   hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300
-                   font-black text-[10px] uppercase tracking-widest
-                   transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg v-if="!cargandoOut" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-            </svg>
-            <svg v-else class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
-            </svg>
-            {{ cargandoOut ? 'Cerrando...' : 'Cerrar sesión' }}
-          </button>
-        </div>
-
         <!-- Sin sesión -->
         <button
-          v-else
+          v-if="!authStore.isAuthenticated"
           @click="showLogin = true"
           class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl
                  bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859]
@@ -568,19 +546,18 @@ defineExpose({ isOpen, toggle, close })
     <div
       v-if="showWelcome"
       class="fixed inset-0 z-[10000] flex items-center justify-center p-6
-             bg-black/75 backdrop-blur-sm"
+             bg-black/25 backdrop-blur-sm"
       @click.self="showWelcome = false"
     >
       <Transition name="welcome-card" appear>
         <div
           v-if="showWelcome"
           class="relative rounded-3xl p-10 max-w-sm w-full text-center
-                 bg-[#1F2937] border border-[#333333]
-                 shadow-[0_24px_64px_rgba(0,0,0,0.7)]"
+                 bg-white border border-gray-100 shadow-xl"
         >
           <!-- Icono -->
           <div class="mx-auto mb-6 w-16 h-16 rounded-2xl
-                      bg-[#00A859]/15 border border-[#00A859]/30
+                      bg-[#F0FBF4] border border-[#BBE8D0]
                       flex items-center justify-center">
             <svg class="w-8 h-8 text-[#00A859]" fill="none" stroke="currentColor"
                  viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -595,21 +572,21 @@ defineExpose({ isOpen, toggle, close })
           </p>
 
           <!-- Mensaje principal -->
-          <h2 class="text-white text-xl font-bold leading-snug">
+          <h2 class="text-[#121212] text-xl font-bold leading-snug">
             ¡Te damos la bienvenida<br>a DuaLab para
           </h2>
           <p class="text-[#00A859] text-4xl font-black tracking-tight mt-2 mb-1">
             {{ welcomeRole === ROLE_DOCENTE ? 'docentes' : welcomeRole === ROLE_EMPRESA ? 'empresas' : 'admin' }}
           </p>
-          <p class="text-white text-xl font-bold">!</p>
+          <p class="text-[#121212] text-xl font-bold">!</p>
 
           <!-- Nombre de usuario -->
-          <p v-if="welcomeName" class="mt-3 text-white/50 text-sm">
+          <p v-if="welcomeName" class="mt-3 text-gray-400 text-sm">
             {{ welcomeName }}
           </p>
 
           <!-- Separador -->
-          <div class="mt-8 border-t border-[#333333]" />
+          <div class="mt-8 border-t border-gray-100" />
 
           <!-- Botón cerrar -->
           <button
@@ -624,9 +601,9 @@ defineExpose({ isOpen, toggle, close })
           <!-- X esquina -->
           <button
             @click="showWelcome = false"
-            class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/5
-                   hover:bg-white/10 flex items-center justify-center
-                   text-white/40 hover:text-white transition-all"
+            class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-100
+                   hover:bg-gray-200 flex items-center justify-center
+                   text-gray-400 hover:text-gray-600 transition-all"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
