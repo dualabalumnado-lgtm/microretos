@@ -30,7 +30,7 @@ jobs:
       # ─── Arrancar la app ───────────────────────────────────────
       # Opción A: si usas docker-compose
       - name: Build & start application
-        run: docker-compose up -d --build
+        run: docker compose up -d --build
 
       # Opción B: si arranca directamente con node
       # - name: Start application
