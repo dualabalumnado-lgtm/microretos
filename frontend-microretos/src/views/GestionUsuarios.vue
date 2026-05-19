@@ -1,6 +1,96 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import api from '../api.js'
+import { useUIState } from '../composables/useUIState.js'
+
+const { tourActivo } = useUIState()
+
+// ── Tour guiado ─────────────────────────────────────────────────────────────
+const modoGuia = ref(false)
+const pasoGuia = ref(1)
+
+const refContadores = ref(null)
+const refTabs       = ref(null)
+const refLista      = ref(null)
+const refBtnNuevo   = ref(null)
+const refBtnGuia    = ref(null)
+
+const tourRefs = { refContadores, refTabs, refLista, refBtnNuevo, refBtnGuia }
+
+const guiaPasosData = [
+  { ref: 'refContadores', seccion: 'contadores', texto: 'Aquí puedes ver de un vistazo el total de cuentas activas, cuántas son docentes, cuántas son empresas y cuántas hay en la papelera.' },
+  { ref: 'refTabs',       seccion: 'tabs',        texto: 'Alterna entre la vista de cuentas activas y la papelera. También puedes filtrar por rol: Todos, Docentes o Empresas.' },
+  { ref: 'refLista',      seccion: 'lista',       texto: 'Aquí aparecen todas las cuentas. Cada fila muestra el nombre, rol, estado (sin activar o bloqueada) y las acciones disponibles: activar, editar, bloquear y eliminar.' },
+  { ref: 'refBtnNuevo',   seccion: 'btn-nuevo',   texto: 'Pulsa aquí para crear una nueva cuenta de docente o empresa. Las cuentas nuevas quedan pendientes de activación hasta que las valides manualmente.' },
+  { ref: 'refBtnGuia',    seccion: null,           texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
+]
+
+const pasoActual    = computed(() => guiaPasosData[pasoGuia.value - 1])
+const seccionActiva = computed(() => modoGuia.value ? (pasoActual.value?.seccion ?? null) : null)
+const pasoRefActivo = computed(() => modoGuia.value ? (pasoActual.value?.ref ?? null) : null)
+
+const bocadilloPos = ref({ top: 60, left: 16, width: 300, dir: 'top', arrowLeft: 150 })
+
+function recalcularBocadillo() {
+  const el = tourRefs[pasoActual.value?.ref]?.value
+  if (!el) return
+  const rect      = el.getBoundingClientRect()
+  const WIN_W     = window.innerWidth
+  const WIN_H     = window.innerHeight
+  const TOOLTIP_W = Math.min(300, WIN_W - 32)
+  const TOOLTIP_H = 200
+  const GAP       = 14
+
+  const visibleTop    = Math.max(0, rect.top)
+  const visibleBottom = Math.min(WIN_H, rect.bottom)
+  const centerX       = rect.left + rect.width / 2
+
+  const spaceBelow = WIN_H - visibleBottom - GAP
+  const spaceAbove = visibleTop - GAP
+  const dir = spaceBelow >= TOOLTIP_H + GAP ? 'top' : spaceAbove >= TOOLTIP_H + GAP ? 'bottom' : 'top'
+
+  let tooltipTop = dir === 'top' ? visibleBottom + GAP : visibleTop - TOOLTIP_H - GAP
+  tooltipTop = Math.max(10, Math.min(tooltipTop, WIN_H - TOOLTIP_H - 10))
+
+  let tooltipLeft = centerX - TOOLTIP_W / 2
+  tooltipLeft = Math.max(16, Math.min(tooltipLeft, WIN_W - TOOLTIP_W - 16))
+
+  const arrowLeft = Math.max(16, Math.min(centerX - tooltipLeft, TOOLTIP_W - 16))
+
+  bocadilloPos.value = { top: tooltipTop, left: tooltipLeft, width: TOOLTIP_W, dir, arrowLeft }
+}
+
+function scrollYRecalcular() {
+  const el = tourRefs[pasoActual.value?.ref]?.value
+  if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
+  requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
+}
+
+function onScrollGuia() {
+  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo)
+}
+
+watch(pasoGuia, () => { if (modoGuia.value) nextTick(scrollYRecalcular) })
+watch(modoGuia, (val) => {
+  tourActivo.value = val
+  if (val) {
+    window.addEventListener('scroll', onScrollGuia, { passive: true })
+    nextTick(scrollYRecalcular)
+  } else {
+    window.removeEventListener('scroll', onScrollGuia)
+  }
+})
+
+function avanzarPaso() {
+  if (pasoGuia.value < guiaPasosData.length) {
+    pasoGuia.value++
+  } else {
+    modoGuia.value = false
+    pasoGuia.value = 1
+  }
+}
+function retrocederPaso() { if (pasoGuia.value > 1) pasoGuia.value-- }
+function cerrarGuia() { modoGuia.value = false; pasoGuia.value = 1 }
 
 // ── Estado principal ────────────────────────────────────────────────
 const usuarios    = ref([])
@@ -354,11 +444,57 @@ onMounted(async () => {
   } finally {
     cargando.value = false
   }
+  await nextTick()
+  pasoGuia.value = 1
+  modoGuia.value = true
+})
+
+onUnmounted(() => {
+  tourActivo.value = false
+  window.removeEventListener('scroll', onScrollGuia)
 })
 </script>
 
 <template>
   <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 lg:px-8">
+
+    <!-- ══ TOUR BOCADILLO ═══════════════════════════════════════════════════ -->
+    <Transition name="sp-fade">
+      <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
+        <div class="absolute inset-0 pointer-events-auto" />
+        <div class="absolute pointer-events-auto"
+             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px', zIndex: 9992 }">
+          <div v-if="bocadilloPos.dir === 'top'"
+               class="absolute bg-[#1a2332] border-l border-t border-white/10 w-3 h-3 rotate-45 -top-1.5"
+               :style="{ left: (bocadilloPos.arrowLeft - 6) + 'px' }" />
+          <div class="bg-[#1a2332] border border-white/10 rounded-2xl p-4 shadow-2xl">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]">Gestión de cuentas · Guía</span>
+              <span class="text-[9px] font-bold text-white/40">{{ pasoGuia }} / {{ guiaPasosData.length }}</span>
+            </div>
+            <p class="text-xs text-white/80 leading-relaxed mb-3">{{ pasoActual?.texto }}</p>
+            <div class="flex items-center justify-between gap-2">
+              <button @click="cerrarGuia" class="text-[10px] font-bold text-white/30 hover:text-white/60 transition-colors">
+                Cerrar
+              </button>
+              <div class="flex gap-2">
+                <button v-if="pasoGuia > 1" @click="retrocederPaso"
+                        class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[11px] font-black hover:bg-white/20 transition-all">
+                  ← Ant.
+                </button>
+                <button @click="avanzarPaso"
+                        class="px-3 py-1.5 rounded-xl bg-[#00A859] text-white text-[11px] font-black hover:bg-[#00A859]/80 transition-all">
+                  {{ pasoGuia < guiaPasosData.length ? 'Siguiente →' : 'Finalizar' }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="bocadilloPos.dir === 'bottom'"
+               class="absolute bg-[#1a2332] border-r border-b border-white/10 w-3 h-3 rotate-45 -bottom-1.5"
+               :style="{ left: (bocadilloPos.arrowLeft - 6) + 'px' }" />
+        </div>
+      </div>
+    </Transition>
 
     <!-- ── Cabecera ────────────────────────────────────────── -->
     <div class="max-w-5xl mx-auto mb-8 flex flex-col sm:flex-row sm:items-end gap-4">
@@ -366,9 +502,28 @@ onMounted(async () => {
         <p class="text-[10px] font-black uppercase tracking-[0.25em] text-[#00A859] mb-1">Administración</p>
         <h1 class="text-2xl font-black tracking-tight text-gray-900">Gestión de cuentas</h1>
         <p class="text-sm text-gray-400 mt-1">Crea, activa, bloquea y elimina cuentas de docentes y empresas.</p>
+        <!-- Botón guía -->
+        <button ref="refBtnGuia"
+                @click="modoGuia = true; pasoGuia = 1"
+                :class="{ 'tour-active': pasoRefActivo === 'refBtnGuia' }"
+                class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full
+                       bg-blue-500/10 border border-blue-500/20 text-blue-500
+                       text-[10px] font-black uppercase tracking-widest
+                       hover:bg-blue-500/20 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Guía
+        </button>
       </div>
       <button
+        ref="refBtnNuevo"
         @click="modalCrear = true"
+        :class="{
+          'tour-active': pasoRefActivo === 'refBtnNuevo',
+          'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'btn-nuevo'
+        }"
         class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A859] hover:bg-[#009950]
                text-white font-black text-xs uppercase tracking-widest transition-all shrink-0 shadow-sm"
       >
@@ -380,7 +535,13 @@ onMounted(async () => {
     </div>
 
     <!-- ── Contadores ───────────────────────────────────────── -->
-    <div v-if="!cargando" class="max-w-5xl mx-auto mb-5 flex flex-wrap gap-2">
+    <div v-if="!cargando"
+         ref="refContadores"
+         :class="{
+           'tour-active': pasoRefActivo === 'refContadores',
+           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'contadores'
+         }"
+         class="max-w-5xl mx-auto mb-5 flex flex-wrap gap-2">
       <!-- Total activos -->
       <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-200 shadow-sm">
         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,7 +582,12 @@ onMounted(async () => {
     </div>
 
     <!-- ── Tabs + filtros ─────────────────────────────────── -->
-    <div class="max-w-5xl mx-auto mb-5 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <div ref="refTabs"
+         :class="{
+           'tour-active': pasoRefActivo === 'refTabs',
+           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'tabs'
+         }"
+         class="max-w-5xl mx-auto mb-5 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
       <div class="flex gap-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm">
         <button @click="cambiarVista('activos')"
           :class="vista === 'activos' ? 'bg-[#00A859]/10 text-[#00A859] border border-[#00A859]/30' : 'text-gray-400 hover:text-gray-600'"
@@ -449,7 +615,12 @@ onMounted(async () => {
     </div>
 
     <!-- ── Lista de usuarios ──────────────────────────────── -->
-    <div class="max-w-5xl mx-auto">
+    <div ref="refLista"
+         :class="{
+           'tour-active': pasoRefActivo === 'refLista',
+           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'lista'
+         }"
+         class="max-w-5xl mx-auto">
       <div v-if="cargando" class="flex items-center justify-center py-20 text-gray-300">
         <svg class="w-6 h-6 animate-spin mr-3" viewBox="0 0 24 24">
           <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
@@ -1045,6 +1216,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Tour */
+.tour-active {
+  box-shadow: 0 0 0 3px #00A859, 0 0 0 8px rgba(0, 168, 89, 0.2), 0 4px 20px rgba(0,0,0,0.1) !important;
+  border-radius: 1rem;
+  transition: box-shadow 0.25s ease;
+}
+.tour-seccion-blur {
+  filter: blur(2px);
+  opacity: 0.4;
+  pointer-events: none;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+.sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
+.sp-fade-enter-from,  .sp-fade-leave-to      { opacity: 0; }
+
 /* Transiciones generales */
 .overlay-enter-active, .overlay-leave-active { transition: opacity 0.25s ease; }
 .overlay-enter-from, .overlay-leave-to { opacity: 0; }
