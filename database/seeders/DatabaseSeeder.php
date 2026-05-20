@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
         'microreto_tokens', 'microretos',
         'resultados_aprendizaje', 'criterios_evaluacion',
         'modulos', 'centro_ciclo',
-        'ciclos_formativos', 'empresa_familia',
+        'ciclos_formativos', 'familias', 'empresa_familia',
         'empresas', 'centro_educativo', 'demos',
     ] as $tabla) {
         \Illuminate\Support\Facades\DB::table($tabla)->truncate();
