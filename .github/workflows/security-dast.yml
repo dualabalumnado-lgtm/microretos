@@ -94,11 +94,16 @@ jobs:
           echo "Timeout: la app no arrancó"
           exit 1
 
+      - name: Prepare report directory
+        run: |
+          mkdir -p zap-output
+          chmod 777 zap-output
+
       # ─── 6. ZAP SCAN ───────────────────────────────────────────────────────
       - name: OWASP ZAP Baseline Scan
         run: |
           docker run --network host \
-            -v $(pwd):/zap/wrk/:rw \
+            -v $(pwd)/zap-output:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:8000 \
@@ -113,8 +118,8 @@ jobs:
         with:
           name: zap-dast-report
           path: |
-            zap-report.html
-            zap-report.json
+            zap-output/zap-report.html
+            zap-output/zap-report.json
 
       # ─── 7. JOB SUMMARY ────────────────────────────────────────────────────
       - name: Write Job Summary
