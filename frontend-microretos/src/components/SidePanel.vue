@@ -100,44 +100,6 @@ defineExpose({ isOpen, toggle, close })
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
-      <!-- ── Cabecera: DuaLab → home + botón cerrar ── -->
-      <div class="flex items-center border-b border-white/10 shrink-0">
-        <RouterLink
-          to="/"
-          @click="close"
-          class="flex items-center gap-3 px-5 pt-4 pb-4 flex-1 min-w-0
-                 hover:opacity-80 transition-opacity duration-150"
-        >
-          <img
-            src="../assets/logo.png"
-            alt="DuaLab Logo"
-            class="h-9 w-auto object-contain"
-            @error="logoError = true"
-            v-if="!logoError"
-          />
-          <div v-else
-               class="w-9 h-9 rounded-xl bg-[#00A859] flex items-center justify-center font-black text-white text-sm shrink-0">
-            D
-          </div>
-          <span class="ml-4 font-black text-xl tracking-tighter text-white uppercase select-none">
-            Dua<span class="text-[#00A859]">Lab</span>
-          </span>
-        </RouterLink>
-
-        <!-- Botón cerrar panel -->
-        <button
-          @click="close"
-          aria-label="Cerrar menú"
-          class="mr-3 w-8 h-8 rounded-xl flex items-center justify-center
-                 text-white/40 hover:text-white hover:bg-white/10
-                 transition-all duration-150 shrink-0"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-
       <!-- ── Navegación ── -->
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 
