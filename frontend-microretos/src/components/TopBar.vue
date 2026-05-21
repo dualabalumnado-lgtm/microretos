@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../api.js'
 import { useAuthStore } from '../stores/auth'
 
@@ -71,21 +71,19 @@ const cerrarSesion = async () => {
       </span>
     </button>
 
-    <!-- Logo DuaLab -->
-    <RouterLink to="/" class="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity duration-150">
-      <img src="../assets/logo.png" alt="DuaLab" class="h-6 w-auto object-contain" />
-      <span class="font-black text-sm tracking-tighter text-white uppercase select-none">
-        Dua<span class="text-[#00A859]">Lab</span>
-      </span>
-    </RouterLink>
-
-    <!-- Separador + sección activa -->
-    <template v-if="sectionLabel">
-      <span class="text-white/15 select-none">/</span>
-      <span class="text-[11px] font-black uppercase tracking-[0.15em] text-white/50 truncate">
-        {{ sectionLabel }}
-      </span>
-    </template>
+    <!-- Section label -->
+    <span
+      v-if="sectionLabel"
+      class="text-[11px] font-black uppercase tracking-[0.15em] text-white/50 truncate"
+    >
+      {{ sectionLabel }}
+    </span>
+    <span
+      v-else
+      class="font-black text-sm tracking-tighter text-white/40 uppercase select-none"
+    >
+      Dua<span class="text-[#00A859]/60">Lab</span>
+    </span>
 
     <div class="flex-1" />
 
