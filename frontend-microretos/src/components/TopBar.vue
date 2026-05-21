@@ -74,7 +74,7 @@ const cerrarSesion = async () => {
     <!-- Logo DuaLab -->
     <RouterLink to="/" class="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity duration-150">
       <img src="../assets/logo.png" alt="DuaLab" class="h-6 w-auto object-contain" />
-      <span class="font-black text-sm tracking-tighter text-white uppercase select-none hidden sm:block">
+      <span class="font-black text-sm tracking-tighter text-white uppercase select-none">
         Dua<span class="text-[#00A859]">Lab</span>
       </span>
     </RouterLink>
