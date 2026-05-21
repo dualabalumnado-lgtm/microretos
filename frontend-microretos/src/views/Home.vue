@@ -55,7 +55,7 @@ const irABiblioteca = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] overflow-hidden font-sans text-[#1F2937] relative flex items-center justify-center p-4 md:p-12">
+  <div class="min-h-screen bg-[#F8FAFC] overflow-hidden font-sans text-[#1F2937] relative flex items-center justify-center p-4 md:p-12 pt-12 md:pt-12">
     
     <div class="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-[#99CC33]/10 rounded-full blur-[100px] pointer-events-none transition-opacity duration-1000" :class="isLoaded ? 'opacity-100' : 'opacity-0'"></div>
     <div class="absolute bottom-[-10%] right-[-10%] w-[30vw] h-[30vw] bg-[#00A859]/10 rounded-full blur-[100px] pointer-events-none transition-opacity duration-1000 delay-300" :class="isLoaded ? 'opacity-100' : 'opacity-0'"></div>

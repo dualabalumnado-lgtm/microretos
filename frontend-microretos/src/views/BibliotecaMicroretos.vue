@@ -326,7 +326,7 @@ function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 font-sans text-[#1F2937] relative overflow-hidden">
+  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 font-sans text-[#1F2937] relative overflow-hidden pt-12 md:pt-12">
 
     <div
       class="absolute top-[-10%] left-1/2 transform -translate-x-1/2 w-[800px] h-[500px] bg-[#99CC33] blur-[120px] rounded-full pointer-events-none transition-opacity duration-1000"

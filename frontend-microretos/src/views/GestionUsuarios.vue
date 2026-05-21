@@ -1,96 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import api from '../api.js'
-import { useUIState } from '../composables/useUIState.js'
-
-const { tourActivo } = useUIState()
-
-// ── Tour guiado ─────────────────────────────────────────────────────────────
-const modoGuia = ref(false)
-const pasoGuia = ref(1)
-
-const refContadores = ref(null)
-const refTabs       = ref(null)
-const refLista      = ref(null)
-const refBtnNuevo   = ref(null)
-const refBtnGuia    = ref(null)
-
-const tourRefs = { refContadores, refTabs, refLista, refBtnNuevo, refBtnGuia }
-
-const guiaPasosData = [
-  { ref: 'refContadores', seccion: 'contadores', texto: 'Aquí puedes ver de un vistazo el total de cuentas activas, cuántas son docentes, cuántas son empresas y cuántas hay en la papelera.' },
-  { ref: 'refTabs',       seccion: 'tabs',        texto: 'Alterna entre la vista de cuentas activas y la papelera. También puedes filtrar por rol: Todos, Docentes o Empresas.' },
-  { ref: 'refLista',      seccion: 'lista',       texto: 'Aquí aparecen todas las cuentas. Cada fila muestra el nombre, rol, estado (sin activar o bloqueada) y las acciones disponibles: activar, editar, bloquear y eliminar.' },
-  { ref: 'refBtnNuevo',   seccion: 'btn-nuevo',   texto: 'Pulsa aquí para crear una nueva cuenta de docente o empresa. Las cuentas nuevas quedan pendientes de activación hasta que las valides manualmente.' },
-  { ref: 'refBtnGuia',    seccion: null,           texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
-]
-
-const pasoActual    = computed(() => guiaPasosData[pasoGuia.value - 1])
-const seccionActiva = computed(() => modoGuia.value ? (pasoActual.value?.seccion ?? null) : null)
-const pasoRefActivo = computed(() => modoGuia.value ? (pasoActual.value?.ref ?? null) : null)
-
-const bocadilloPos = ref({ top: 60, left: 16, width: 300, dir: 'top', arrowLeft: 150 })
-
-function recalcularBocadillo() {
-  const el = tourRefs[pasoActual.value?.ref]?.value
-  if (!el) return
-  const rect      = el.getBoundingClientRect()
-  const WIN_W     = window.innerWidth
-  const WIN_H     = window.innerHeight
-  const TOOLTIP_W = Math.min(300, WIN_W - 32)
-  const TOOLTIP_H = 200
-  const GAP       = 14
-
-  const visibleTop    = Math.max(0, rect.top)
-  const visibleBottom = Math.min(WIN_H, rect.bottom)
-  const centerX       = rect.left + rect.width / 2
-
-  const spaceBelow = WIN_H - visibleBottom - GAP
-  const spaceAbove = visibleTop - GAP
-  const dir = spaceBelow >= TOOLTIP_H + GAP ? 'top' : spaceAbove >= TOOLTIP_H + GAP ? 'bottom' : 'top'
-
-  let tooltipTop = dir === 'top' ? visibleBottom + GAP : visibleTop - TOOLTIP_H - GAP
-  tooltipTop = Math.max(10, Math.min(tooltipTop, WIN_H - TOOLTIP_H - 10))
-
-  let tooltipLeft = centerX - TOOLTIP_W / 2
-  tooltipLeft = Math.max(16, Math.min(tooltipLeft, WIN_W - TOOLTIP_W - 16))
-
-  const arrowLeft = Math.max(16, Math.min(centerX - tooltipLeft, TOOLTIP_W - 16))
-
-  bocadilloPos.value = { top: tooltipTop, left: tooltipLeft, width: TOOLTIP_W, dir, arrowLeft }
-}
-
-function scrollYRecalcular() {
-  const el = tourRefs[pasoActual.value?.ref]?.value
-  if (el) el.scrollIntoView({ behavior: 'instant', block: 'nearest' })
-  requestAnimationFrame(() => requestAnimationFrame(recalcularBocadillo))
-}
-
-function onScrollGuia() {
-  if (modoGuia.value) requestAnimationFrame(recalcularBocadillo)
-}
-
-watch(pasoGuia, () => { if (modoGuia.value) nextTick(scrollYRecalcular) })
-watch(modoGuia, (val) => {
-  tourActivo.value = val
-  if (val) {
-    window.addEventListener('scroll', onScrollGuia, { passive: true })
-    nextTick(scrollYRecalcular)
-  } else {
-    window.removeEventListener('scroll', onScrollGuia)
-  }
-})
-
-function avanzarPaso() {
-  if (pasoGuia.value < guiaPasosData.length) {
-    pasoGuia.value++
-  } else {
-    modoGuia.value = false
-    pasoGuia.value = 1
-  }
-}
-function retrocederPaso() { if (pasoGuia.value > 1) pasoGuia.value-- }
-function cerrarGuia() { modoGuia.value = false; pasoGuia.value = 1 }
 
 // ── Estado principal ────────────────────────────────────────────────
 const usuarios    = ref([])
@@ -421,8 +331,8 @@ function cambiarVista(v) {
 
 // ── Formato ─────────────────────────────────────────────────────────
 const ROLE_COLORS = {
-  2: { bg: 'bg-blue-50 text-blue-700 border-blue-200',    label: 'Docente' },
-  3: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Empresa' },
+  2: { bg: 'bg-blue-50 text-blue-600 border-blue-200',    label: 'Docente' },
+  3: { bg: 'bg-amber-50 text-amber-600 border-amber-200', label: 'Empresa' },
 }
 function roleChip(role) {
   return ROLE_COLORS[role] ?? { bg: 'bg-gray-100 text-gray-500 border-gray-200', label: 'Admin' }
@@ -444,88 +354,23 @@ onMounted(async () => {
   } finally {
     cargando.value = false
   }
-  await nextTick()
-  pasoGuia.value = 1
-  modoGuia.value = true
-})
-
-onUnmounted(() => {
-  tourActivo.value = false
-  window.removeEventListener('scroll', onScrollGuia)
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 lg:px-8">
-
-    <!-- ══ TOUR BOCADILLO ═══════════════════════════════════════════════════ -->
-    <Transition name="sp-fade">
-      <div v-if="modoGuia" class="fixed inset-0 z-[9990] pointer-events-none">
-        <div class="absolute inset-0 pointer-events-auto" />
-        <div class="absolute pointer-events-auto"
-             :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: bocadilloPos.width + 'px', zIndex: 9992 }">
-          <div v-if="bocadilloPos.dir === 'top'"
-               class="absolute bg-[#1a2332] border-l border-t border-white/10 w-3 h-3 rotate-45 -top-1.5"
-               :style="{ left: (bocadilloPos.arrowLeft - 6) + 'px' }" />
-          <div class="bg-[#1a2332] border border-white/10 rounded-2xl p-4 shadow-2xl">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[9px] font-black uppercase tracking-widest text-[#00A859]">Gestión de cuentas · Guía</span>
-              <span class="text-[9px] font-bold text-white/40">{{ pasoGuia }} / {{ guiaPasosData.length }}</span>
-            </div>
-            <p class="text-xs text-white/80 leading-relaxed mb-3">{{ pasoActual?.texto }}</p>
-            <div class="flex items-center justify-between gap-2">
-              <button @click="cerrarGuia" class="text-[10px] font-bold text-white/30 hover:text-white/60 transition-colors">
-                Cerrar
-              </button>
-              <div class="flex gap-2">
-                <button v-if="pasoGuia > 1" @click="retrocederPaso"
-                        class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[11px] font-black hover:bg-white/20 transition-all">
-                  ← Ant.
-                </button>
-                <button @click="avanzarPaso"
-                        class="px-3 py-1.5 rounded-xl bg-[#00A859] text-white text-[11px] font-black hover:bg-[#00A859]/80 transition-all">
-                  {{ pasoGuia < guiaPasosData.length ? 'Siguiente →' : 'Finalizar' }}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div v-if="bocadilloPos.dir === 'bottom'"
-               class="absolute bg-[#1a2332] border-r border-b border-white/10 w-3 h-3 rotate-45 -bottom-1.5"
-               :style="{ left: (bocadilloPos.arrowLeft - 6) + 'px' }" />
-        </div>
-      </div>
-    </Transition>
+  <div class="min-h-screen bg-gray-50 text-[#121212] px-4 py-8 lg:px-8 pt-12 md:pt-12">
 
     <!-- ── Cabecera ────────────────────────────────────────── -->
     <div class="max-w-5xl mx-auto mb-8 flex flex-col sm:flex-row sm:items-end gap-4">
       <div class="flex-1">
         <p class="text-[10px] font-black uppercase tracking-[0.25em] text-[#00A859] mb-1">Administración</p>
-        <h1 class="text-2xl font-black tracking-tight text-gray-900">Gestión de cuentas</h1>
-        <p class="text-sm text-gray-400 mt-1">Crea, activa, bloquea y elimina cuentas de docentes y empresas.</p>
-        <!-- Botón guía -->
-        <button ref="refBtnGuia"
-                @click="modoGuia = true; pasoGuia = 1"
-                :class="{ 'tour-active': pasoRefActivo === 'refBtnGuia' }"
-                class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full
-                       bg-blue-500/10 border border-blue-500/20 text-blue-500
-                       text-[10px] font-black uppercase tracking-widest
-                       hover:bg-blue-500/20 transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          Guía
-        </button>
+        <h1 class="text-2xl font-black tracking-tight">Gestión de cuentas</h1>
+        <p class="text-sm text-gray-500 mt-1">Crea, activa, bloquea y elimina cuentas de docentes y empresas.</p>
       </div>
       <button
-        ref="refBtnNuevo"
         @click="modalCrear = true"
-        :class="{
-          'tour-active': pasoRefActivo === 'refBtnNuevo',
-          'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'btn-nuevo'
-        }"
         class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A859] hover:bg-[#009950]
-               text-white font-black text-xs uppercase tracking-widest transition-all shrink-0 shadow-sm"
+               text-white font-black text-xs uppercase tracking-widest transition-all shrink-0"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v14M5 12h14"/>
@@ -535,20 +380,14 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Contadores ───────────────────────────────────────── -->
-    <div v-if="!cargando"
-         ref="refContadores"
-         :class="{
-           'tour-active': pasoRefActivo === 'refContadores',
-           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'contadores'
-         }"
-         class="max-w-5xl mx-auto mb-5 flex flex-wrap gap-2">
+    <div v-if="!cargando" class="max-w-5xl mx-auto mb-5 flex flex-wrap gap-2">
       <!-- Total activos -->
-      <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-200 shadow-sm">
+      <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-2xl border border-gray-200">
         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
         </svg>
-        <span class="font-black text-xl text-gray-800">{{ totalActivos }}</span>
+        <span class="font-black text-xl text-[#121212]">{{ totalActivos }}</span>
         <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">cuentas</span>
       </div>
       <!-- Docentes -->
@@ -557,8 +396,8 @@ onUnmounted(() => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 3h6v4H9V3zM9 12l2 2 4-4"/>
         </svg>
-        <span class="font-black text-xl text-blue-700">{{ totalDocentes }}</span>
-        <span class="text-xs font-semibold text-blue-500 uppercase tracking-wider">docentes</span>
+        <span class="font-black text-xl text-blue-600">{{ totalDocentes }}</span>
+        <span class="text-xs font-semibold text-blue-400 uppercase tracking-wider">docentes</span>
       </div>
       <!-- Empresas -->
       <div class="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-2xl border border-amber-200">
@@ -566,36 +405,31 @@ onUnmounted(() => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
-        <span class="font-black text-xl text-amber-700">{{ totalEmpresas }}</span>
-        <span class="text-xs font-semibold text-amber-500 uppercase tracking-wider">empresas</span>
+        <span class="font-black text-xl text-amber-600">{{ totalEmpresas }}</span>
+        <span class="text-xs font-semibold text-amber-400 uppercase tracking-wider">empresas</span>
       </div>
       <!-- Papelera -->
       <div v-if="totalPapelera > 0" class="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-2xl border border-red-200">
-        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <polyline points="3 6 5 6 21 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
         </svg>
-        <span class="font-black text-xl text-red-600">{{ totalPapelera }}</span>
-        <span class="text-xs font-semibold text-red-500 uppercase tracking-wider">reciclados</span>
+        <span class="font-black text-xl text-red-500">{{ totalPapelera }}</span>
+        <span class="text-xs font-semibold text-red-400 uppercase tracking-wider">reciclados</span>
       </div>
     </div>
 
     <!-- ── Tabs + filtros ─────────────────────────────────── -->
-    <div ref="refTabs"
-         :class="{
-           'tour-active': pasoRefActivo === 'refTabs',
-           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'tabs'
-         }"
-         class="max-w-5xl mx-auto mb-5 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-      <div class="flex gap-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm">
+    <div class="max-w-5xl mx-auto mb-5 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+      <div class="flex gap-1 p-1 bg-gray-100 border border-gray-200 rounded-xl">
         <button @click="cambiarVista('activos')"
-          :class="vista === 'activos' ? 'bg-[#00A859]/10 text-[#00A859] border border-[#00A859]/30' : 'text-gray-400 hover:text-gray-600'"
+          :class="vista === 'activos' ? 'bg-[#00A859]/20 text-[#00A859] border border-[#00A859]/40' : 'text-gray-400 hover:text-gray-600'"
           class="px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all">
           Activos
         </button>
         <button @click="cambiarVista('papelera')"
-          :class="vista === 'papelera' ? 'bg-red-50 text-red-600 border border-red-200' : 'text-gray-400 hover:text-gray-600'"
+          :class="vista === 'papelera' ? 'bg-red-100 text-red-600 border border-red-300' : 'text-gray-400 hover:text-gray-600'"
           class="px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
@@ -604,10 +438,10 @@ onUnmounted(() => {
           Papelera
         </button>
       </div>
-      <div class="flex gap-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm">
+      <div class="flex gap-1 p-1 bg-gray-100 border border-gray-200 rounded-xl">
         <button v-for="f in [{ val: 0, label: 'Todos' }, { val: 2, label: 'Docentes' }, { val: 3, label: 'Empresas' }]"
           :key="f.val" @click="filtroRol = f.val"
-          :class="filtroRol === f.val ? 'bg-gray-100 text-gray-800' : 'text-gray-400 hover:text-gray-600'"
+          :class="filtroRol === f.val ? 'bg-white text-[#1F2937] shadow-sm' : 'text-gray-400 hover:text-gray-600'"
           class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
           {{ f.label }}
         </button>
@@ -615,28 +449,23 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Lista de usuarios ──────────────────────────────── -->
-    <div ref="refLista"
-         :class="{
-           'tour-active': pasoRefActivo === 'refLista',
-           'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'lista'
-         }"
-         class="max-w-5xl mx-auto">
-      <div v-if="cargando" class="flex items-center justify-center py-20 text-gray-300">
+    <div class="max-w-5xl mx-auto">
+      <div v-if="cargando" class="flex items-center justify-center py-20 text-gray-400">
         <svg class="w-6 h-6 animate-spin mr-3" viewBox="0 0 24 24">
           <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
         </svg>
         Cargando...
       </div>
 
-      <div v-else-if="usuariosFiltrados.length === 0" class="text-center py-20 text-gray-300 text-sm">
+      <div v-else-if="usuariosFiltrados.length === 0" class="text-center py-20 text-gray-400 text-sm">
         {{ vista === 'papelera' ? 'La papelera está vacía.' : 'No hay cuentas en este filtro.' }}
       </div>
 
       <div v-else class="space-y-2">
         <div
           v-for="u in usuariosFiltrados" :key="u.id"
-          class="flex flex-col gap-3 bg-white border rounded-2xl px-4 py-3.5 transition-all shadow-sm"
-          :class="u.is_blocked ? 'border-red-200 bg-red-50' : vista === 'papelera' ? 'border-gray-100 opacity-70' : 'border-gray-200 hover:border-gray-300 hover:shadow-md'"
+          class="flex flex-col gap-3 bg-white border rounded-2xl px-4 py-3.5 transition-all"
+          :class="u.is_blocked ? 'border-red-200 bg-red-50' : vista === 'papelera' ? 'border-gray-200 opacity-70' : 'border-gray-200 hover:border-gray-300'"
         >
           <!-- Fila principal -->
           <div class="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -644,24 +473,24 @@ onUnmounted(() => {
             <!-- Avatar + info -->
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <div class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-black text-sm"
-                   :class="u.role === 2 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'">
+                   :class="u.role === 2 ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'">
                 {{ u.name.charAt(0).toUpperCase() }}
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-bold text-sm text-gray-900 truncate">{{ u.name }}</span>
+                  <span class="font-bold text-sm text-[#1F2937] truncate">{{ u.name }}</span>
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
                         :class="roleChip(u.role).bg">
                     {{ roleChip(u.role).label }}
                   </span>
                   <span v-if="!u.is_active"
                         class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider
-                               bg-yellow-50 text-yellow-700 border border-yellow-200">
+                               bg-yellow-50 text-yellow-600 border border-yellow-200">
                     Sin activar
                   </span>
                   <span v-if="u.is_blocked"
                         class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider
-                               bg-red-50 text-red-700 border border-red-200">
+                               bg-red-50 text-red-600 border border-red-200">
                     Bloqueada
                   </span>
                 </div>
@@ -680,11 +509,11 @@ onUnmounted(() => {
 
             <!-- Fecha -->
             <div class="hidden md:block text-right shrink-0">
-              <p class="text-[10px] text-gray-300 uppercase tracking-wider">Creada</p>
+              <p class="text-[10px] text-gray-400 uppercase tracking-wider">Creada</p>
               <p class="text-xs text-gray-500">{{ fmtDate(u.created_at) }}</p>
             </div>
             <div v-if="vista === 'papelera'" class="hidden md:block text-right shrink-0">
-              <p class="text-[10px] text-gray-300 uppercase tracking-wider">Eliminada</p>
+              <p class="text-[10px] text-gray-400 uppercase tracking-wider">Eliminada</p>
               <p class="text-xs text-red-400">{{ fmtDate(u.deleted_at) }}</p>
             </div>
 
@@ -755,8 +584,8 @@ onUnmounted(() => {
               <!-- Eliminar -->
               <button @click="enviarPapelera(u)"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
-                       uppercase tracking-wider bg-red-50 text-red-500 border border-red-200
-                       hover:bg-red-100 transition-all">
+                       uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20
+                       hover:bg-red-500/20 transition-all">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"
                      stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <polyline points="3 6 5 6 21 6"/>
@@ -770,8 +599,8 @@ onUnmounted(() => {
             <div v-else class="flex items-center gap-1.5 shrink-0">
               <button @click="restaurar(u)"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
-                       uppercase tracking-wider bg-[#00A859]/10 text-[#00A859]
-                       border border-[#00A859]/30 hover:bg-[#00A859]/20 transition-all">
+                       uppercase tracking-wider bg-[#00A859]/15 text-[#00A859]
+                       border border-[#00A859]/30 hover:bg-[#00A859]/25 transition-all">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -780,8 +609,8 @@ onUnmounted(() => {
               </button>
               <button @click="destruir(u)"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
-                       uppercase tracking-wider bg-red-50 text-red-600
-                       border border-red-200 hover:bg-red-100 transition-all">
+                       uppercase tracking-wider bg-red-500/15 text-red-300
+                       border border-red-500/30 hover:bg-red-500/25 transition-all">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -795,7 +624,7 @@ onUnmounted(() => {
           <div v-if="vista === 'activos' && u.role === 2" class="border-t border-gray-100 pt-2.5">
             <button @click="abrirModalCentro(u)"
               class="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider
-                     text-gray-300 hover:text-blue-500 transition-colors">
+                     text-gray-400 hover:text-blue-600 transition-colors">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -811,11 +640,11 @@ onUnmounted(() => {
     <!-- ══ MODAL: Crear cuenta ═════════════════════════════════════ -->
     <Transition name="overlay">
       <div v-if="modalCrear"
-           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
            @click.self="modalCrear = false">
         <Transition name="modal-scale">
           <div v-if="modalCrear"
-               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-xl w-full max-w-md p-8">
+               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl w-full max-w-md p-8">
             <button @click="modalCrear = false"
               class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200
                      flex items-center justify-center text-gray-400 hover:text-gray-600 transition-all">
@@ -824,48 +653,48 @@ onUnmounted(() => {
               </svg>
             </button>
 
-            <h2 class="text-lg font-black mb-1 text-gray-900">Nueva cuenta</h2>
-            <p class="text-xs text-gray-400 mb-6">
+            <h2 class="text-lg font-black mb-1 text-[#121212]">Nueva cuenta</h2>
+            <p class="text-xs text-gray-500 mb-6">
               La cuenta quedará pendiente de activación hasta que la valides.
             </p>
 
             <form @submit.prevent="crearUsuario" class="space-y-4">
               <!-- Nombre -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Nombre</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nombre</label>
                 <input v-model="form.name" type="text" placeholder="Nombre completo"
-                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formErrors.name ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formErrors.name ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formErrors.name" class="text-[10px] text-red-500 mt-1">{{ formErrors.name }}</p>
               </div>
 
               <!-- Email -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Correo electrónico</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Correo electrónico</label>
                 <input v-model="form.email" type="email" placeholder="correo@ejemplo.com"
-                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formErrors.email ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formErrors.email ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formErrors.email" class="text-[10px] text-red-500 mt-1">{{ formErrors.email }}</p>
               </div>
 
               <!-- Contraseña -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Contraseña temporal</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Contraseña temporal</label>
                 <input v-model="form.password" type="password" placeholder="Mín. 8 caracteres, mayúsculas y números"
-                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formErrors.password ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formErrors.password ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formErrors.password" class="text-[10px] text-red-500 mt-1">{{ formErrors.password }}</p>
               </div>
 
               <!-- Rol -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Rol</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Rol</label>
                 <div class="flex gap-3">
                   <button type="button" @click="form.role = '2'"
-                    :class="form.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                    :class="form.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -874,7 +703,7 @@ onUnmounted(() => {
                     Docente
                   </button>
                   <button type="button" @click="form.role = '3'"
-                    :class="form.role === '3' ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                    :class="form.role === '3' ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -886,7 +715,7 @@ onUnmounted(() => {
                 <p v-if="formErrors.role" class="text-[10px] text-red-500 mt-1">{{ formErrors.role }}</p>
               </div>
 
-              <p v-if="msgCrear" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p v-if="msgCrear" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {{ msgCrear }}
               </p>
 
@@ -904,23 +733,23 @@ onUnmounted(() => {
     <!-- ══ MODAL: Éxito al crear cuenta ═══════════════════════════ -->
     <Transition name="overlay">
       <div v-if="modalExito"
-           class="fixed inset-0 z-[9100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+           class="fixed inset-0 z-[9100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
         <Transition name="modal-scale">
           <div v-if="modalExito"
-               class="bg-white border border-gray-200 rounded-[1.75rem] shadow-xl w-full max-w-sm p-8 text-center">
+               class="bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl w-full max-w-sm p-8 text-center">
 
             <!-- Icono -->
-            <div class="mx-auto mb-5 w-16 h-16 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/25
+            <div class="mx-auto mb-5 w-16 h-16 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/20
                         flex items-center justify-center">
               <svg class="w-8 h-8 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
               </svg>
             </div>
 
-            <h2 class="text-xl font-black mb-2 text-gray-900">¡Cuenta creada!</h2>
+            <h2 class="text-xl font-black mb-2 text-[#121212]">¡Cuenta creada!</h2>
             <p class="text-sm text-gray-500 leading-relaxed mb-2">
               La cuenta de
-              <span class="text-gray-900 font-bold">{{ cuentaRecienCreada?.name }}</span>
+              <span class="text-[#1F2937] font-bold">{{ cuentaRecienCreada?.name }}</span>
               se ha creado correctamente.
             </p>
 
@@ -932,7 +761,7 @@ onUnmounted(() => {
                   d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
               </svg>
               <div>
-                <p class="text-xs font-black text-yellow-700 uppercase tracking-wider mb-0.5">Pendiente de activación</p>
+                <p class="text-xs font-black text-yellow-600 uppercase tracking-wider mb-0.5">Pendiente de activación</p>
                 <p class="text-xs text-gray-500">
                   La cuenta aún no puede iniciar sesión.
                   Pulsa el botón <span class="text-[#00A859] font-bold">Activar</span> en la fila
@@ -954,11 +783,11 @@ onUnmounted(() => {
     <!-- ══ MODAL: Asociar centro ═══════════════════════════════════ -->
     <Transition name="overlay">
       <div v-if="modalCentro"
-           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
            @click.self="modalCentro = false">
         <Transition name="modal-scale">
           <div v-if="modalCentro"
-               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-xl
+               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl
                       w-full max-w-lg flex flex-col" style="max-height: 85vh">
 
             <!-- Cabecera -->
@@ -970,16 +799,16 @@ onUnmounted(() => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
               </button>
-              <h2 class="text-base font-black mb-0.5 text-gray-900">Asociar centro educativo</h2>
-              <p class="text-xs text-gray-400">
-                Docente: <span class="text-gray-900 font-bold">{{ usuarioCentro?.name }}</span>
+              <h2 class="text-base font-black mb-0.5 text-[#121212]">Asociar centro educativo</h2>
+              <p class="text-xs text-gray-500">
+                Docente: <span class="text-[#1F2937] font-bold">{{ usuarioCentro?.name }}</span>
               </p>
 
               <!-- Centro actual -->
               <div v-if="usuarioCentro?.centro_nombre"
                    class="mt-3 flex items-center justify-between
                           bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                <div class="flex items-center gap-2 text-xs text-blue-700">
+                <div class="flex items-center gap-2 text-xs text-blue-600">
                   <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
@@ -994,7 +823,7 @@ onUnmounted(() => {
 
               <!-- Buscador -->
               <div class="relative mt-3">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300"
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" stroke-width="2"/>
                   <path stroke-linecap="round" stroke-width="2" d="M21 21l-4.35-4.35"/>
@@ -1005,7 +834,7 @@ onUnmounted(() => {
                   placeholder="Buscar por nombre del centro…"
                   autofocus
                   class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5
-                         text-sm text-gray-800 placeholder-gray-300 outline-none
+                         text-sm text-[#1F2937] placeholder-gray-300 outline-none
                          focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10 transition-all"
                 />
               </div>
@@ -1013,7 +842,7 @@ onUnmounted(() => {
 
             <!-- Lista de centros -->
             <div class="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-              <div v-if="cargandoCentros" class="flex items-center justify-center py-10 text-gray-300">
+              <div v-if="cargandoCentros" class="flex items-center justify-center py-10 text-gray-400">
                 <svg class="w-5 h-5 animate-spin mr-2" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/>
                 </svg>
@@ -1021,7 +850,7 @@ onUnmounted(() => {
               </div>
 
               <div v-else-if="centrosFiltrados.length === 0"
-                   class="text-center py-10 text-gray-300 text-sm">
+                   class="text-center py-10 text-gray-400 text-sm">
                 No se encontraron centros con ese nombre.
               </div>
 
@@ -1033,13 +862,13 @@ onUnmounted(() => {
                 class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left
                        border transition-all disabled:opacity-50"
                 :class="usuarioCentro?.centro_educativo_id === c.id
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300 hover:text-gray-800'"
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300 hover:text-[#1F2937]'"
               >
                 <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                      :class="usuarioCentro?.centro_educativo_id === c.id ? 'bg-blue-100' : 'bg-gray-100'">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                       :class="usuarioCentro?.centro_educativo_id === c.id ? 'text-blue-600' : 'text-gray-400'">
+                       :class="usuarioCentro?.centro_educativo_id === c.id ? 'text-blue-500' : 'text-gray-400'">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
                   </svg>
@@ -1055,7 +884,7 @@ onUnmounted(() => {
             </div>
 
             <div class="px-6 py-4 border-t border-gray-100 shrink-0">
-              <p class="text-[10px] text-gray-300 text-center">
+              <p class="text-[10px] text-gray-400 text-center">
                 {{ centrosFiltrados.length }} centro{{ centrosFiltrados.length !== 1 ? 's' : '' }} encontrado{{ centrosFiltrados.length !== 1 ? 's' : '' }}
               </p>
             </div>
@@ -1067,11 +896,11 @@ onUnmounted(() => {
     <!-- ══ MODAL: Editar cuenta ══════════════════════════════════ -->
     <Transition name="overlay">
       <div v-if="modalEditar"
-           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           class="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
            @click.self="modalEditar = false">
         <Transition name="modal-scale">
           <div v-if="modalEditar"
-               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-xl w-full max-w-md p-8">
+               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl w-full max-w-md p-8">
 
             <!-- Aviso de seguridad -->
             <div class="mb-5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
@@ -1080,8 +909,8 @@ onUnmounted(() => {
                   d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
               </svg>
               <div>
-                <p class="text-xs font-black text-amber-700 uppercase tracking-wider mb-0.5">Edición de cuenta sensible</p>
-                <p class="text-xs text-gray-500">Estás modificando los datos de <span class="text-gray-900 font-bold">{{ usuarioEditando?.name }}</span>. Cualquier cambio tendrá efecto inmediato.</p>
+                <p class="text-xs font-black text-amber-600 uppercase tracking-wider mb-0.5">Edición de cuenta sensible</p>
+                <p class="text-xs text-gray-500">Estás modificando los datos de <span class="text-[#1F2937] font-bold">{{ usuarioEditando?.name }}</span>. Cualquier cambio tendrá efecto inmediato.</p>
               </div>
             </div>
 
@@ -1093,46 +922,46 @@ onUnmounted(() => {
               </svg>
             </button>
 
-            <h2 class="text-lg font-black mb-1 text-gray-900">Editar cuenta</h2>
-            <p class="text-xs text-gray-400 mb-6">Modifica los datos de la cuenta. Deja la contraseña en blanco para no cambiarla.</p>
+            <h2 class="text-lg font-black mb-1 text-[#121212]">Editar cuenta</h2>
+            <p class="text-xs text-gray-500 mb-6">Modifica los datos de la cuenta. Deja la contraseña en blanco para no cambiarla.</p>
 
             <form @submit.prevent="guardarEdicion" class="space-y-4">
               <!-- Nombre -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Nombre</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nombre</label>
                 <input v-model="formEditar.name" type="text" placeholder="Nombre completo"
-                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formEditarErrors.name ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formEditarErrors.name ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formEditarErrors.name" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.name }}</p>
               </div>
 
               <!-- Email -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Correo electrónico</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Correo electrónico</label>
                 <input v-model="formEditar.email" type="email" placeholder="correo@ejemplo.com"
-                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formEditarErrors.email ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formEditarErrors.email ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formEditarErrors.email" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.email }}</p>
               </div>
 
               <!-- Nueva contraseña (opcional) -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Nueva contraseña <span class="normal-case text-gray-300 font-normal">(opcional)</span></label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nueva contraseña <span class="normal-case text-gray-400 font-normal">(opcional)</span></label>
                 <input v-model="formEditar.password" type="password" placeholder="Dejar en blanco para no cambiar"
-                  class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 placeholder-gray-300
+                  class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
-                  :class="formEditarErrors.password ? 'border-red-300' : 'border-gray-200'" />
+                  :class="formEditarErrors.password ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formEditarErrors.password" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.password }}</p>
               </div>
 
               <!-- Rol -->
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Rol</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Rol</label>
                 <div class="flex gap-3">
                   <button type="button" @click="formEditar.role = '2'"
-                    :class="formEditar.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                    :class="formEditar.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1141,7 +970,7 @@ onUnmounted(() => {
                     Docente
                   </button>
                   <button type="button" @click="formEditar.role = '3'"
-                    :class="formEditar.role === '3' ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                    :class="formEditar.role === '3' ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1152,7 +981,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <p v-if="msgEditar" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p v-if="msgEditar" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {{ msgEditar }}
               </p>
 
@@ -1170,10 +999,10 @@ onUnmounted(() => {
     <!-- ══ MODAL: Confirmación ════════════════════════════════════ -->
     <Transition name="overlay">
       <div v-if="confirm.show"
-           class="fixed inset-0 z-[9200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           class="fixed inset-0 z-[9200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
            @click.self="confirm.show = false">
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-xl w-full max-w-sm p-6">
-          <h3 class="font-black text-base mb-2 text-gray-900">{{ confirm.title }}</h3>
+        <div class="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+          <h3 class="font-black text-base mb-2 text-[#121212]">{{ confirm.title }}</h3>
           <p class="text-sm text-gray-500 mb-6">{{ confirm.body }}</p>
           <div class="flex gap-3">
             <button @click="confirm.show = false"
@@ -1197,11 +1026,11 @@ onUnmounted(() => {
     <Transition name="toast">
       <div v-if="toast.show"
            class="fixed bottom-6 right-6 z-[9300] flex items-center gap-3 px-4 py-3
-                  rounded-xl border shadow-lg text-xs font-bold"
+                  rounded-xl border shadow-xl text-xs font-bold"
            :class="toast.ok
-             ? 'bg-white border-gray-200 text-gray-700'
-             : 'bg-red-50 border-red-200 text-red-600'">
-        <svg v-if="toast.ok" class="w-4 h-4 shrink-0 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             ? 'bg-[#00A859]/20 border-[#00A859]/40 text-[#00A859]'
+             : 'bg-red-500/20 border-red-500/40 text-red-300'">
+        <svg v-if="toast.ok" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
         </svg>
         <svg v-else class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1216,21 +1045,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Tour */
-.tour-active {
-  box-shadow: 0 0 0 3px #00A859, 0 0 0 8px rgba(0, 168, 89, 0.2), 0 4px 20px rgba(0,0,0,0.1) !important;
-  border-radius: 1rem;
-  transition: box-shadow 0.25s ease;
-}
-.tour-seccion-blur {
-  filter: blur(2px);
-  opacity: 0.4;
-  pointer-events: none;
-  transition: filter 0.3s ease, opacity 0.3s ease;
-}
-.sp-fade-enter-active, .sp-fade-leave-active { transition: opacity 200ms ease; }
-.sp-fade-enter-from,  .sp-fade-leave-to      { opacity: 0; }
-
 /* Transiciones generales */
 .overlay-enter-active, .overlay-leave-active { transition: opacity 0.25s ease; }
 .overlay-enter-from, .overlay-leave-to { opacity: 0; }

@@ -912,7 +912,7 @@ async function guardarEstadoGen(nuevoEstado) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden">
+  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden pt-12 md:pt-12">
     
     <!-- ══════════ TOUR OVERLAY ════════════════════════════════════════════ -->
   <Transition name="sp-fade">
@@ -1940,7 +1940,7 @@ async function guardarEstadoGen(nuevoEstado) {
 
       <div v-if="microretosGenerados.length > 0" class="mt-24 pb-20 space-y-32 font-sans relative">
         
-        <div v-if="microretosGenerados.length > 1" class="flex justify-center md:justify-end mb-8 sticky top-4 z-50">
+        <div v-if="microretosGenerados.length > 1" class="flex justify-center md:justify-end mb-8 sticky top-16 z-50">
             <button @click="guardarTodos" :disabled="todosGuardados || guardandoTodos" class="px-8 py-4 bg-white border-2 border-gray-200 text-[#1F2937] hover:border-[#00A859] hover:text-[#00A859] rounded-full font-black text-xs md:text-sm uppercase tracking-widest shadow-lg transition-all hover:-translate-y-1 active:scale-95 disabled:hover:translate-y-0 disabled:opacity-80 flex items-center gap-2">
                 <template v-if="guardandoTodos">
                   <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2v4a6 6 0 106 6h4a10 10 0 11-10-10z"/></svg> 
