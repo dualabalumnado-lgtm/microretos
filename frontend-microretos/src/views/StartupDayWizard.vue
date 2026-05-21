@@ -20,6 +20,27 @@ const uuid           = ref(route.params.uuid || null);
 const isLoaded       = ref(false);
 const errorMsg       = ref('');
 const publicadoExito = ref(false);
+const modalPublicarVisible   = ref(false);
+const dropdownEstadoAbierto  = ref(false);
+const modalRecurso           = ref(null); // { url, label, tipo: 'video'|'imagen'|'pdf'|'otro' }
+
+function abrirRecurso(item) {
+  const filename = (item.filename || '').toLowerCase();
+  let tipo = 'otro';
+  if (item.resource_type === 'video' || /\.(mp4|mov|avi|webm|mkv)$/.test(filename)) tipo = 'video';
+  else if (item.resource_type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(filename)) tipo = 'imagen';
+  else if (/\.pdf$/.test(filename)) tipo = 'pdf';
+  modalRecurso.value = { url: item.url, label: item.label || item.filename, tipo };
+}
+
+// Estado del proyecto con etiqueta y color para el desplegable
+const estadoOpciones = {
+  borrador:  { label: 'Borrador',  dot: 'bg-amber-400', text: 'text-amber-700', bg: 'bg-amber-50' },
+  archivado: { label: 'Archivar',  dot: 'bg-gray-400',  text: 'text-gray-500',  bg: 'bg-gray-50' },
+  publicado: { label: 'Propuesta', dot: 'bg-[#00A859]', text: 'text-[#00A859]', bg: 'bg-[#00A859]/10' },
+};
+
+const modalBorradorAviso = ref(false);
 
 const familias   = ref([]);
 const ciclos     = ref([]);
@@ -533,6 +554,7 @@ async function cargarProyecto() {
     paso.value = p.paso_actual || 1;
     pasoMaxAlcanzado.value = p.paso_actual || 1;
     proyectoValidado.value = !!p.empresa_validado;
+    if (p.estado === 'borrador') modalBorradorAviso.value = true;
     Object.assign(form.value, {
       titulo: p.titulo || '', empresa_id: p.empresa_id || '',
       centro_id: p.centro_id || '', familia_id: p.familia_id || '',
@@ -588,7 +610,7 @@ onMounted(async () => {
     }
   }
   await nextTick();
-  modoGuia.value = true;
+  if (!modalBorradorAviso.value) modoGuia.value = true;
 });
 
 // ── Guardar ───────────────────────────────────────────────────────────────────
@@ -618,10 +640,39 @@ async function guardar(siguientePaso) {
   }
 }
 
-async function publicar() {
+function mostrarModalPublicar() {
+  modalPublicarVisible.value = true;
+}
+
+async function confirmarGuardarBorrador() {
+  modalPublicarVisible.value = false;
+  form.value.estado = 'borrador';
+  await guardar(paso.value);
+}
+
+async function archivarProyecto() {
+  form.value.estado = 'archivado';
+  await guardar(paso.value);
+  dropdownEstadoAbierto.value = false;
+}
+
+async function aprobarProyecto() {
+  dropdownEstadoAbierto.value = false;
   form.value.estado = 'publicado';
   await guardar(paso.value);
   if (!errorMsg.value) publicadoExito.value = true;
+}
+
+async function seleccionarEstado(estado) {
+  dropdownEstadoAbierto.value = false;
+  if (estado === 'borrador') {
+    form.value.estado = 'borrador';
+    await guardar(paso.value);
+  } else if (estado === 'archivado') {
+    await archivarProyecto();
+  } else if (estado === 'publicado') {
+    await aprobarProyecto();
+  }
 }
 
 const progreso = computed(() => Math.round(((paso.value - 1) / (totalPasos - 1)) * 100));
@@ -667,7 +718,7 @@ const guiaWizard = [
   },
   {
     titulo: 'Paso 8 · Publicar',
-    texto: 'Revisa el resumen del proyecto. Aquí también puedes adjuntar vídeos o documentos de presentación que la empresa verá al abrir el enlace de validación. Cuando todo esté listo, pulsa "Publicar" para generar ese enlace único. Si aún falta información, guárdalo como Borrador y termínalo más tarde.',
+    texto: 'Revisa el resumen del proyecto. Aquí también puedes adjuntar vídeos o documentos de presentación que la empresa verá al abrir el enlace de validación. El proyecto se guarda como borrador por defecto. Usa el desplegable "Estado del proyecto" → "Propuesta" para generar el enlace único y enviárselo a la empresa cuando estés listo.',
   },
 ];
 
@@ -677,7 +728,7 @@ onUnmounted(() => { tourActivo.value = false; });
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]"
+  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12 md:pt-12"
        :class="isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'"
        style="transition: opacity 0.4s ease, transform 0.4s ease">
 
@@ -686,7 +737,7 @@ onUnmounted(() => { tourActivo.value = false; });
                 bg-[#99CC33] opacity-5 blur-[120px] rounded-full pointer-events-none z-0" />
 
     <!-- Barra de progreso superior -->
-    <div class="sticky top-0 z-20 bg-[#F8FAFC]/95 backdrop-blur border-b border-gray-100 shadow-sm">
+    <div class="sticky top-12 z-20 bg-[#F8FAFC]/95 backdrop-blur border-b border-gray-100 shadow-sm">
       <div class="max-w-3xl mx-auto px-4 py-3">
         <div class="flex items-center gap-4 mb-2">
           <button @click="router.push({ name: 'startup-day' })"
@@ -695,7 +746,7 @@ onUnmounted(() => { tourActivo.value = false; });
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
-            Salir
+            Todos los proyectos
           </button>
           <div class="flex-1 min-w-0">
             <p class="text-[9px] font-black uppercase tracking-[0.25em] text-[#00A859]">
@@ -706,10 +757,10 @@ onUnmounted(() => { tourActivo.value = false; });
           <span class="text-xs font-black text-gray-400 shrink-0">{{ progreso }}%</span>
           <button @click="modoGuia = true"
                   title="Ver guía de este paso"
-                  class="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 shrink-0
-                         flex items-center justify-center text-blue-500 text-xs font-black
-                         hover:bg-blue-500/20 transition-all">
-            ?
+                  class="px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 shrink-0
+                         flex items-center justify-center text-blue-500 text-[10px] font-black
+                         hover:bg-blue-500/20 transition-all uppercase tracking-widest">
+            Guía
           </button>
         </div>
 
@@ -1667,7 +1718,7 @@ onUnmounted(() => { tourActivo.value = false; });
               </svg>
             </div>
             <div>
-              <h2 class="text-2xl font-black text-[#121212]">¡Proyecto publicado!</h2>
+              <h2 class="text-2xl font-black text-[#121212]">¡Proyecto aprobado!</h2>
               <p class="text-gray-500 text-sm mt-1.5 max-w-sm mx-auto">
                 El enlace de validación ya está listo. Puedes enviárselo a la empresa por correo para que valide el proyecto.
               </p>
@@ -1763,18 +1814,21 @@ onUnmounted(() => { tourActivo.value = false; });
                 <!-- Lista -->
                 <div v-if="videosLocales.length" class="space-y-2 mb-3">
                   <div v-for="(v, i) in videosLocales" :key="i"
-                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                    <div class="w-7 h-7 rounded-lg bg-blue-50 shrink-0 flex items-center justify-center">
+                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100
+                              hover:border-blue-200 hover:bg-blue-50/40 transition-colors group/vid">
+                    <button @click="abrirRecurso(v)"
+                            class="w-7 h-7 rounded-lg bg-blue-50 shrink-0 flex items-center justify-center
+                                   group-hover/vid:bg-blue-100 transition-colors">
                       <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
                       </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs font-bold text-gray-700 truncate">{{ v.label || v.filename }}</p>
+                    </button>
+                    <button @click="abrirRecurso(v)" class="flex-1 min-w-0 text-left">
+                      <p class="text-xs font-bold text-gray-700 truncate group-hover/vid:text-blue-600 transition-colors">{{ v.label || v.filename }}</p>
                       <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ v.filename }}</p>
-                    </div>
-                    <button @click="removeVideo(i)"
+                    </button>
+                    <button @click.stop="removeVideo(i)"
                             class="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-colors shrink-0">
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
@@ -1807,23 +1861,26 @@ onUnmounted(() => { tourActivo.value = false; });
 
               <!-- ── DOCUMENTOS ─────────────────────────────────────── -->
               <div>
-                <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-3">Documentos</p>
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-3">Documentos, imágenes, etc...</p>
 
                 <!-- Lista -->
                 <div v-if="documentosLocales.length" class="space-y-2 mb-3">
                   <div v-for="(d, i) in documentosLocales" :key="i"
-                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                    <div class="w-7 h-7 rounded-lg bg-[#00A859]/10 shrink-0 flex items-center justify-center">
+                       class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100
+                              hover:border-[#00A859]/30 hover:bg-[#00A859]/5 transition-colors group/doc">
+                    <button @click="abrirRecurso(d)"
+                            class="w-7 h-7 rounded-lg bg-[#00A859]/10 shrink-0 flex items-center justify-center
+                                   group-hover/doc:bg-[#00A859]/20 transition-colors">
                       <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                       </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs font-bold text-gray-700 truncate">{{ d.label || d.filename }}</p>
+                    </button>
+                    <button @click="abrirRecurso(d)" class="flex-1 min-w-0 text-left">
+                      <p class="text-xs font-bold text-gray-700 truncate group-hover/doc:text-[#00A859] transition-colors">{{ d.label || d.filename }}</p>
                       <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ d.filename }}</p>
-                    </div>
-                    <button @click="removeDocumento(i)"
+                    </button>
+                    <button @click.stop="removeDocumento(i)"
                             class="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-colors shrink-0">
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
@@ -1846,7 +1903,7 @@ onUnmounted(() => { tourActivo.value = false; });
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
                     <span class="text-xs text-gray-400 font-medium">
-                      {{ subiendoDoc ? 'Subiendo documento...' : 'Seleccionar archivo (PDF, Word, Excel, imagen...)' }}
+                      {{ subiendoDoc ? 'Subiendo archivo...' : 'Seleccionar archivo (PDF, Word, Excel, imagen...)' }}
                     </span>
                     <input type="file"
                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp,.zip"
@@ -1859,28 +1916,140 @@ onUnmounted(() => { tourActivo.value = false; });
             </div>
           </div>
 
-          <div class="bg-[#00A859]/8 border border-[#00A859]/20 rounded-4xl p-5 mb-5">
+          <div class="bg-amber-50/80 border border-amber-200/60 rounded-4xl p-5 mb-5">
             <div class="flex items-start gap-3">
-              <svg class="w-5 h-5 text-[#00A859] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
               <p class="text-sm text-[#1F2937] leading-relaxed">
-                Al publicar se generará un <strong>enlace único</strong> que podrás enviar a la empresa para que valide el proyecto.
-                Podrás seguir editando el proyecto después de publicarlo.
+                El proyecto se guarda como <strong>borrador</strong> por defecto. Usa el desplegable <strong>Estado del proyecto</strong> para cambiar el estado.
+                Selecciona <strong>Propuesta</strong> para generar el enlace único de validación y enviárselo a la empresa.
+                Una vez la empresa valide el enlace, el proyecto quedará marcado como <strong>Validado</strong>.
               </p>
             </div>
           </div>
 
           <div class="flex flex-col sm:flex-row justify-between gap-3">
             <button @click="paso = 7" class="btn-secondary">← Anterior</button>
-            <div class="flex gap-3">
-              <button @click="guardar(paso)" :disabled="guardando" class="btn-secondary">
-                {{ guardando ? 'Guardando…' : 'Guardar borrador' }}
+            <div class="flex flex-wrap gap-3 justify-end items-center">
+
+              <!-- ── Desplegable Estado del proyecto ── -->
+              <div class="relative">
+                <button
+                  @click="dropdownEstadoAbierto = !dropdownEstadoAbierto"
+                  :disabled="guardando"
+                  class="btn-secondary flex items-center gap-2"
+                >
+                  <!-- Dot + label del estado actual -->
+                  <span :class="['w-2 h-2 rounded-full shrink-0', estadoOpciones[form.estado]?.dot || 'bg-amber-400']" />
+                  <span :class="estadoOpciones[form.estado]?.text || 'text-amber-700'">
+                    {{ estadoOpciones[form.estado]?.label || 'Borrador' }}
+                  </span>
+                  <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+
+                <!-- Menú desplegable -->
+                <Transition enter-active-class="transition-all duration-150 ease-out"
+                            enter-from-class="opacity-0 scale-95 -translate-y-1"
+                            leave-active-class="transition-all duration-100 ease-in"
+                            leave-to-class="opacity-0 scale-95 -translate-y-1">
+                  <div v-if="dropdownEstadoAbierto"
+                       class="absolute bottom-full right-0 mb-2 bg-white border border-gray-100
+                              rounded-2xl shadow-xl p-2 min-w-[190px] z-20">
+
+                    <!-- Borrador -->
+                    <button @click="seleccionarEstado('borrador')"
+                            :class="['w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-colors',
+                                     form.estado === 'borrador'
+                                       ? 'bg-amber-50 text-amber-700'
+                                       : 'text-amber-700 hover:bg-amber-50']">
+                      <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      Borrador
+                      <svg v-if="form.estado === 'borrador'" class="w-3.5 h-3.5 ml-auto text-amber-500"
+                           fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    </button>
+
+                    <!-- Archivar -->
+                    <button @click="seleccionarEstado('archivado')"
+                            :class="['w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-colors',
+                                     form.estado === 'archivado'
+                                       ? 'bg-gray-100 text-gray-600'
+                                       : 'text-gray-500 hover:bg-gray-50']">
+                      <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+                      Archivar
+                      <svg v-if="form.estado === 'archivado'" class="w-3.5 h-3.5 ml-auto text-gray-400"
+                           fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    </button>
+
+                    <div class="my-1 border-t border-gray-100" />
+
+                    <!-- Propuesta + (i) -->
+                    <div class="flex items-center gap-1 px-1">
+                      <button @click="seleccionarEstado('publicado')"
+                              :class="['flex-1 flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-xs font-bold text-left transition-colors',
+                                       form.estado === 'publicado'
+                                         ? 'bg-[#00A859]/10 text-[#00A859]'
+                                         : 'text-[#00A859] hover:bg-[#00A859]/10']">
+                        <span class="w-2 h-2 rounded-full bg-[#00A859] shrink-0" />
+                        Propuesta
+                        <svg v-if="form.estado === 'publicado'" class="w-3.5 h-3.5 ml-auto text-[#00A859]"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </button>
+                      <!-- Tooltip (i) -->
+                      <div class="relative group/info shrink-0">
+                        <div class="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center cursor-help">
+                          <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                          </svg>
+                        </div>
+                        <div class="absolute hidden group-hover/info:block bottom-full right-0 mb-2
+                                    bg-[#1a2332] text-white text-[11px] rounded-xl p-3 w-56 z-30
+                                    leading-relaxed shadow-2xl">
+                          Selecciona <strong class="text-white">Propuesta</strong> para generar el enlace único y enviárselo a la empresa. Cuando la empresa valide, el proyecto pasará a <strong class="text-white">Validado</strong>.
+                          <div class="absolute bottom-[-4px] right-3 w-2 h-2 bg-[#1a2332] rotate-45" />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </Transition>
+
+                <!-- Capa para cerrar al hacer clic fuera -->
+                <div v-if="dropdownEstadoAbierto"
+                     class="fixed inset-0 z-10"
+                     @click="dropdownEstadoAbierto = false" />
+              </div>
+
+              <!-- Archivar Proyecto (antes: Guardar borrador) -->
+              <button @click="archivarProyecto" :disabled="guardando" class="btn-secondary">
+                {{ guardando ? 'Archivando…' : 'Archivar Proyecto' }}
               </button>
-              <button @click="publicar" :disabled="guardando || !form.titulo.trim()" class="btn-primary">
-                {{ guardando ? 'Publicando…' : 'Publicar proyecto' }}
+
+              <!-- Biblioteca de proyectos -->
+              <button @click="router.push({ name: 'startup-day' })"
+                      class="btn-secondary flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                </svg>
+                Biblioteca
               </button>
+
+              <!-- Publicar proyecto → muestra modal, guarda como borrador -->
+              <button @click="mostrarModalPublicar" :disabled="guardando || !form.titulo.trim()" class="btn-primary">
+                {{ guardando ? 'Guardando…' : 'Publicar proyecto' }}
+              </button>
+
             </div>
           </div>
           </template>
@@ -1889,6 +2058,181 @@ onUnmounted(() => { tourActivo.value = false; });
       </template>
     </div>
   </div>
+
+  <!-- ══ MODAL AVISO BORRADOR ════════════════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalBorradorAviso"
+         class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+         @click.self="modalBorradorAviso = false; modoGuia.value = true">
+
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8">
+
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100
+                    flex items-center justify-center mb-5 mx-auto">
+          <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+
+        <h3 class="text-xl font-black text-[#121212] text-center mb-4">
+          Proyecto en borrador
+        </h3>
+
+        <p class="text-sm text-gray-600 leading-relaxed text-center">
+          Este proyecto está marcado como <strong>borrador</strong> porque se guardó así para seguir editando.
+          Si necesitas enviarlo a la empresa, termina de editar y en el desplegable <strong>Estado del proyecto</strong>
+          selecciona <strong>Propuesta</strong> para generar el enlace de validación.
+        </p>
+
+        <button
+          @click="modalBorradorAviso = false; modoGuia.value = true"
+          class="mt-7 w-full inline-flex items-center justify-center
+                 px-6 py-3 bg-[#1F2937] text-white rounded-full
+                 text-xs font-black uppercase tracking-widest shadow-sm
+                 hover:bg-[#1F2937]/80 transition-all active:scale-95"
+        >
+          Entendido, seguir editando
+        </button>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- ══ MODAL VISOR RECURSOS (vídeos / docs / imágenes) ══════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalRecurso"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @click.self="modalRecurso = null">
+
+      <!-- Backdrop con blur -->
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-md" @click="modalRecurso = null" />
+
+      <!-- Panel -->
+      <div class="relative z-10 bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden
+                  flex flex-col max-h-[90vh]">
+
+        <!-- Cabecera -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <p class="text-sm font-black text-[#121212] truncate pr-4">{{ modalRecurso.label }}</p>
+          <button @click="modalRecurso = null"
+                  class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center
+                         text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Contenido según tipo -->
+        <div class="flex-1 overflow-auto bg-gray-950 flex items-center justify-center min-h-[300px]">
+
+          <!-- Vídeo -->
+          <video v-if="modalRecurso.tipo === 'video'"
+                 :src="modalRecurso.url"
+                 controls autoplay
+                 class="w-full max-h-[70vh] object-contain" />
+
+          <!-- Imagen -->
+          <img v-else-if="modalRecurso.tipo === 'imagen'"
+               :src="modalRecurso.url"
+               :alt="modalRecurso.label"
+               class="max-w-full max-h-[70vh] object-contain" />
+
+          <!-- PDF -->
+          <iframe v-else-if="modalRecurso.tipo === 'pdf'"
+                  :src="modalRecurso.url"
+                  class="w-full h-[70vh] border-0" />
+
+          <!-- Otro (enlace externo) -->
+          <div v-else class="flex flex-col items-center gap-4 p-10 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center">
+              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <p class="text-gray-400 text-sm">Este tipo de archivo no se puede previsualizar</p>
+            <a :href="modalRecurso.url" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00A859] text-white
+                      rounded-full text-xs font-black uppercase tracking-widest
+                      hover:bg-[#00A859]/90 transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+              Abrir en nueva pestaña
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- ══ MODAL AVISO PUBLICAR ══════════════════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalPublicarVisible"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @click.self="modalPublicarVisible = false">
+
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      <!-- Contenido -->
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8
+                  transform transition-all duration-200"
+           :class="modalPublicarVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'">
+
+        <!-- Icono -->
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100
+                    flex items-center justify-center mb-5 mx-auto">
+          <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+
+        <h3 class="text-xl font-black text-[#121212] text-center mb-4">
+          Sobre la publicación del proyecto
+        </h3>
+
+        <p class="text-sm text-gray-600 leading-relaxed text-center">
+          Este proyecto se guarda como <strong>borrador</strong> por defecto.
+          Puedes modificar esta opción, pero se aconseja validar con la empresa
+          previamente enviándoles el enlace, antes de marcarla como validada.
+          El enlace se generará una vez selecciones <strong>Propuesta</strong> en el desplegable de Estado del proyecto.
+        </p>
+
+        <button
+          @click="confirmarGuardarBorrador"
+          class="mt-7 w-full inline-flex items-center justify-center
+                 px-6 py-3 bg-[#00A859] text-white rounded-full
+                 text-xs font-black uppercase tracking-widest shadow-sm
+                 hover:bg-[#00A859]/90 transition-all active:scale-95"
+        >
+          Entendido
+        </button>
+      </div>
+    </div>
+  </Transition>
+
 </template>
 
 <style scoped>

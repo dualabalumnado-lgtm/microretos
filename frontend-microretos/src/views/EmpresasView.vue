@@ -44,20 +44,20 @@ const modoEjemplo       = ref('')   // 'contactar' | 'validar'
 
 const empresaEjemplo = {
   id: -1,
-  nombre_comercial: 'TechSolutions SL',
-  razon_social: 'TechSolutions Solutions SL',
-  cif: 'B12345678',
-  sector: 'Tecnología',
-  municipio: 'Las Palmas de GC',
-  provincia: 'Las Palmas',
-  email_general: 'info@techsolutions.es',
-  email_contacto: 'rrhh@techsolutions.es',
-  persona_contacto: 'María García',
-  posicion_contacto: 'Responsable de RRHH',
+  nombre_comercial: 'Herrería Canaria Artesanal SL',
+  razon_social: 'Herrería Canaria Artesanal Sociedad Limitada',
+  cif: 'B38901234',
+  sector: 'Fabricación y metal',
+  municipio: 'Santa Cruz de Tenerife',
+  provincia: 'Santa Cruz de Tenerife',
+  email_general: 'info@herreriacanaria.es',
+  email_contacto: 'formacion@herreriacanaria.es',
+  persona_contacto: 'Carlos Medina',
+  posicion_contacto: 'Responsable de formación',
   estado_contacto: 'Pendiente',
-  telefono: '928 123 456',
-  actividad: 'Desarrollo de software a medida',
-  familias: [{ id: 1, nombre: 'Informática y Comunicaciones' }],
+  telefono: '922 456 789',
+  actividad: 'Fabricación de estructuras metálicas y forja artesanal',
+  familias: [{ id: 2, nombre: 'Fabricación Mecánica' }],
 }
 
 function abrirBienvenida(modo) {
@@ -308,7 +308,7 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
+  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Fondo decorativo -->
     <div class="fixed top-0 right-0 w-150 h-100
@@ -324,13 +324,13 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
     ═════════════════════════════════════════════════════════ -->
     <Transition name="bv-fade">
       <div v-if="desbloqueado && mostrarBienvenida"
-           class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="relative bg-[#1a2332] border border-white/10 rounded-[2rem]
-                    shadow-2xl max-w-md w-full p-8 text-white">
+           class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div class="relative bg-white border border-gray-200 rounded-[2rem]
+                    shadow-2xl max-w-md w-full p-8">
 
           <!-- Cabecera -->
           <div class="flex items-center gap-3 mb-6">
-            <div class="w-12 h-12 rounded-2xl bg-[#00A859]/15 border border-[#00A859]/30
+            <div class="w-12 h-12 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/20
                         flex items-center justify-center shrink-0">
               <svg class="w-6 h-6 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -340,7 +340,7 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
             </div>
             <div>
               <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-0.5">Directorio de empresas</p>
-              <h2 class="text-xl font-black tracking-tight text-white">¿Qué necesitas?</h2>
+              <h2 class="text-xl font-black tracking-tight text-[#121212]">¿Qué necesitas?</h2>
             </div>
           </div>
 
@@ -348,64 +348,64 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
           <div class="space-y-3 mb-6">
 
             <button @click="abrirBienvenida('contactar')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-[#00A859]/10 hover:border-[#00A859]/30
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-gray-200
+                           bg-gray-50 hover:bg-[#00A859]/8 hover:border-[#00A859]/30
                            transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-[#00A859]/15 border border-[#00A859]/25
+              <div class="w-9 h-9 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20
                           flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-[#00A859]/25 transition-colors">
+                          group-hover:bg-[#00A859]/20 transition-colors">
                 <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
               </div>
               <div>
-                <p class="font-black text-white text-sm mb-0.5">Contactar empresa</p>
-                <p class="text-xs text-white/50 leading-relaxed">Enviar un email directo a la empresa.</p>
+                <p class="font-black text-[#1F2937] text-sm mb-0.5">Contactar empresa</p>
+                <p class="text-xs text-gray-500 leading-relaxed">Enviar un email directo a la empresa.</p>
               </div>
             </button>
 
             <button @click="abrirBienvenida('validar')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-amber-500/10 hover:border-amber-500/30
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-gray-200
+                           bg-gray-50 hover:bg-amber-50 hover:border-amber-200
                            transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25
+              <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200
                           flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-amber-500/25 transition-colors">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          group-hover:bg-amber-100 transition-colors">
+                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
               </div>
               <div>
-                <p class="font-black text-white text-sm mb-0.5">Enviar validación</p>
-                <p class="text-xs text-white/50 leading-relaxed">Compartir enlace de propuesta con la empresa.</p>
+                <p class="font-black text-[#1F2937] text-sm mb-0.5">Enviar validación</p>
+                <p class="text-xs text-gray-500 leading-relaxed">Compartir enlace de propuesta con la empresa.</p>
               </div>
             </button>
 
             <button @click="abrirBienvenida('listar')"
-                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-white/10
-                           bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/30
+                    class="w-full flex items-start gap-4 p-4 rounded-2xl border border-gray-200
+                           bg-gray-50 hover:bg-blue-50 hover:border-blue-200
                            transition-all duration-200 text-left group">
-              <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25
+              <div class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200
                           flex items-center justify-center shrink-0 mt-0.5
-                          group-hover:bg-blue-500/25 transition-colors">
-                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          group-hover:bg-blue-100 transition-colors">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M4 6h16M4 10h16M4 14h16M4 18h7"/>
                 </svg>
               </div>
               <div>
-                <p class="font-black text-white text-sm mb-0.5">Ver listado de empresas</p>
-                <p class="text-xs text-white/50 leading-relaxed">Explorar el directorio completo con filtros.</p>
+                <p class="font-black text-[#1F2937] text-sm mb-0.5">Ver listado de empresas</p>
+                <p class="text-xs text-gray-500 leading-relaxed">Explorar el directorio completo con filtros.</p>
               </div>
             </button>
 
           </div>
 
           <button @click="abrirBienvenida('listar')"
-                  class="w-full text-center text-[10px] font-bold text-white/40
-                         hover:text-white/60 transition-colors py-1">
+                  class="w-full text-center text-[10px] font-bold text-gray-400
+                         hover:text-gray-600 transition-colors py-1">
             Saltar
           </button>
         </div>

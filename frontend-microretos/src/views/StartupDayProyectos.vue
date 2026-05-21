@@ -35,7 +35,7 @@ const tourRefs = { refBusqueda, refFiltros, refGrid, refBtnNuevo, refBtnGuia };
 
 const guiaPasosDataBase = [
   { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar proyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
-  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Todos, Borrador (aún en edición), Propuesta (enviada a empresa, pendiente de validación), Proyecto (validado por empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
+  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Todos, Borrador (aún en edición), Propuesta (enviada a empresa, pendiente de validación), Validados (validados por empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
   { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los proyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo.' },
   { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo proyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al reto correspondiente.' },
   { ref: 'refBtnGuia',  seccion: null,        texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
@@ -132,8 +132,7 @@ onMounted(async () => {
     cargando.value = false;
   }
   await nextTick();
-  pasoGuia.value = 1;
-  modoGuia.value = true;
+  guiaBienvenida.value = true;
 });
 
 onUnmounted(() => {
@@ -145,13 +144,13 @@ onBeforeRouteUpdate(async () => {
   modoGuia.value = false;
   pasoGuia.value = 1;
   await nextTick();
-  modoGuia.value = true;
+  guiaBienvenida.value = true;
 });
 
 function getEtiqueta(p) {
   if (p.estado === 'borrador')  return 'Borrador';
   if (p.estado === 'archivado') return 'Archivado';
-  return p.empresa_validado ? 'Proyecto' : 'Propuesta';
+  return p.empresa_validado ? 'Validado' : 'Propuesta';
 }
 function getColor(p) {
   if (p.estado === 'borrador')  return 'bg-amber-50 border-amber-200 text-amber-700';
@@ -161,7 +160,7 @@ function getColor(p) {
 }
 
 const filtroOpciones = ['todos', 'borrador', 'propuesta', 'proyecto', 'archivado'];
-const filtroLabels   = { todos: 'Todos', borrador: 'Borrador', propuesta: 'Propuesta', proyecto: 'Proyecto', archivado: 'Archivado' };
+const filtroLabels   = { todos: 'Todos', borrador: 'Borrador', propuesta: 'Propuesta', proyecto: 'Validados', archivado: 'Archivado' };
 
 const proyectosFiltrados = computed(() => {
   let lista = proyectos.value;
@@ -212,7 +211,7 @@ function mostrarSnack(mensaje, accion = null) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937]">
+  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Modal bienvenida -->
     <BienvenidaStartupDayModal :show="guiaBienvenida" @seleccionar="seleccionarOpcionBienvenida" />
