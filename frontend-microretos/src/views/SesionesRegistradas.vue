@@ -169,7 +169,7 @@ function formatFecha(isoDate) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
+  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]

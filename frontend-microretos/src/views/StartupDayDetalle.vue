@@ -14,11 +14,61 @@ const error    = ref(false);
 const isLoaded = ref(false);
 const urlCopiada = ref(false);
 
+// ── Recursos adjuntos ───────────────────────────────────────────────────────
+const recursosAbierto    = ref(false);
+const videos             = ref([]);
+const documentos         = ref([]);
+const modalRecurso       = ref(null);
+const modalBorradorAviso  = ref(false);
+const modalPropuestaAviso = ref(false);
+const urlCopiadaModal     = ref(false);
+
+// ── Confirmación envío enlace empresa ──────────────────────────────────────
+const modalConfirmEnvio   = ref(false);
+const confirmEnvioTexto   = ref('');
+const infoEmpresaAbierta  = ref(false);
+const confirmEnvioValido  = computed(() =>
+  confirmEnvioTexto.value.trim().toLowerCase() === 'enviar'
+);
+
+function abrirConfirmEnvio() {
+  confirmEnvioTexto.value = '';
+  infoEmpresaAbierta.value = false;
+  modalConfirmEnvio.value = true;
+}
+
+function confirmarEnvio() {
+  if (!confirmEnvioValido.value) return;
+  modalConfirmEnvio.value = false;
+}
+
+async function copiarUrlModal() {
+  await navigator.clipboard.writeText(landingUrl.value);
+  urlCopiadaModal.value = true;
+  setTimeout(() => { urlCopiadaModal.value = false; }, 2500);
+}
+
+function abrirRecurso(item) {
+  const filename = (item.filename || '').toLowerCase();
+  let tipo = 'otro';
+  if (item.resource_type === 'video' || /\.(mp4|mov|avi|webm|mkv)$/.test(filename)) tipo = 'video';
+  else if (item.resource_type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(filename)) tipo = 'imagen';
+  else if (/\.pdf$/.test(filename)) tipo = 'pdf';
+  modalRecurso.value = { url: item.url, label: item.label || item.filename, tipo };
+}
+
 onMounted(async () => {
   setTimeout(() => { isLoaded.value = true; }, 80);
   try {
-    const res = await api.get(`/startup/proyectos/${route.params.uuid}`);
-    proyecto.value = res.data;
+    const [proyRes, recRes] = await Promise.all([
+      api.get(`/startup/proyectos/${route.params.uuid}`),
+      api.get('/upload/recursos', { params: { microproyecto: route.params.uuid } }),
+    ]);
+    proyecto.value       = proyRes.data;
+    videos.value         = recRes.data.videos    || [];
+    documentos.value     = recRes.data.documentos || [];
+    if (proyRes.data.estado === 'borrador') modalBorradorAviso.value = true;
+    if (proyRes.data.estado === 'publicado' && !proyRes.data.empresa_validado) modalPropuestaAviso.value = true;
   } catch {
     error.value = true;
   } finally {
@@ -39,7 +89,7 @@ function getEstadoKey(p) {
   if (p.estado === 'archivado') return 'archivado';
   return p.empresa_validado ? 'proyecto' : 'propuesta';
 }
-const estadoLabel = { borrador: 'Borrador', archivado: 'Archivado', propuesta: 'Propuesta', proyecto: 'Proyecto' };
+const estadoLabel = { borrador: 'Borrador', archivado: 'Archivado', propuesta: 'Propuesta', proyecto: 'Validado' };
 
 const landingUrl = computed(() => {
   if (!proyecto.value?.token_empresa) return '';
@@ -76,7 +126,7 @@ async function archivar() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937]">
+  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Fondo decorativo -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px]
@@ -364,10 +414,578 @@ async function archivar() {
             <p class="text-sm text-gray-600 leading-relaxed">{{ proyecto.resumen.texto }}</p>
           </div>
 
+          <!-- ── Recursos adjuntos ───────────────────────────────────────── -->
+          <div v-if="videos.length || documentos.length" class="sm:col-span-2">
+            <button
+              @click="recursosAbierto = !recursosAbierto"
+              class="w-full flex items-center justify-between px-5 py-4
+                     bg-white border border-gray-100 rounded-[1.5rem] shadow-sm
+                     hover:border-[#00A859]/30 transition-all"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-[#00A859]/10 border border-[#00A859]/20
+                            flex items-center justify-center shrink-0">
+                  <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                  </svg>
+                </div>
+                <div class="text-left">
+                  <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Recursos adjuntos</p>
+                  <p class="text-xs text-gray-500 mt-0.5">
+                    {{ videos.length > 0 ? `${videos.length} vídeo${videos.length > 1 ? 's' : ''}` : '' }}
+                    {{ videos.length && documentos.length ? ' · ' : '' }}
+                    {{ documentos.length > 0 ? `${documentos.length} documento${documentos.length > 1 ? 's' : ''}` : '' }}
+                  </p>
+                </div>
+              </div>
+              <svg :class="['w-4 h-4 text-gray-400 transition-transform duration-200', recursosAbierto ? 'rotate-180' : '']"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+
+            <!-- Panel desplegable -->
+            <Transition
+              enter-active-class="transition-all duration-200 ease-out"
+              enter-from-class="opacity-0 -translate-y-1"
+              leave-active-class="transition-all duration-150 ease-in"
+              leave-to-class="opacity-0 -translate-y-1"
+            >
+              <div v-if="recursosAbierto"
+                   class="mt-2 bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-5 space-y-5">
+
+                <!-- Vídeos -->
+                <div v-if="videos.length">
+                  <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-3">Vídeos</p>
+                  <div class="space-y-2">
+                    <div v-for="(v, i) in videos" :key="i"
+                         class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100
+                                hover:border-blue-200 hover:bg-blue-50/40 transition-colors group/vid">
+                      <button @click="abrirRecurso(v)"
+                              class="w-7 h-7 rounded-lg bg-blue-50 shrink-0 flex items-center justify-center
+                                     group-hover/vid:bg-blue-100 transition-colors">
+                        <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                        </svg>
+                      </button>
+                      <button @click="abrirRecurso(v)" class="flex-1 min-w-0 text-left">
+                        <p class="text-xs font-bold text-gray-700 truncate group-hover/vid:text-blue-600 transition-colors">
+                          {{ v.label || v.filename }}
+                        </p>
+                        <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ v.filename }}</p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Documentos, imágenes, etc. -->
+                <div v-if="documentos.length">
+                  <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-3">Documentos, imágenes, etc...</p>
+                  <div class="space-y-2">
+                    <div v-for="(d, i) in documentos" :key="i"
+                         class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100
+                                hover:border-[#00A859]/30 hover:bg-[#00A859]/5 transition-colors group/doc">
+                      <button @click="abrirRecurso(d)"
+                              class="w-7 h-7 rounded-lg bg-[#00A859]/10 shrink-0 flex items-center justify-center
+                                     group-hover/doc:bg-[#00A859]/20 transition-colors">
+                        <svg class="w-3.5 h-3.5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                      </button>
+                      <button @click="abrirRecurso(d)" class="flex-1 min-w-0 text-left">
+                        <p class="text-xs font-bold text-gray-700 truncate group-hover/doc:text-[#00A859] transition-colors">
+                          {{ d.label || d.filename }}
+                        </p>
+                        <p class="text-[9px] text-blue-400/80 truncate">Cloudinary · {{ d.filename }}</p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </Transition>
+          </div>
+
         </div>
       </template>
     </div>
   </div>
+
+  <!-- ══ MODAL VISOR RECURSOS ═════════════════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalRecurso"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @click.self="modalRecurso = null">
+
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-md" @click="modalRecurso = null" />
+
+      <div class="relative z-10 bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden
+                  flex flex-col max-h-[90vh]">
+
+        <!-- Cabecera -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <p class="text-sm font-black text-[#121212] truncate pr-4">{{ modalRecurso.label }}</p>
+          <button @click="modalRecurso = null"
+                  class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center
+                         text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Contenido según tipo -->
+        <div class="flex-1 overflow-auto bg-gray-950 flex items-center justify-center min-h-[300px]">
+
+          <video v-if="modalRecurso.tipo === 'video'"
+                 :src="modalRecurso.url" controls autoplay
+                 class="w-full max-h-[70vh] object-contain" />
+
+          <img v-else-if="modalRecurso.tipo === 'imagen'"
+               :src="modalRecurso.url" :alt="modalRecurso.label"
+               class="max-w-full max-h-[70vh] object-contain" />
+
+          <iframe v-else-if="modalRecurso.tipo === 'pdf'"
+                  :src="modalRecurso.url"
+                  class="w-full h-[70vh] border-0" />
+
+          <div v-else class="flex flex-col items-center gap-4 p-10 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center">
+              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <p class="text-gray-400 text-sm">Este tipo de archivo no se puede previsualizar</p>
+            <a :href="modalRecurso.url" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00A859] text-white
+                      rounded-full text-xs font-black uppercase tracking-widest
+                      hover:bg-[#00A859]/90 transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+              Abrir en nueva pestaña
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- ══ MODAL AVISO PROPUESTA ═══════════════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalPropuestaAviso"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @click.self="modalPropuestaAviso = false">
+
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="modalPropuestaAviso = false" />
+
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 overflow-y-auto max-h-[90vh]">
+
+        <!-- Icono -->
+        <div class="w-14 h-14 rounded-2xl bg-[#00A859]/10 border border-[#00A859]/20
+                    flex items-center justify-center mb-5 mx-auto">
+          <svg class="w-7 h-7 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+        </div>
+
+        <!-- Badge estado -->
+        <div class="flex justify-center mb-4">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+                       bg-[#00A859]/10 border border-[#00A859]/20 text-[#00A859]
+                       text-[10px] font-black uppercase tracking-widest">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#00A859] animate-pulse" />
+            Propuesta · Pendiente de validar
+          </span>
+        </div>
+
+        <h3 class="text-xl font-black text-[#121212] text-center mb-2">
+          Proyecto en propuesta
+        </h3>
+        <p class="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+          Este proyecto fue enviado a la empresa y está pendiente de su validación.
+          El enlace único ya está generado — asegúrate de que la empresa lo haya recibido.
+        </p>
+
+        <!-- Paso 1: Enviar enlace -->
+        <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-3">
+          <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+            1 · Envía el enlace a la empresa
+          </p>
+          <div class="flex items-center gap-2 mb-3">
+            <p class="flex-1 text-xs text-gray-400 truncate font-mono bg-white border border-gray-200
+                       rounded-xl px-3 py-2 min-w-0">
+              {{ landingUrl || '—' }}
+            </p>
+            <button @click="copiarUrlModal"
+                    :class="['shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all',
+                             urlCopiadaModal
+                               ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20'
+                               : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]']">
+              {{ urlCopiadaModal ? '¡Copiado!' : 'Copiar' }}
+            </button>
+          </div>
+
+          <!-- Info empresa desplegable -->
+          <div v-if="proyecto && proyecto.empresa_id" class="mb-3">
+            <button @click="infoEmpresaAbierta = !infoEmpresaAbierta"
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-xl
+                           bg-white border border-gray-200 text-xs font-bold text-gray-600
+                           hover:border-[#00A859]/40 hover:text-[#00A859] transition-all">
+              <span class="flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre || 'Ver info de la empresa' }}
+              </span>
+              <svg class="w-3.5 h-3.5 transition-transform duration-200 text-gray-400 shrink-0"
+                   :class="infoEmpresaAbierta ? 'rotate-180' : ''"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <Transition
+              enter-active-class="transition-all duration-200 ease-out overflow-hidden"
+              enter-from-class="opacity-0 max-h-0"
+              enter-to-class="opacity-100 max-h-96"
+              leave-active-class="transition-all duration-150 ease-in overflow-hidden"
+              leave-from-class="opacity-100 max-h-96"
+              leave-to-class="opacity-0 max-h-0"
+            >
+              <div v-if="infoEmpresaAbierta"
+                   class="mt-2 px-3 py-3 bg-white border border-gray-200 rounded-xl space-y-1.5">
+                <p v-if="proyecto.datos_empresa?.sector"
+                   class="text-[10px] text-gray-400">
+                  <span class="font-black uppercase tracking-wider">Sector:</span>
+                  {{ proyecto.datos_empresa.sector }}
+                </p>
+                <p v-if="proyecto.datos_empresa?.persona_contacto"
+                   class="text-[10px] text-gray-400">
+                  <span class="font-black uppercase tracking-wider">Contacto:</span>
+                  {{ proyecto.datos_empresa.persona_contacto }}
+                </p>
+                <p v-if="proyecto.datos_empresa?.email"
+                   class="text-[10px] text-gray-400">
+                  <span class="font-black uppercase tracking-wider">Email:</span>
+                  {{ proyecto.datos_empresa.email }}
+                </p>
+                <p v-if="proyecto.datos_empresa?.descripcion"
+                   class="text-[10px] text-gray-500 leading-relaxed pt-1 border-t border-gray-100">
+                  {{ proyecto.datos_empresa.descripcion }}
+                </p>
+              </div>
+            </Transition>
+          </div>
+
+          <!-- Botones: enviar + directorio -->
+          <div v-if="!authStore.isEmpresa" class="flex flex-col gap-2">
+            <button v-if="proyecto && proyecto.empresa_id"
+                    @click="abrirConfirmEnvio"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-2.5
+                           bg-amber-50 border border-amber-200 text-amber-700 rounded-xl
+                           text-xs font-bold hover:bg-amber-100 transition-all">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              Enviar enlace a la empresa
+            </button>
+            <button @click="router.push({ name: 'empresas' }); modalPropuestaAviso = false"
+                    class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5
+                           bg-white border border-gray-200 text-gray-500 rounded-xl
+                           text-xs font-bold hover:border-[#00A859]/40 hover:text-[#00A859] transition-all">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+              Ir al directorio de empresas
+            </button>
+          </div>
+        </div>
+
+        <!-- Paso 2: Esperar validación -->
+        <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-6">
+          <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+            2 · Espera la validación
+          </p>
+          <div class="space-y-2">
+
+            <div class="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl">
+              <span class="w-5 h-5 rounded-full bg-[#00A859]/10 text-[#00A859] text-[10px] font-black
+                           flex items-center justify-center shrink-0 mt-0.5">✓</span>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                La empresa accede al formulario de validación a través del enlace y lo cumplimenta.
+              </p>
+            </div>
+
+            <div class="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl">
+              <span class="w-5 h-5 rounded-full bg-[#00A859]/10 text-[#00A859] text-[10px] font-black
+                           flex items-center justify-center shrink-0 mt-0.5">✓</span>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                Al validarlo, el proyecto cambia automáticamente a <strong class="text-[#00A859]">Validado</strong>
+                sin que tengas que hacer nada más.
+              </p>
+            </div>
+
+            <div class="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+              <span class="w-5 h-5 rounded-full bg-amber-100 text-amber-600 text-[10px] font-black
+                           flex items-center justify-center shrink-0 mt-0.5">!</span>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                ¿La empresa ya validó pero no aparece? Ve a <strong>Editar</strong> y comprueba el
+                desplegable <strong>Estado del proyecto</strong>.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Botones -->
+        <div class="flex gap-3">
+          <button
+            @click="modalPropuestaAviso = false"
+            class="flex-1 inline-flex items-center justify-center
+                   px-5 py-3 bg-gray-100 text-[#1F2937] rounded-full
+                   text-xs font-black uppercase tracking-widest
+                   hover:bg-gray-200 transition-all active:scale-95"
+          >
+            Entendido
+          </button>
+          <button
+            v-if="!authStore.isEmpresa"
+            @click="router.push({ name: 'startup-day-editar', params: { uuid: proyecto.uuid } })"
+            class="flex-1 inline-flex items-center justify-center gap-2
+                   px-5 py-3 bg-[#00A859] text-white rounded-full
+                   text-xs font-black uppercase tracking-widest shadow-sm
+                   hover:bg-[#00A859]/90 transition-all active:scale-95"
+          >
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Ir a editar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </Transition>
+
+  <!-- ══ MODAL CONFIRMACIÓN ENVÍO ENLACE ══════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalConfirmEnvio"
+         class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+         @click.self="modalConfirmEnvio = false">
+
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="modalConfirmEnvio = false" />
+
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 overflow-y-auto max-h-[90vh]">
+
+        <!-- Icono -->
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200
+                    flex items-center justify-center mb-5 mx-auto">
+          <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+
+        <h3 class="text-xl font-black text-[#121212] text-center mb-1">
+          Confirmar envío
+        </h3>
+        <p class="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+          Estás a punto de abrir el panel de envío del enlace de validación para:
+        </p>
+
+        <!-- Tarjeta empresa -->
+        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-5">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-8 h-8 rounded-xl bg-[#00A859]/10 flex items-center justify-center shrink-0">
+              <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <p class="font-black text-sm text-[#121212]">
+              {{ proyecto?.empresa_nombre || proyecto?.datos_empresa?.nombre || '—' }}
+            </p>
+          </div>
+          <div class="space-y-1 pl-10">
+            <p v-if="proyecto?.datos_empresa?.sector" class="text-[11px] text-gray-500">
+              <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Sector:</span>
+              {{ proyecto.datos_empresa.sector }}
+            </p>
+            <p v-if="proyecto?.datos_empresa?.persona_contacto" class="text-[11px] text-gray-500">
+              <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Contacto:</span>
+              {{ proyecto.datos_empresa.persona_contacto }}
+            </p>
+            <p v-if="proyecto?.datos_empresa?.email" class="text-[11px] text-gray-500">
+              <span class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Email:</span>
+              {{ proyecto.datos_empresa.email }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Campo de seguridad: escribe "enviar" -->
+        <div class="mb-5">
+          <label class="block text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2">
+            Escribe <span class="font-black text-[#1F2937] normal-case tracking-normal">enviar</span> para confirmar
+          </label>
+          <input
+            v-model="confirmEnvioTexto"
+            type="text"
+            placeholder="Escribe enviar…"
+            autocomplete="off"
+            @keydown.enter.prevent="confirmEnvioValido && confirmarEnvio()"
+            class="w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
+            :class="confirmEnvioTexto && !confirmEnvioValido
+              ? 'border-red-300 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-200'
+              : confirmEnvioTexto && confirmEnvioValido
+                ? 'border-[#00A859]/50 bg-[#00A859]/5 text-[#00A859] focus:ring-2 focus:ring-[#00A859]/20'
+                : 'border-gray-200 bg-white focus:border-gray-400 focus:ring-2 focus:ring-gray-100'"
+          />
+          <p v-if="confirmEnvioTexto && !confirmEnvioValido"
+             class="mt-1.5 text-[10px] text-red-500 font-semibold">
+            Escribe exactamente: enviar
+          </p>
+          <p v-if="confirmEnvioTexto && confirmEnvioValido"
+             class="mt-1.5 text-[10px] text-[#00A859] font-semibold">
+            Confirmado. Ya puedes continuar.
+          </p>
+        </div>
+
+        <!-- Botones principales -->
+        <div class="flex gap-3 mb-3">
+          <button
+            @click="modalConfirmEnvio = false"
+            class="flex-1 inline-flex items-center justify-center
+                   px-4 py-2.5 bg-gray-100 text-[#1F2937] rounded-full
+                   text-xs font-black uppercase tracking-widest
+                   hover:bg-gray-200 transition-all active:scale-95"
+          >
+            Cancelar
+          </button>
+          <button
+            @click="confirmarEnvio"
+            :disabled="!confirmEnvioValido"
+            class="flex-1 inline-flex items-center justify-center gap-2
+                   px-4 py-2.5 rounded-full text-xs font-black uppercase tracking-widest
+                   transition-all active:scale-95"
+            :class="confirmEnvioValido
+              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-300 cursor-not-allowed'"
+          >
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Confirmar y enviar
+          </button>
+        </div>
+
+        <!-- Botón directorio de empresas -->
+        <button
+          @click="router.push({ name: 'empresas' }); modalConfirmEnvio = false; modalPropuestaAviso = false"
+          class="w-full inline-flex items-center justify-center gap-2
+                 px-4 py-2.5 bg-white border border-gray-200 text-gray-500 rounded-full
+                 text-xs font-bold hover:border-[#00A859]/40 hover:text-[#00A859] transition-all"
+        >
+          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+          Ir al directorio de empresas
+        </button>
+
+      </div>
+    </div>
+  </Transition>
+
+  <!-- ══ MODAL AVISO BORRADOR ════════════════════════════════════════════════ -->
+  <Transition
+    enter-active-class="transition-all duration-200 ease-out"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-all duration-150 ease-in"
+    leave-to-class="opacity-0"
+  >
+    <div v-if="modalBorradorAviso"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @click.self="modalBorradorAviso = false">
+
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="modalBorradorAviso = false" />
+
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8">
+
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100
+                    flex items-center justify-center mb-5 mx-auto">
+          <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+
+        <h3 class="text-xl font-black text-[#121212] text-center mb-4">
+          Proyecto en borrador
+        </h3>
+
+        <p class="text-sm text-gray-600 leading-relaxed text-center">
+          Este proyecto está marcado como <strong>borrador</strong> porque se guardó así para seguir editando.
+          Si necesitas enviarlo a la empresa, entra en <strong>Editar</strong> y en el desplegable
+          <strong>Estado del proyecto</strong> selecciona <strong>Propuesta</strong> para generar el enlace de validación.
+        </p>
+
+        <div class="flex gap-3 mt-7">
+          <button
+            @click="modalBorradorAviso = false"
+            class="flex-1 inline-flex items-center justify-center
+                   px-5 py-3 bg-gray-100 text-[#1F2937] rounded-full
+                   text-xs font-black uppercase tracking-widest
+                   hover:bg-gray-200 transition-all active:scale-95"
+          >
+            Entendido
+          </button>
+          <button
+            v-if="!authStore.isEmpresa"
+            @click="router.push({ name: 'startup-day-editar', params: { uuid: proyecto.uuid } })"
+            class="flex-1 inline-flex items-center justify-center gap-2
+                   px-5 py-3 bg-[#00A859] text-white rounded-full
+                   text-xs font-black uppercase tracking-widest shadow-sm
+                   hover:bg-[#00A859]/90 transition-all active:scale-95"
+          >
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Ir a editar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </Transition>
+
 </template>
 
 <style scoped>

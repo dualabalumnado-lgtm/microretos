@@ -239,8 +239,7 @@ onMounted(async () => {
     }
   }
   await nextTick()
-  pasoGuia.value = 1
-  modoGuia.value = true
+  guiaBienvenida.value = true
 })
 
 onUnmounted(() => {
@@ -475,7 +474,7 @@ onBeforeRouteUpdate(async () => {
   modoGuia.value = false
   pasoGuia.value = 1
   await nextTick()
-  modoGuia.value = true
+  guiaBienvenida.value = true
 })
 
 // ─── Modal ficha de microreto ─────────────────────────────────────────────────
@@ -543,7 +542,7 @@ function formatFecha(isoDate) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937]">
+  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12">
 
     <!-- ══════════ MODAL BIENVENIDA "¿QUÉ NECESITAS?" ══════════════════════════ -->
     <BienvenidaModal :show="guiaBienvenida" @seleccionar="seleccionarOpcionBienvenida" />
@@ -1160,7 +1159,7 @@ function formatFecha(isoDate) {
           </div>
 
           <div ref="refSesiones"
-               class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-6"
+               class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-[4.5rem]"
                :class="{ 'tour-active': tourTargetActivo === 'refSesiones' }">
 
             <!-- Cabecera -->

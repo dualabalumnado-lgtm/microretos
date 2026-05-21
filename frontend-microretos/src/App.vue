@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { RouterView } from 'vue-router'
+import TopBar from './components/TopBar.vue'
 import SidePanel from './components/SidePanel.vue'
 import { useAuthStore } from './stores/auth'
 import { useIdleTimer } from './composables/useIdleTimer'
@@ -13,6 +14,9 @@ const authStore = useAuthStore()
 const isPublicRetoRoute = computed(() =>
   route.path.startsWith('/reto/') || route.path.startsWith('/startup/landing/')
 )
+
+const sidePanelRef = ref(null)
+const togglePanel  = () => sidePanelRef.value?.toggle()
 
 // ── Expiración de token (401 del servidor) ────────────────────────────────────
 const handleTokenExpired = () => {
@@ -79,7 +83,8 @@ const cerrarSesionIdle = () => {
 </script>
 
 <template>
-  <SidePanel v-if="!isPublicRetoRoute" />
+  <TopBar v-if="!isPublicRetoRoute" @toggle-panel="togglePanel" />
+  <SidePanel v-if="!isPublicRetoRoute" ref="sidePanelRef" />
   <RouterView />
 
   <!-- Modal idle: ¿Sigues ahí? -->
