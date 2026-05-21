@@ -125,7 +125,7 @@ defineExpose({ isOpen, toggle, close })
   <Transition name="sp-slide">
     <aside
       v-if="isOpen && !tourActivo"
-      class="fixed top-0 left-0 h-full w-64 max-w-[85vw] z-40 flex flex-col
+      class="fixed top-12 left-0 h-[calc(100vh-3rem)] w-64 max-w-[85vw] z-40 flex flex-col
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
