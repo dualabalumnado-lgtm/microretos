@@ -65,11 +65,11 @@ const onOverlay = (e) => { if (e.target === e.currentTarget) cerrar() }
         class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
         @click="onOverlay">
 
-        <div class="bg-white border border-gray-100 rounded-[2rem] shadow-2xl
+        <div class="bg-[#1a2332] border border-white/10 rounded-[2rem] shadow-2xl
                     w-full max-w-lg overflow-hidden">
 
-          <!-- Cabecera — oscura -->
-          <div class="bg-[#1a2332] px-8 py-6 flex items-start justify-between">
+          <!-- Cabecera -->
+          <div class="bg-[#0f1720] px-8 py-6 flex items-start justify-between">
             <div>
               <p class="text-[#00A859] text-xs font-bold uppercase tracking-widest mb-1">{{ _app }}</p>
               <h2 class="text-2xl font-black tracking-tight text-white">Equipo de desarrollo</h2>
@@ -82,22 +82,22 @@ const onOverlay = (e) => { if (e.target === e.currentTarget) cerrar() }
             </button>
           </div>
 
-          <!-- Autores — tema claro -->
-          <div class="px-8 py-6 space-y-3 bg-white">
+          <!-- Autores -->
+          <div class="px-8 py-6 space-y-3">
             <div v-for="(a, i) in autores" :key="i"
-              class="flex items-start gap-4 p-4 rounded-2xl bg-[#F8FAFC] border border-gray-100
-                     hover:border-[#BBE8D0] hover:bg-[#F0FBF4] transition-all">
+              class="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10
+                     hover:border-white/20 hover:bg-white/8 transition-all">
 
               <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
                 :class="a.icono === 'shield'
-                  ? 'bg-violet-50 border border-violet-200'
-                  : 'bg-[#F0FBF4] border border-[#BBE8D0]'">
+                  ? 'bg-violet-500/15 border border-violet-500/30'
+                  : 'bg-[#00A859]/10 border border-[#00A859]/25'">
                 <svg v-if="a.icono === 'code'" class="w-5 h-5 text-[#00A859]"
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
                 </svg>
-                <svg v-else class="w-5 h-5 text-violet-500"
+                <svg v-else class="w-5 h-5 text-violet-400"
                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955
@@ -108,18 +108,18 @@ const onOverlay = (e) => { if (e.target === e.currentTarget) cerrar() }
               </div>
 
               <div class="min-w-0">
-                <p class="font-bold text-sm text-[#1F2937]">{{ a.nombre }}</p>
+                <p class="font-bold text-sm text-white">{{ a.nombre }}</p>
                 <p class="text-[11px] mt-0.5 leading-relaxed"
-                  :class="a.icono === 'shield' ? 'text-violet-600' : 'text-[#00A859]'">
+                  :class="a.icono === 'shield' ? 'text-violet-400' : 'text-[#00A859]'">
                   {{ a.rol }}
                 </p>
-                <p class="text-[10px] text-gray-400 mt-1">{{ a.formacion }}</p>
+                <p class="text-[10px] text-white/40 mt-1">{{ a.formacion }}</p>
               </div>
             </div>
           </div>
 
-          <!-- Pie — oscuro -->
-          <div class="bg-[#1a2332] px-8 py-4 flex items-center justify-between">
+          <!-- Pie -->
+          <div class="bg-[#0f1720] px-8 py-4 flex items-center justify-between">
             <span class="text-[10px] text-white/20">{{ _yr }}</span>
             <span class="text-[10px] text-white/20">Prácticas de empresa · {{ _yr }}</span>
           </div>
