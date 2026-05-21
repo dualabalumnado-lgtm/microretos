@@ -99,28 +99,6 @@ defineExpose({ isOpen, toggle, close })
     />
   </Transition>
 
-  <!-- Botón hamburguesa (oculto durante el tour) -->
-  <button
-    v-show="!tourActivo"
-    @click="toggle"
-    :aria-label="isOpen ? 'Cerrar menú' : 'Abrir menú'"
-    :aria-expanded="isOpen"
-    class="fixed top-5 left-5 z-50 w-11 h-11 rounded-2xl
-           bg-[#1F2937] border border-[#333333] shadow-lg
-           flex items-center justify-center
-           hover:border-[#00A859] hover:shadow-[0_0_0_3px_rgba(0,168,89,0.2)]
-           transition-all duration-200"
-  >
-    <span class="flex flex-col gap-[5px] w-[18px]">
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300 origin-center"
-            :class="isOpen ? 'rotate-45 translate-y-[7px]' : ''" />
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300"
-            :class="isOpen ? 'opacity-0 scale-x-0' : ''" />
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300 origin-center"
-            :class="isOpen ? '-rotate-45 -translate-y-[7px]' : ''" />
-    </span>
-  </button>
-
   <!-- Panel lateral (también oculto durante el tour) -->
   <Transition name="sp-slide">
     <aside
@@ -133,21 +111,21 @@ defineExpose({ isOpen, toggle, close })
       <RouterLink
         to="/"
         @click="close"
-        class="flex items-center gap-3 px-5 pt-4 pb-4 border-b border-white/10
+        class="flex items-center gap-2 px-4 pt-2 pb-2 border-b border-white/10
                hover:opacity-80 transition-opacity duration-150 shrink-0"
       >
         <img
           src="../assets/logo.png"
           alt="DuaLab Logo"
-          class="h-9 w-auto object-contain"
+          class="h-7 w-auto object-contain"
           @error="logoError = true"
           v-if="!logoError"
         />
         <div v-else
-             class="w-9 h-9 rounded-xl bg-[#00A859] flex items-center justify-center font-black text-white text-sm shrink-0">
+             class="w-7 h-7 rounded-lg bg-[#00A859] flex items-center justify-center font-black text-white text-xs shrink-0">
           D
         </div>
-        <span class="ml-4 font-black text-xl tracking-tighter text-white uppercase select-none">
+        <span class="ml-2 font-black text-lg tracking-tighter text-white uppercase select-none">
           Dua<span class="text-[#00A859]">Lab</span>
         </span>
       </RouterLink>
