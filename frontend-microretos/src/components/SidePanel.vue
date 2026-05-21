@@ -107,29 +107,6 @@ defineExpose({ isOpen, toggle, close })
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
-      <!-- ── Cabecera: DuaLab → home ── -->
-      <RouterLink
-        to="/"
-        @click="close"
-        class="flex items-center gap-2 px-4 pt-2 pb-2 border-b border-white/10
-               hover:opacity-80 transition-opacity duration-150 shrink-0"
-      >
-        <img
-          src="../assets/logo.png"
-          alt="DuaLab Logo"
-          class="h-7 w-auto object-contain"
-          @error="logoError = true"
-          v-if="!logoError"
-        />
-        <div v-else
-             class="w-7 h-7 rounded-lg bg-[#00A859] flex items-center justify-center font-black text-white text-xs shrink-0">
-          D
-        </div>
-        <span class="ml-2 font-black text-lg tracking-tighter text-white uppercase select-none">
-          Dua<span class="text-[#00A859]">Lab</span>
-        </span>
-      </RouterLink>
-
       <!-- ── Navegación ── -->
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 
