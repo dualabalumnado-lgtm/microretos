@@ -215,12 +215,12 @@ function cancelar() {
 .dsm-btn-dark {
   display: flex; align-items: center; justify-content: center; gap: .5rem;
   padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, #1F2937, #374151); color: #fff;
+  background: linear-gradient(135deg, #00A859, #3db87a); color: #fff;
   border: none; border-radius: 1rem;
   font-weight: 900; font-size: .7rem; letter-spacing: .15em; text-transform: uppercase;
-  cursor: pointer; box-shadow: 0 6px 20px rgba(31,41,55,.28); transition: all .2s;
+  cursor: pointer; box-shadow: 0 6px 20px rgba(0,168,89,.25); transition: all .2s;
 }
-.dsm-btn-dark:hover:not(:disabled)  { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(31,41,55,.38); }
+.dsm-btn-dark:hover:not(:disabled)  { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,168,89,.35); }
 .dsm-btn-dark:active:not(:disabled) { transform: scale(.97); }
 .dsm-btn-dark:disabled              { opacity: .45; cursor: not-allowed; }
 

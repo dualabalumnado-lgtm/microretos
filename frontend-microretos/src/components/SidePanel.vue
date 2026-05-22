@@ -99,59 +99,14 @@ defineExpose({ isOpen, toggle, close })
     />
   </Transition>
 
-  <!-- Botón hamburguesa (oculto durante el tour) -->
-  <button
-    v-show="!tourActivo"
-    @click="toggle"
-    :aria-label="isOpen ? 'Cerrar menú' : 'Abrir menú'"
-    :aria-expanded="isOpen"
-    class="fixed top-5 left-5 z-50 w-11 h-11 rounded-2xl
-           bg-[#1F2937] border border-[#333333] shadow-lg
-           flex items-center justify-center
-           hover:border-[#00A859] hover:shadow-[0_0_0_3px_rgba(0,168,89,0.2)]
-           transition-all duration-200"
-  >
-    <span class="flex flex-col gap-[5px] w-[18px]">
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300 origin-center"
-            :class="isOpen ? 'rotate-45 translate-y-[7px]' : ''" />
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300"
-            :class="isOpen ? 'opacity-0 scale-x-0' : ''" />
-      <span class="block h-[2px] rounded-full bg-white transition-all duration-300 origin-center"
-            :class="isOpen ? '-rotate-45 -translate-y-[7px]' : ''" />
-    </span>
-  </button>
-
   <!-- Panel lateral (también oculto durante el tour) -->
   <Transition name="sp-slide">
     <aside
       v-if="isOpen && !tourActivo"
-      class="fixed top-0 left-0 h-full w-64 max-w-[85vw] z-40 flex flex-col
+      class="fixed top-12 left-0 h-[calc(100vh-3rem)] w-64 max-w-[85vw] z-40 flex flex-col
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
-      <!-- ── Cabecera: DuaLab → home ── -->
-      <RouterLink
-        to="/"
-        @click="close"
-        class="flex items-center gap-3 px-5 pt-4 pb-4 border-b border-white/10
-               hover:opacity-80 transition-opacity duration-150 shrink-0"
-      >
-        <img
-          src="../assets/logo.png"
-          alt="DuaLab Logo"
-          class="h-9 w-auto object-contain"
-          @error="logoError = true"
-          v-if="!logoError"
-        />
-        <div v-else
-             class="w-9 h-9 rounded-xl bg-[#00A859] flex items-center justify-center font-black text-white text-sm shrink-0">
-          D
-        </div>
-        <span class="ml-4 font-black text-xl tracking-tighter text-white uppercase select-none">
-          Dua<span class="text-[#00A859]">Lab</span>
-        </span>
-      </RouterLink>
-
       <!-- ── Navegación ── -->
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
 

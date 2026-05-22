@@ -685,7 +685,7 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] overflow-x-hidden">
+  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] overflow-x-hidden pt-12 md:pt-12">
 
     <!-- ══════════ TOUR BOCADILLO ════════════════════════════ -->
     <Transition name="modal-fade">
@@ -874,8 +874,8 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
               @click="pedirNuevoCentro"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-sm
-                     bg-[#1F2937] text-white border border-[#333333]
-                     hover:bg-[#2d3748] transition-all duration-200 shadow-sm
+                     bg-white text-[#1F2937] border border-gray-200
+                     hover:border-[#99CC33] hover:text-[#00A859] transition-all duration-200 shadow-sm
                      disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg class="w-4 h-4 text-[#99CC33]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -907,8 +907,8 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
               @click="cargarDatos"
               :disabled="cargando"
               class="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-sm
-                     bg-[#1F2937] text-white border border-[#333333]
-                     hover:bg-[#2d3748] transition-all duration-200
+                     bg-white text-[#1F2937] border border-gray-200
+                     hover:border-gray-300 hover:text-gray-700 transition-all duration-200
                      disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg class="w-4 h-4" :class="cargando ? 'animate-spin' : ''"
@@ -1962,7 +1962,7 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
               Cancelar
             </button>
             <button @click="confirmarNuevoCentro"
-              class="flex-1 py-2.5 rounded-xl bg-[#1F2937] text-white text-sm font-black hover:bg-[#374151] transition-all shadow-sm">
+              class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-sm font-black hover:bg-[#009950] transition-all shadow-sm">
               Continuar
             </button>
           </div>
@@ -2135,8 +2135,8 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
             <button
               @click="verificarPasswordCatalogo"
               :disabled="passwordCatalogoLoad || !passwordCatalogo.trim()"
-              class="flex-1 py-2.5 rounded-xl bg-[#1F2937] text-white text-sm font-black
-                     hover:bg-[#374151] transition-all shadow-sm
+              class="flex-1 py-2.5 rounded-xl bg-[#00A859] text-white text-sm font-black
+                     hover:bg-[#009950] transition-all shadow-sm
                      disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <svg v-if="passwordCatalogoLoad" class="animate-spin w-4 h-4" viewBox="0 0 24 24">
@@ -2262,8 +2262,8 @@ watch(zonaPeligroAbierta, (val) => { if (val) cargarResumen() })
                px-5 py-3.5 rounded-2xl shadow-xl text-sm font-bold
                max-w-sm"
         :class="snackbar.tipo === 'ok'
-          ? 'bg-[#1F2937] text-white border border-[#333333]'
-          : 'bg-red-600 text-white border border-red-500'"
+          ? 'bg-white text-[#1F2937] border border-gray-200 shadow-lg'
+          : 'bg-red-50 text-red-700 border border-red-200'"
       >
         <svg v-if="snackbar.tipo === 'ok' && !snackbar.accion" class="w-4 h-4 text-[#00A859] shrink-0"
              fill="none" stroke="currentColor" viewBox="0 0 24 24">
