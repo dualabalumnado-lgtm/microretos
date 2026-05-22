@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { RouterView } from 'vue-router'
 import TopBar from './components/TopBar.vue'
 import SidePanel from './components/SidePanel.vue'
+import AppCredit from './components/AppCredit.vue'
 import { useAuthStore } from './stores/auth'
 import { useIdleTimer } from './composables/useIdleTimer'
 
@@ -86,6 +87,7 @@ const cerrarSesionIdle = () => {
   <TopBar v-if="!isPublicRetoRoute" @toggle-panel="togglePanel" />
   <SidePanel v-if="!isPublicRetoRoute" ref="sidePanelRef" />
   <RouterView />
+  <AppCredit />
 
   <!-- Modal idle: ¿Sigues ahí? -->
   <Transition name="idle-fade">
