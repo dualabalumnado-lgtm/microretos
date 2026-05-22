@@ -1,31 +1,61 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router'; // Importamos el router
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
+import LoginModal from '../components/LoginModal.vue';
+import { useUIState } from '../composables/useUIState.js';
 
-const router = useRouter(); // Instanciamos el router
-
-// Estado para controlar las animaciones de entrada
+const router = useRouter();
+const route  = useRoute();
+const authStore = useAuthStore();
+const { triggerWelcome } = useUIState();
 const isLoaded = ref(false);
+const showLogin = ref(false); // 👈 controla el modal
+
+// Ruta a la que volver tras el login (puede venir de ?redirect=... al expirar el token)
+const redirectTrasLogin = ref(null)
 
 onMounted(() => {
-  // Pequeño retraso para asegurar que la vista renderiza antes de animar
-  setTimeout(() => {
-    isLoaded.value = true;
-  }, 100);
+  setTimeout(() => { isLoaded.value = true; }, 100);
+  // Si llegamos aquí por expiración de sesión, abrir el modal automáticamente
+  if (route.query.redirect) {
+    redirectTrasLogin.value = route.query.redirect
+    showLogin.value = true;
+  }
 });
 
-// Funciones de navegación conectadas a tus rutas
 const irAGenerador = () => {
-  router.push({ name: 'microretos' });
+  if (authStore.isAuthenticated) {
+    router.push({ name: 'microretos' });
+  } else {
+    redirectTrasLogin.value = null
+    destinoTrasLogin.value = 'microretos'
+    showLogin.value = true;
+  }
+};
+
+// Destino tras login (generador o biblioteca según desde dónde se abrió el modal)
+const destinoTrasLogin = ref('microretos')
+
+const onLoginSuccess = (data) => {
+  const role = data?.role ?? authStore.userRole
+  const destino = redirectTrasLogin.value ?? { name: destinoTrasLogin.value }
+  router.push(destino).finally(() => triggerWelcome(role, authStore.userName))
 };
 
 const irABiblioteca = () => {
-  router.push({ name: 'biblioteca' });
+  if (authStore.isAuthenticated) {
+    router.push({ name: 'biblioteca' });
+  } else {
+    redirectTrasLogin.value = null
+    destinoTrasLogin.value = 'biblioteca'
+    showLogin.value = true;
+  }
 };
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] overflow-hidden font-sans text-[#1F2937] relative flex items-center justify-center p-4 md:p-12">
+  <div class="min-h-screen bg-[#F8FAFC] overflow-hidden font-sans text-[#1F2937] relative flex items-center justify-center p-4 md:p-12 pt-12 md:pt-12">
     
     <div class="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-[#99CC33]/10 rounded-full blur-[100px] pointer-events-none transition-opacity duration-1000" :class="isLoaded ? 'opacity-100' : 'opacity-0'"></div>
     <div class="absolute bottom-[-10%] right-[-10%] w-[30vw] h-[30vw] bg-[#00A859]/10 rounded-full blur-[100px] pointer-events-none transition-opacity duration-1000 delay-300" :class="isLoaded ? 'opacity-100' : 'opacity-0'"></div>
@@ -55,7 +85,7 @@ const irABiblioteca = () => {
               Conecta talento <br class="hidden md:block"/> con <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00A859] to-[#99CC33]">retos reales.</span>
             </h1>
             <p class="text-lg md:text-xl text-gray-500 leading-relaxed font-medium max-w-xl mx-auto md:mx-0">
-              DuaLab es la solución definitiva para conectar empresas con el alumnado en prácticas. Transformamos necesidades empresariales en <strong class="text-[#00A859] font-bold">microretos académicos</strong> para impulsar el aprendizaje práctico y descubrir talento emergente.
+              DuaLab es la solución definitiva para conectar empresas con el alumnado en prácticas. Transformamos necesidades empresariales en <strong class="text-[#00A859] font-bold">retos académicos</strong> para impulsar el aprendizaje práctico y descubrir talento emergente.
             </p>
           </div>
 
@@ -64,7 +94,7 @@ const irABiblioteca = () => {
             
             <button @click="irAGenerador" class="group relative w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#00A859] to-[#99CC33] text-white rounded-full font-black text-sm uppercase tracking-widest shadow-[0_10px_30px_rgba(0,168,89,0.3)] hover:shadow-[0_15px_40px_rgba(153,204,51,0.4)] transition-all duration-300 hover:-translate-y-1 active:scale-95">
               <svg class="w-5 h-5 transition-transform group-hover:rotate-180 duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              Generador de Microretos
+              Generador de Retos
             </button>
 
             <button @click="irABiblioteca" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-5 bg-white text-[#1F2937] border-2 border-gray-200 rounded-full font-black text-sm uppercase tracking-widest shadow-sm hover:border-[#00A859] hover:text-[#00A859] transition-all duration-300 hover:-translate-y-1 active:scale-95">
@@ -101,7 +131,7 @@ const irABiblioteca = () => {
                 <div class="bg-[#99CC33] text-[#121212] w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black shadow-md">2</div>
                 <div>
                   <h4 class="font-bold text-[#00A859] text-lg">La IA lo transforma</h4>
-                  <p class="text-sm text-gray-600 leading-relaxed mt-1">DuaLab genera un microreto académico alineado al currículo oficial.</p>
+                  <p class="text-sm text-gray-600 leading-relaxed mt-1">DuaLab genera un reto académico alineado al currículo oficial.</p>
                 </div>
               </div>
 
@@ -117,7 +147,7 @@ const irABiblioteca = () => {
             </div>
           </div>
           
-          <div class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 z-20 bg-[#1F2937] text-white p-5 rounded-3xl shadow-2xl flex items-center gap-4 animate-bounce" style="animation-duration: 3s;">
+          <div class="hidden sm:flex absolute -bottom-4 -right-4 z-20 bg-[#1F2937] text-white p-4 sm:p-5 rounded-3xl shadow-2xl items-center gap-3 sm:gap-4 animate-bounce" style="animation-duration: 3s;">
             <div class="bg-[#99CC33] text-[#121212] rounded-full p-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
             </div>
@@ -130,6 +160,8 @@ const irABiblioteca = () => {
         </div>
       </main>
     </div>
+    <!-- Al final del template, antes del último </div> -->
+    <LoginModal v-model="showLogin" @login-success="onLoginSuccess" />
   </div>
 </template>
 

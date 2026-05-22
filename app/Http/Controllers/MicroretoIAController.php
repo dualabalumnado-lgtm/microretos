@@ -6,62 +6,293 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\Microreto;
 use App\Models\Modulo;
+use App\Models\CicloFormativo;
+use App\Models\Empresa;
 
 class MicroretoIAController extends Controller
 {
-
-    public function index()
+    public function index(Request $request)
     {
-        // 1. Obtenemos todos los microretos usando Eloquent (para que respete los arrays de tu modelo)
-        $microretos = \App\Models\Microreto::all();
+        // Límite de seguridad: máximo 500 registros por llamada.
+        // El frontend filtra en cliente, así que cargamos todo pero con techo.
+        // Cuando el volumen crezca habrá que añadir filtros server-side.
+        $limit = min((int) $request->query('limit', 500), 500);
 
-        // 2. Mapeamos cada microreto para inyectarle el Centro y la Familia
-        $microretos->map(function ($reto) {
-            
-            // Buscamos la empresa vinculada a este reto
-            $empresa = \App\Models\Empresa::where('nombre_comercial', $reto->empresa_nombre)->first();
-            
-            if ($empresa) {
-                // Si la empresa existe, le pasamos el centro
-                $reto->centro_educativo = $empresa->centro_educativo;
-                
-                // Buscamos la familia en la tabla pivote
-                $familia = \Illuminate\Support\Facades\DB::table('empresa_familia')
-                    ->where('empresa_id', $empresa->id)
-                    ->value('familia');
-                    
-                $reto->familia = $familia;
+        // Pre-cargar módulos y ciclos para derivar curso sin N+1
+        $modulosPorCiclo = \App\Models\Modulo::select('idcicloformativo', 'nombre', 'curso')
+            ->get()
+            ->groupBy('idcicloformativo');
+        $ciclosPorNombre = CicloFormativo::pluck('id', 'nombre');
+
+        $user  = $request->user();
+        $query = Microreto::with([
+            'empresa.centroEducativo',
+            'empresa.familias',
+        ])
+        ->orderByDesc('created_at')
+        ->limit($limit);
+
+        // Docentes solo ven microretos de su centro educativo
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $centroId     = $user->centro_educativo_id;
+            $centroNombre = $user->centroEducativo?->nombre;
+            $query->whereHas('empresa', function ($q) use ($centroId, $centroNombre) {
+                $q->where('centro_id', $centroId);
+                if ($centroNombre) {
+                    $q->orWhere('centro_educativo', $centroNombre);
+                }
+            });
+        }
+
+        $microretos = $query->get()
+        ->map(function ($reto) use ($modulosPorCiclo, $ciclosPorNombre) {
+
+            $reto->es_simulado = (bool) $reto->es_simulado;
+
+            if ($reto->empresa) {
+                $reto->centro_educativo  = $reto->empresa->centroEducativo?->nombre
+                    ?? $reto->empresa->centro_educativo
+                    ?? 'Centro Desconocido';
+
+                $reto->familia           = $reto->empresa->familias->first()?->nombre
+                    ?? 'Familia Desconocida';
+
+                $reto->empresa_es_simulada = (bool) $reto->empresa->es_simulada;
             } else {
-                // Valores por defecto si por algún motivo la empresa fue borrada o no coincide
-                $reto->centro_educativo = 'Centro Desconocido';
-                $reto->familia = 'Familia Desconocida';
+                $reto->centro_educativo    = 'Centro Desconocido';
+                $reto->familia             = 'Familia Desconocida';
+                $reto->empresa_es_simulada = false;
+            }
+
+            // Derivar curso en memoria si no está guardado (evita N+1)
+            if (is_null($reto->curso) && $reto->modulo && $reto->modulo !== 'Transversal') {
+                $cicloId = $reto->ciclo_id ?? $ciclosPorNombre->get($reto->ciclo);
+                if ($cicloId) {
+                    $primerModulo    = trim(explode(' y ', $reto->modulo)[0]);
+                    $modulosDelCiclo = $modulosPorCiclo->get($cicloId, collect());
+                    $modulo = $modulosDelCiclo->first(fn($m) =>
+                        $m->nombre === $primerModulo ||
+                        str_starts_with($m->nombre, rtrim($primerModulo, '.'))
+                    );
+                    $reto->curso = $modulo?->curso;
+                }
             }
 
             return $reto;
         });
 
-        // 3. Devolvemos el JSON listo y vitaminado para tu frontend en Vue
         return response()->json($microretos);
+    }
+
+    public function show($id)
+    {
+        // Acepta UUID (formato preferido, IDOR-safe) o ID entero (legacy: sesiones antiguas
+        // guardadas antes de que el frontend migrara a uuid).
+        $query = Microreto::with([
+            'empresa.centroEducativo',
+            'empresa.familias',
+        ]);
+
+        $reto = is_numeric($id)
+            ? $query->findOrFail((int) $id)
+            : $query->where('uuid', $id)->firstOrFail();
+
+        $reto->es_simulado = (bool) $reto->es_simulado;
+
+        if ($reto->empresa) {
+            $reto->centro_educativo = $reto->empresa->centroEducativo?->nombre
+                ?? $reto->empresa->centro_educativo
+                ?? 'Centro Desconocido';
+
+            $reto->familia = $reto->empresa->familias->first()?->nombre
+                ?? 'Familia Desconocida';
+
+            $reto->empresa_es_simulada = (bool) $reto->empresa->es_simulada;
+        } else {
+            $reto->centro_educativo    = 'Centro Desconocido';
+            $reto->familia             = 'Familia Desconocida';
+            $reto->empresa_es_simulada = false;
+        }
+
+        // Derivar curso si no está guardado aún
+        if (is_null($reto->curso)) {
+            $reto->curso = $this->derivarCurso($reto->ciclo_id, $reto->ciclo, $reto->modulo);
+        }
+
+        // Fallback: intentar derivarlo de evaluacion_oficial cuando modulo es 'Transversal'
+        if (is_null($reto->curso) && $reto->evaluacion_oficial && $reto->ciclo_id) {
+            $reto->curso = $this->derivarCursoDeEvaluacion($reto->ciclo_id, $reto->evaluacion_oficial);
+        }
+
+        return response()->json($reto);
+    }
+
+    /**
+     * Deduce el número de curso (1 o 2) a partir del módulo guardado en el microreto.
+     * Primero intenta por ciclo_id (FK), luego por nombre de ciclo (legacy).
+     * Tolerante al punto final en nombres de módulo (datos BOE vs. texto libre).
+     */
+    private function derivarCurso(?int $cicloId, ?string $cicloNombre, ?string $moduloTexto): ?int
+    {
+        if (!$moduloTexto || $moduloTexto === 'Transversal') {
+            return null;
+        }
+
+        // El campo 'modulo' puede ser "Módulo A y Módulo B" — tomamos el primero
+        $primerModulo = trim(explode(' y ', $moduloTexto)[0]);
+
+        $cicloIdResuelto = $cicloId;
+
+        if (!$cicloIdResuelto && $cicloNombre) {
+            $cicloIdResuelto = CicloFormativo::where('nombre', $cicloNombre)->value('id');
+        }
+
+        if (!$cicloIdResuelto) {
+            return null;
+        }
+
+        // Intento exacto primero; si falla, toleramos punto final (nombres BOE acaban en '.')
+        $curso = Modulo::where('idcicloformativo', $cicloIdResuelto)
+            ->where('nombre', $primerModulo)
+            ->value('curso');
+
+        if (is_null($curso)) {
+            $curso = Modulo::where('idcicloformativo', $cicloIdResuelto)
+                ->where('nombre', 'LIKE', rtrim($primerModulo, '.') . '%')
+                ->orderByRaw('LENGTH(nombre) ASC') // preferir el más corto (más específico)
+                ->value('curso');
+        }
+
+        return $curso;
+    }
+
+    /**
+     * Fallback: cuando modulo = 'Transversal', intentamos derivar el curso
+     * mirando los módulos referenciados en el JSON de evaluacion_oficial.
+     */
+    private function derivarCursoDeEvaluacion(int $cicloId, array $evaluacionOficial): ?int
+    {
+        foreach ($evaluacionOficial as $item) {
+            $nombreModulo = $item['modulo'] ?? null;
+            if (!$nombreModulo) continue;
+
+            $curso = Modulo::where('idcicloformativo', $cicloId)
+                ->where('nombre', 'LIKE', rtrim($nombreModulo, '.') . '%')
+                ->orderByRaw('LENGTH(nombre) ASC')
+                ->value('curso');
+
+            if (!is_null($curso)) {
+                return $curso;
+            }
+        }
+
+        return null;
+    }
+
+    public function simularInfoEmpresa(Request $request)
+    {
+        $request->validate([
+            'empresaNombre'    => 'required|string',
+            'empresaSector'    => 'required|string',
+            'empresaTamano'    => 'nullable|string',
+            'empresaUbicacion' => 'nullable|string',
+        ]);
+
+        $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector})";
+        if ($request->filled('empresaTamano'))    $contextoEmpresa .= ", Tamaño: {$request->empresaTamano}";
+        if ($request->filled('empresaUbicacion')) $contextoEmpresa .= ", Ubicación: {$request->empresaUbicacion}";
+
+        $limitacionesOpciones  = ['Presupuesto Cero/Muy Bajo', 'Equipos obsoletos', 'Internet inestable', 'Software cerrado', 'Resistencia al cambio', 'Espacio reducido', 'Falta de tiempo', 'Normativa RGPD'];
+        $consecuenciasOpciones = ['Errores frecuentes', 'Costes innecesarios', 'Pérdida de tiempo', 'Insatisfacción del cliente', 'Riesgos de seguridad', 'Desperdicio de materiales', 'Falta de comunicación interna'];
+
+        $limitacionesStr  = implode('", "', $limitacionesOpciones);
+        $consecuenciasStr = implode('", "', $consecuenciasOpciones);
+
+        $systemPrompt = "Eres un responsable o empleado de la empresa '{$request->empresaNombre}' del sector '{$request->empresaSector}'. Conoces perfectamente la operativa diaria, los problemas internos, las limitaciones reales y los objetivos de mejora de tu empresa. Describes situaciones concretas, creíbles y propias del sector, sin inventar soluciones.";
+
+        $userPrompt = "Rellena el siguiente formulario de diagnóstico empresarial como si fueras un representante de {$contextoEmpresa}.
+
+FORMULARIO (responde en español, con detalle y realismo):
+- P1 (diaANormal): Describe brevemente el día a día de tu empresa y cómo funciona vuestro proceso o servicio principal (máx. 900 caracteres).
+- P2 (friccionArea): Nombra el área o proceso concreto que más trabajo extra genera actualmente (máx. 380 caracteres).
+- P2b (friccionProblema): Explica con detalle qué ocurre hoy en ese proceso y por qué genera problemas (máx. 1100 caracteres).
+- P3 (restricciones): De esta lista, devuelve SOLO los textos que aplican realmente a tu empresa: [\"{$limitacionesStr}\"]. Devuelve exactamente los textos tal como aparecen. Puede ser un array vacío.
+- P3b (otraLimitacion): Si tenéis alguna limitación adicional no incluida en la lista, descríbela brevemente (máx. 500 caracteres, puede estar vacío).
+- P3b2 (loQueNoQuieren): Describe qué tipo de soluciones no queréis bajo ningún concepto (máx. 450 caracteres).
+- P4 (consecuencias): De esta lista, devuelve SOLO los textos que describen consecuencias reales del problema en tu empresa: [\"{$consecuenciasStr}\"]. Devuelve exactamente los textos tal como aparecen. Puede ser un array vacío.
+- P4b (otraConsecuencia): Si hay alguna consecuencia adicional no incluida en la lista, descríbela (máx. 280 caracteres, puede estar vacío).
+- P5 (expectativasAlumno): ¿Qué esperáis que investigue o proponga el alumno de FP para ayudaros? (máx. 750 caracteres).
+
+Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
+{
+  \"diaANormal\": \"...\",
+  \"friccionArea\": \"...\",
+  \"friccionProblema\": \"...\",
+  \"restricciones\": [],
+  \"otraLimitacion\": \"\",
+  \"loQueNoQuieren\": \"...\",
+  \"consecuencias\": [],
+  \"otraConsecuencia\": \"\",
+  \"expectativasAlumno\": \"...\"
+}";
+
+        $response = Http::withToken(config('services.openai.key'))
+            ->timeout(60)
+            ->post("https://api.openai.com/v1/chat/completions", [
+                "model"           => "gpt-4o",
+                "messages"        => [
+                    ["role" => "system", "content" => $systemPrompt],
+                    ["role" => "user",   "content" => $userPrompt],
+                ],
+                "response_format" => ["type" => "json_object"],
+                "temperature"     => 0.8,
+            ]);
+
+        if ($response->successful()) {
+            return response()->json(json_decode($response->json()['choices'][0]['message']['content'], true));
+        }
+
+        return response()->json(['error' => 'Error al contactar con la IA'], 500);
     }
 
     public function generar(Request $request)
     {
-        $request->validate([
-            'empresaNombre' => 'required|string',
-            'empresaSector' => 'required|string',
-            'friccionProblema' => 'required|string',
-            'ciclo_nombre' => 'required|string',
-            'ciclo_id' => 'required',
-            'nivelGrupo' => 'required|string',
-            'cursoSeleccionado' => 'required|integer',
-            'modulo_id' => 'nullable|array',
-            'cantidad' => 'required|integer|min:1|max:15' // ¡NUEVO! Validamos la cantidad
+        // El frontend manda empresaId (camelCase), normalizamos antes de validar
+        $request->merge([
+            'empresa_id' => $request->empresa_id ?? $request->empresaId,
         ]);
 
+        $request->validate([
+            'empresa_id'       => 'required|integer|exists:empresas,id',
+            'empresaNombre'    => 'required|string',
+            'empresaSector'    => 'required|string',
+            'friccionProblema' => 'required|string',
+            'ciclo_nombre'     => 'required|string',
+            'ciclo_id'         => 'required',
+            'nivelGrupo'       => 'required|string',
+            'cursoSeleccionado'=> 'required|integer',
+            'modulo_id'        => 'nullable|array',
+            'cantidad'         => 'required|integer|min:1|max:5',
+            'familia'          => 'nullable|string',
+        ]);
+
+        // Docentes solo pueden generar retos con empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $empresa      = Empresa::find($request->empresa_id);
+            $centroNombre = $user->centroEducativo?->nombre;
+            $perteneceAlCentro = $empresa &&
+                ($empresa->centro_id === $user->centro_educativo_id ||
+                 ($centroNombre && $empresa->centro_educativo === $centroNombre));
+            if (!$perteneceAlCentro) {
+                return response()->json(['error' => 'No autorizado: la empresa no pertenece a tu centro educativo.'], 403);
+            }
+        }
+
         $consecuencias = implode(", ", $request->consecuencias ?? []);
-        
+
         $query = Modulo::with(['ras.criteriosEvaluacion']);
-        
+
         if ($request->filled('modulo_id') && is_array($request->modulo_id) && count($request->modulo_id) > 0) {
             $query->whereIn('id', $request->modulo_id);
         } else {
@@ -82,39 +313,59 @@ class MicroretoIAController extends Controller
         }
         $curriculumTexto .= "\n--- FIN CURRÍCULO ---";
 
-        $esBasica = ($request->nivelGrupo === 'Básico');
-        $reglaExtra = $esBasica ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado." : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
+        $esBasica    = ($request->nivelGrupo === 'Bajo');
+        $reglaExtra  = $esBasica
+            ? "REGLA: Nivel Básico (FP Básica). Reto eminentemente manual, paso a paso y muy guiado."
+            : "REGLA: Nivel {$request->nivelGrupo}. Adapta la complejidad técnica al nivel indicado.";
         $reglaExtra .= " TEN EN CUENTA QUE ES PARA ALUMNADO DE {$request->cursoSeleccionado}º CURSO. Adapta el prototipo a sus conocimientos.";
 
+        $familia = $request->filled('familia') ? $request->familia : null;
+
         $contextoEmpresa = "EMPRESA: {$request->empresaNombre} (Sector: {$request->empresaSector}). ";
-        if ($request->filled('empresaTamano')) $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
+        if ($request->filled('empresaTamano'))    $contextoEmpresa .= "Tamaño: {$request->empresaTamano}. ";
         if ($request->filled('empresaUbicacion')) $contextoEmpresa .= "Ubicación: {$request->empresaUbicacion}. ";
 
-        $contextoFriccion = "OPERATIVA Y OFERTA (P1): {$request->diaANormal}\n";
+        $contextoFormativo  = "CICLO FORMATIVO: {$request->ciclo_nombre} ({$request->cursoSeleccionado}º curso).\n";
+        if ($familia) {
+            $contextoFormativo .= "FAMILIA PROFESIONAL: {$familia}.\n";
+            $contextoFormativo .= "IMPORTANTE: Todos los prototipos, soluciones sugeridas y terminología deben ser específicos de la Familia Profesional «{$familia}». Usa herramientas, técnicas, documentos y procesos propios de ese perfil profesional. No propongas entregables genéricos.\n";
+        }
+
+        $contextoFriccion  = "OPERATIVA Y OFERTA (P1): {$request->diaANormal}\n";
         $contextoFriccion .= "PROCESO QUE DA TRABAJO EXTRA (P2): {$request->friccionArea}\n";
         $contextoFriccion .= "DETALLE DEL PROBLEMA (P2b): {$request->friccionProblema}\n";
         $contextoFriccion .= "OBJETIVOS DE MEJORA / CONSECUENCIAS (P4): {$consecuencias}\n";
-
         if ($request->filled('expectativasAlumno')) {
             $contextoFriccion .= "EXPECTATIVA DE LO QUE DEBE HACER EL ALUMNO (P5): {$request->expectativasAlumno}\n";
         }
 
-        // ======================================================================
-        // PROMPT OPTIMIZADO PARA ACEPTAR CANTIDAD DINÁMICA
-        // ======================================================================
+        $familiaRegla = $familia
+            ? "4. Los prototipos, las necesidades y la terminología de cada microreto DEBEN ser propios de la Familia Profesional «{$familia}». Adapta cada entregable al perfil real del alumnado: usa las herramientas, los procesos y los documentos habituales en esa familia profesional. Nunca propongas entregables genéricos que no encajen con el perfil."
+            : "4. Adapta los prototipos y necesidades al perfil profesional del alumnado según el ciclo formativo indicado.";
+
         $systemPrompt = "Eres un consultor de innovación y diseñador instruccional experto en formación profesional y metodologías ágiles (Design Thinking).
         REGLAS ESTRICTAS:
         1. NO proponer soluciones cerradas. Puedes sugerir el tipo de prototipo a entregar. El alumno debe idear la solución final.
         2. Genera EXACTAMENTE {$request->cantidad} microreto(s) totalmente distintos entre sí para la misma empresa.
-        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto.";
+        3. Para lograr variedad, selecciona diferentes Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada reto.
+        {$familiaRegla}";
+
+        $prototiposHint = $familia
+            ? "Entregable específico de la Familia Profesional «{$familia}» (usa herramientas, documentos y técnicas habituales en ese perfil, NO entregables genéricos)"
+            : "Entregable concreto adaptado al ciclo formativo (ej: Diagrama de flujo, Guion de entrevista)";
+
+        $queNecesitanHint = $familia
+            ? "Necesidad técnica expresada en términos propios de la Familia Profesional «{$familia}»"
+            : "Necesidad técnica o organizativa concreta";
 
         $userPrompt = "
         {$contextoEmpresa}
+        {$contextoFormativo}
         {$contextoFriccion}
-        LIMITACIONES TÉCNICAS Y LOGÍSTICAS (P3): {$request->restricciones}. 
+        LIMITACIONES TÉCNICAS Y LOGÍSTICAS (P3): {$request->restricciones}.
         LO QUE NO QUIEREN (P3b): {$request->loQueNoQuieren}.
         DURACIÓN: {$request->duracion}.
-        
+
         {$curriculumTexto}
         {$reglaExtra}
 
@@ -129,38 +380,38 @@ class MicroretoIAController extends Controller
                     \"dia_a_dia\": \"1 frase clara sobre cómo operan y dónde falla el proceso actualmente.\",
                     \"dificultades\": [\"Fallo 1\", \"Fallo 2\"],
                     \"pregunta_reto\": \"Formula el desafío en forma de pregunta abierta empezando por ¿Cómo podríamos...?\",
-                    \"que_necesitan\": [\"Necesidad 1\", \"Necesidad 2\"],
+                    \"que_necesitan\": [\"{$queNecesitanHint} 1\", \"{$queNecesitanHint} 2\"],
                     \"limitaciones\": [\"Restricción 1\", \"Restricción 2\"],
-                    \"prototipos\": [\"Entregable concreto 1 (ej: Diagrama de flujo)\", \"Entregable concreto 2 (ej: Guion de entrevista)\"],
+                    \"prototipos\": [\"{$prototiposHint} 1\", \"{$prototiposHint} 2\"],
                     \"ods_sugeridos\": [\"ODS X: Nombre completo del ODS\"],
                     \"evaluacion_oficial\": [
                         {
                             \"modulo\": \"Nombre exacto del Módulo 1\",
                             \"ra\": \"Texto del RA asociado\",
                             \"ce\": [\"Texto CE 1\"],
-                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje.\"
+                            \"aplicacion\": \"Breve frase explicando cómo se aterriza este aprendizaje en el contexto de la Familia Profesional.\"
                         }
                     ],
                     \"variantes\": [
-                        \"Nombre de la Variante: Descripción de una modificación del reto.\"
+                        \"Nombre de la Variante: Descripción de una modificación del reto adaptada a la Familia Profesional.\"
                     ],
                     \"tips_profesorado\": [
-                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles].\"
+                        \"Gestión de Aula: [Instrucciones sobre dinámicas o roles propios de la Familia Profesional].\"
                     ]
                 }
             ]
         }";
 
-        $response = Http::withToken(env('OPENAI_API_KEY'))
-            ->timeout(120) // He subido el timeout a 120s porque si le pides 15 retos, tardará más en generar
+        $response = Http::withToken(config('services.openai.key'))
+            ->timeout(120)
             ->post("https://api.openai.com/v1/chat/completions", [
-                "model" => "gpt-4o",
-                "messages" => [
+                "model"           => "gpt-4o",
+                "messages"        => [
                     ["role" => "system", "content" => $systemPrompt],
-                    ["role" => "user", "content" => $userPrompt]
+                    ["role" => "user",   "content" => $userPrompt],
                 ],
                 "response_format" => ["type" => "json_object"],
-                "temperature" => 0.9
+                "temperature"     => 0.9,
             ]);
 
         if ($response->successful()) {
@@ -170,32 +421,91 @@ class MicroretoIAController extends Controller
         return response()->json(['error' => 'Error al contactar con la IA'], 500);
     }
 
-    // Guarda UN SOLO reto
     public function guardarEnBD(Request $request)
     {
+        // Docentes solo pueden guardar microretos de empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id && !empty($request->empresa_id)) {
+            $empresa      = Empresa::find($request->empresa_id);
+            $centroNombre = $user->centroEducativo?->nombre;
+            $perteneceAlCentro = $empresa &&
+                ($empresa->centro_id === $user->centro_educativo_id ||
+                 ($centroNombre && $empresa->centro_educativo === $centroNombre));
+            if (!$perteneceAlCentro) {
+                return response()->json(['error' => 'No autorizado: la empresa no pertenece a tu centro educativo.'], 403);
+            }
+        }
+
         try {
-            $microreto = Microreto::create($request->all());
+            $datos = $request->except(['_ui_guardado', '_ui_guardando']);
+
+            // Derivar y persistir el curso a partir del módulo y ciclo guardados
+            if (empty($datos['curso'])) {
+                $cicloId   = isset($datos['ciclo_id']) ? (int) $datos['ciclo_id'] : null;
+                $cicloNom  = $datos['ciclo']  ?? null;
+                $moduloNom = $datos['modulo'] ?? null;
+                $datos['curso'] = $this->derivarCurso($cicloId, $cicloNom, $moduloNom);
+            }
+
+            $microreto = Microreto::create($datos);
             return response()->json(['mensaje' => 'Micro-reto archivado', 'reto' => $microreto], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al guardar en BD: ' . $e->getMessage()], 500);
         }
     }
 
-    // ¡NUEVO! Guarda TODOS los retos del array de golpe
     public function guardarLote(Request $request)
     {
         $request->validate([
-            'microretos' => 'required|array'
+            'microretos' => 'required|array',
         ]);
+
+        // Docentes solo pueden guardar microretos de empresas de su centro
+        $user = $request->user();
+        if ($user->isDocente() && $user->centro_educativo_id) {
+            $centroId     = $user->centro_educativo_id;
+            $centroNombre = $user->centroEducativo?->nombre;
+            foreach ($request->microretos as $retoData) {
+                $empresaId = $retoData['empresa_id'] ?? null;
+                if ($empresaId) {
+                    $empresa = Empresa::find($empresaId);
+                    $perteneceAlCentro = $empresa &&
+                        ($empresa->centro_id === $centroId ||
+                         ($centroNombre && $empresa->centro_educativo === $centroNombre));
+                    if (!$perteneceAlCentro) {
+                        return response()->json(['error' => 'No autorizado: alguna empresa no pertenece a tu centro educativo.'], 403);
+                    }
+                }
+            }
+        }
 
         try {
             $insertados = [];
-            foreach($request->microretos as $retoData) {
+            foreach ($request->microretos as $retoData) {
+                unset($retoData['_ui_guardado'], $retoData['_ui_guardando']);
+
+                if (empty($retoData['curso'])) {
+                    $cicloId   = isset($retoData['ciclo_id']) ? (int) $retoData['ciclo_id'] : null;
+                    $cicloNom  = $retoData['ciclo']  ?? null;
+                    $moduloNom = $retoData['modulo'] ?? null;
+                    $retoData['curso'] = $this->derivarCurso($cicloId, $cicloNom, $moduloNom);
+                }
+
                 $insertados[] = Microreto::create($retoData);
             }
             return response()->json(['mensaje' => count($insertados) . ' Micro-retos archivados en lote con éxito'], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al guardar el lote en BD: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            Microreto::findOrFail($id)->delete();
+            return response()->json(['mensaje' => 'Micro-reto eliminado correctamente'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 500);
         }
     }
 }

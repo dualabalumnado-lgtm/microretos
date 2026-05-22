@@ -35,4 +35,25 @@ return [
         ],
     ],
 
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+    ],
+
+    'cloudinary' => [
+        'cloud_name'    => env('CLOUDINARY_CLOUD_NAME'),
+        'api_key'       => env('CLOUDINARY_API_KEY'),
+        'api_secret'    => env('CLOUDINARY_API_SECRET'),
+        'folder'        => env('CLOUDINARY_FOLDER', 'dualab/recursos'),
+        'upload_max_mb' => (int) env('UPLOAD_MAX_SIZE_MB', 20),
+    ],
+
+    'empresas' => [
+        'access_password' => env('EMPRESAS_ACCESS_PASSWORD'),
+    ],
+
+    'admin' => [
+        'email'    => env('ADMIN_EMAIL'),
+        'password' => env('ADMIN_PASSWORD'),
+    ],
+
 ];

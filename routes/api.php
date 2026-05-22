@@ -3,6 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DatosFPController;
 use App\Http\Controllers\MicroretoIAController;
+use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\DemoController;
+use App\Http\Controllers\MicroretoTokenController;
+use App\Http\Controllers\MicroproyectoController;
+use App\Http\Controllers\SesionController;
+use App\Http\Controllers\EmpresaContactoController;
+use App\Http\Controllers\UploadController;
+use App\Http\Controllers\PapeleraController;
+use App\Http\Controllers\AdminUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -10,97 +19,210 @@ use App\Http\Controllers\MicroretoIAController;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/microretos', [MicroretoIAController::class, 'index']);
-// (Si prefieres ponerlo en DatosFPController, cambia la clase)
-// --- RUTAS DE CONSULTA (LECTURA) ---
-// Estas rutas alimentan tus desplegables en cascada
+// --- RUTAS PÚBLICAS (sin autenticación) ---
 
-// 1. Nuevas rutas B2B (Empresas y Familias asociadas)
-Route::get('/empresas', [DatosFPController::class, 'getEmpresas']);
-Route::get('/empresas/{id}/familias', [DatosFPController::class, 'getFamiliasPorEmpresa']);
+// Datos académicos: familias públicas para formularios de contacto u otros usos
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/familias', [DatosFPController::class, 'getFamilias']);
+});
 
-// 2. Rutas Académicas clásicas
-Route::get('/familias', [DatosFPController::class, 'getFamilias']);
-Route::get('/familias/{familia}/ciclos', [DatosFPController::class, 'getCiclos']);
-Route::get('/ciclos/{idCiclo}/modulos', [DatosFPController::class, 'getModulos']);
-Route::get('/modulos/{idModulo}/ra-ce', [DatosFPController::class, 'getRaCe']); // Se llama ra-ce en URL, getRaCe en método
+// Acceso público por token temporal (QR para alumnado)
+Route::middleware('throttle:60,1')
+     ->get('/public/microreto/{token}', [MicroretoTokenController::class, 'show']);
 
-// Crear nueva empresa
-Route::post('/empresas', [\App\Http\Controllers\DatosFPController::class, 'guardarEmpresa']);
+// Validación pública del microproyecto por parte de la empresa (acceso por token)
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/startup/landing/{token}',          [MicroproyectoController::class, 'showByToken']);
+    Route::post('/startup/landing/{token}/validar', [MicroproyectoController::class, 'validarEmpresa']);
+});
 
-// Actualizar información de empresa existente
-Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);
+// Datos académicos (ciclos, módulos) — throttle estándar
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('/familias/{familia}/ciclos',  [DatosFPController::class, 'getCiclos']);
+    Route::get('/ciclos/{idCiclo}/modulos',   [DatosFPController::class, 'getModulos']);
+    Route::get('/modulos/{idModulo}/ra-ce',   [DatosFPController::class, 'getRaCe']);
+    Route::get('/centros',                    [DatosFPController::class, 'getCentros']);
+});
 
+Route::get('/demos', [DemoController::class, 'index']);
+Route::get('/demos/{familia}/microretos', [DemoController::class, 'microretos']);
+Route::get('/demos/{familia}', [DemoController::class, 'show']);
 
-
-// Actualizar información faltante de la empresa 
-Route::put('/empresas/{id}', [\App\Http\Controllers\DatosFPController::class, 'actualizarEmpresa']);
-//-------------------------------------------------------------//
-
-// --- RUTAS DE ACCIÓN (ESCRITURA / IA) ---
-// Estas rutas procesan la generación y el guardado
-
-// Genera el JSON con OpenAI
-Route::post('/generar-microreto', [MicroretoIAController::class, 'generar']);
-
-// Guarda el resultado final en la base de datos
-Route::post('/guardar-microreto-bd', [MicroretoIAController::class, 'guardarEnBD']);
+// Auth pública — throttle estricto para prevenir fuerza bruta
+Route::middleware('throttle:5,1')
+    ->post('/admin/login', [AdminAuthController::class, 'login']);
 
 
-Route::get('/importar-excel', function () {
-    // 1. Buscamos el archivo que acabas de guardar
+// --- RUTAS PROTEGIDAS (requieren token Sanctum) ---
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Auth
+    Route::post('/admin/logout',          [AdminAuthController::class, 'logout']);
+    Route::post('/admin/refresh',         [AdminAuthController::class, 'refresh']);
+    Route::middleware('throttle:5,1')
+        ->post('/admin/verify-password', [AdminAuthController::class, 'verifyPassword']);
+
+    // Biblioteca de microretos (requiere login — protege contra enumeración IDOR)
+    // Los IDs en URL son UUIDs, no secuenciales
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::get('/microretos',      [MicroretoIAController::class, 'index']);
+        Route::get('/microretos/{id}', [MicroretoIAController::class, 'show']);
+    });
+
+    // Centros educativos — creación, edición y borrado protegidos
+    Route::post('/centros',           [DatosFPController::class, 'guardarCentro']);
+    Route::put('/centros/{id}',       [DatosFPController::class, 'actualizarCentro']);
+    Route::delete('/centros/{id}',    [DatosFPController::class, 'eliminarCentro']);
+
+    // Familias profesionales — CRUD protegido
+    Route::post('/familias',          [DatosFPController::class, 'storeFamilia']);
+    Route::put('/familias/{id}',      [DatosFPController::class, 'updateFamilia']);
+    Route::delete('/familias/{id}',   [DatosFPController::class, 'destroyFamilia']);
+
+    // Ciclos formativos — CRUD protegido
+    Route::post('/ciclos',            [DatosFPController::class, 'storeCiclo']);
+    Route::put('/ciclos/{id}',        [DatosFPController::class, 'updateCiclo']);
+    Route::delete('/ciclos/{id}',     [DatosFPController::class, 'destroyCiclo']);
+
+    // Empresas — lectura para usuarios autenticados, escritura/borrado solo admin
+    Route::get('/empresas',                [DatosFPController::class, 'getEmpresas']);
+    Route::get('/empresas/dashboard',      [DatosFPController::class, 'getDashboardEmpresas']);
+    Route::get('/empresas/{id}/familias',  [DatosFPController::class, 'getFamiliasPorEmpresa']);
+    Route::middleware('admin')->group(function () {
+        Route::post('/empresas',               [DatosFPController::class, 'guardarEmpresa']);
+        Route::put('/empresas/{id}',           [DatosFPController::class, 'actualizarEmpresa']);
+        Route::patch('/empresas/{id}/estado',  [DatosFPController::class, 'actualizarEstadoEmpresa']);
+        Route::delete('/empresas/{id}',        [DatosFPController::class, 'eliminarEmpresa']);
+    });
+
+    // Generación IA: throttle estricto (5 generaciones/minuto por usuario)
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('/generar-microreto',      [MicroretoIAController::class, 'generar']);
+        Route::post('/simular-info-empresa',   [MicroretoIAController::class, 'simularInfoEmpresa']);
+    });
+
+    // Guardado y borrado de microretos
+    Route::post('/guardar-microreto-bd',      [MicroretoIAController::class, 'guardarEnBD']);
+    Route::post('/guardar-microretos-lote',   [MicroretoIAController::class, 'guardarLote']);
+    Route::delete('/microretos/{id}',         [MicroretoIAController::class, 'destroy']);
+
+    // Tokens QR temporales (gestión exclusiva de admins)
+    Route::get('/microretos/{id}/token',      [MicroretoTokenController::class, 'get']);
+    Route::post('/microretos/{id}/token',     [MicroretoTokenController::class, 'generate']);
+    Route::delete('/microretos/{id}/token',   [MicroretoTokenController::class, 'destroy']);
+
+    // Sesiones de docentes
+    Route::get('/sesiones',              [SesionController::class, 'index']);
+    Route::post('/sesiones',             [SesionController::class, 'store']);
+    Route::post('/sesiones/lote',        [SesionController::class, 'storeLote']);
+    Route::get('/sesiones/{id}',         [SesionController::class, 'show']);
+    Route::delete('/sesiones/{id}',      [SesionController::class, 'destroy']);
+
+    // Subida y gestión de recursos en Cloudinary (documentos y vídeos del microproyecto)
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::get('/upload/recursos',  [UploadController::class, 'listar']);
+        Route::post('/upload/recurso',  [UploadController::class, 'recurso']);
+        Route::delete('/upload/recurso',[UploadController::class, 'destroy']);
+    });
+
+    // Módulo Empresas — verificación de acceso y contacto
+    Route::middleware('throttle:10,1')
+        ->post('/empresas/verificar-acceso', [EmpresaContactoController::class, 'verificarAcceso']);
+    Route::post('/empresas/{id}/contactar',         [EmpresaContactoController::class, 'contactar']);
+    Route::post('/empresas/{id}/enviar-validacion', [EmpresaContactoController::class, 'enviarValidacion']);
+
+    // StartUp Day — microproyectos CRUD
+    Route::get('/startup/proyectos',          [MicroproyectoController::class, 'index']);
+    Route::post('/startup/proyectos',         [MicroproyectoController::class, 'store']);
+    Route::get('/startup/proyectos/{uuid}',   [MicroproyectoController::class, 'show']);
+    Route::put('/startup/proyectos/{uuid}',   [MicroproyectoController::class, 'update']);
+    Route::delete('/startup/proyectos/{uuid}',[MicroproyectoController::class, 'destroy']);
+
+    // StartUp Day — IA: sugerencia de RA/CE
+    Route::middleware('throttle:10,1')
+        ->post('/startup/sugerir-ra-ce', [MicroproyectoController::class, 'sugerirRaCe']);
+
+    // ── Gestión de usuarios (solo admin) ─────────────────────────────
+    Route::middleware('admin')->prefix('admin/usuarios')->group(function () {
+        Route::get('/',                       [AdminUserController::class, 'index']);
+        Route::post('/',                      [AdminUserController::class, 'store']);
+        Route::get('/papelera',               [AdminUserController::class, 'papelera']);
+        Route::patch('/{user}',               [AdminUserController::class, 'update']);
+        Route::patch('/{user}/activar',       [AdminUserController::class, 'activar']);
+        Route::patch('/{user}/bloquear',      [AdminUserController::class, 'toggleBloquear']);
+        Route::delete('/{user}',              [AdminUserController::class, 'destroy']);
+        Route::post('/{id}/restaurar',        [AdminUserController::class, 'restaurar']);
+        Route::delete('/{id}/destruir',       [AdminUserController::class, 'destruir']);
+        Route::patch('/{user}/centro',        [AdminUserController::class, 'asociarCentro']);
+    });
+
+    // Papelera — gestión de elementos borrados (soft delete)
+    Route::prefix('papelera')->group(function () {
+        Route::get('/',                         [PapeleraController::class, 'index']);
+        Route::delete('/',                      [PapeleraController::class, 'vaciar']);
+        Route::patch('/{tipo}/{id}/restaurar',  [PapeleraController::class, 'restaurar']);
+        Route::delete('/{tipo}/{id}',           [PapeleraController::class, 'destruir']);
+    });
+
+});
+
+// -------- IMPORTACIONES (protegidas con auth) ---------
+Route::middleware('auth:sanctum')->get('/importar-excel', function () {
     $path = storage_path('app/agraria.csv'); ///////////////////////////////////////
-    if (!file_exists($path)) return "No se encuentra el archivo informatica.csv en storage/app/";
+    if (!file_exists($path)) return "No se encuentra el archivo agraria.csv en storage/app/";
 
-    $file = fopen($path, 'r');
+    $familiaImport = 'Agraria'; /////////////////////////////////////
+    $familiaId     = \App\Models\Familia::where('nombre', $familiaImport)->value('id');
 
-    // 2. Ignoramos las primeras 4 líneas (las de colores y cabeceras)
-    for ($i = 0; $i < 4; $i++) {
-        fgetcsv($file, 0, ',', '"');
-    }
-
+    $file     = fopen($path, 'r');
     $contador = 0;
 
-    // 3. Leemos línea por línea
-    while (($data = fgetcsv($file, 0, ',', '"')) !== false) {
-        // Si la columna 4 (Razón social) está vacía, saltamos esta fila
-        if (empty($data[4])) continue; 
+    // Ignoramos las primeras 4 líneas (cabeceras)
+    for ($i = 0; $i < 4; $i++) fgetcsv($file, 0, ',', '"');
 
-        // 4. Guardamos la Empresa
-        $empresa = \App\Models\Empresa::create([
-            'cif'               => $data[2] ?? null,
-            'nombre_comercial'  => $data[4], // Usamos Razón Social porque Nombre Comercial estaba vacío
-            'telefono'          => $data[5] ?? null,
-            'estado_contacto'   => $data[6] ?? null,
-            'fecha_cita'        => $data[7] ?? null,
-            'persona_contacto'  => $data[8] ?? null,
-            'email_general'     => $data[9] ?? null,
-            'posicion_contacto' => $data[10] ?? null,
-            'sector'            => $data[11] ?? null,
-            'actividad'         => $data[12] ?? null,
-            'horario_atencion'  => $data[13] ?? null,
-            'direccion'         => $data[14] ?? null,
-            'numero'            => $data[15] ?? null,
-            'otros_direccion'   => $data[16] ?? null,
-            'codigo_postal'     => $data[17] ?? null,
-            'municipio'         => $data[18] ?? null,
-            'provincia'         => $data[19] ?? null,
-            'web'               => $data[20] ?? null,
-            'proyecto_asociado' => $data[21] ?? null,
-        ]);
+    \Illuminate\Support\Facades\DB::transaction(function () use ($file, $familiaImport, $familiaId, &$contador) {
+        while (($data = fgetcsv($file, 0, ',', '"')) !== false) {
+            if (empty($data[4])) continue;
 
-        // 5. La vinculamos a la Familia en la tabla pivote
-        \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
-            'empresa_id' => $empresa->id,
-            'familia'    => 'Agraria' /////////////////////////////////////
-        ]);
+            $empresa = \App\Models\Empresa::create([
+                'cif'               => $data[2]  ?? null,
+                'nombre_comercial'  => $data[4],
+                'telefono'          => $data[5]  ?? null,
+                'estado_contacto'   => $data[6]  ?? null,
+                'fecha_cita'        => $data[7]  ?? null,
+                'persona_contacto'  => $data[8]  ?? null,
+                'email_general'     => $data[9]  ?? null,
+                'posicion_contacto' => $data[10] ?? null,
+                'sector'            => $data[11] ?? null,
+                'actividad'         => $data[12] ?? null,
+                'horario_atencion'  => $data[13] ?? null,
+                'direccion'         => $data[14] ?? null,
+                'numero'            => $data[15] ?? null,
+                'otros_direccion'   => $data[16] ?? null,
+                'codigo_postal'     => $data[17] ?? null,
+                'municipio'         => $data[18] ?? null,
+                'provincia'         => $data[19] ?? null,
+                'web'               => $data[20] ?? null,
+                'proyecto_asociado' => $data[21] ?? null,
+            ]);
 
-        $contador++;
-    }
+            \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
+                'empresa_id' => $empresa->id,
+                'familia'    => $familiaImport,
+                'familia_id' => $familiaId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $contador++;
+        }
+    });
 
     fclose($file);
-    return "¡BINGO! Se han importado correctamente {$contador} empresas y se han vinculado a la familia de Informática.";
+    return "¡BINGO! Se han importado correctamente {$contador} empresas.";
 });
+
 /* 
 
 Route::get('/importar-excel-nuevo', function () {
@@ -273,7 +395,7 @@ Route::get('/importar-excel-nuevo', function () {
     return "¡BINGO! Se han importado correctamente {$contador} nuevas empresas (Formato Transporte).";
 }); */
 
-Route::get('/importar-excel-5', function () {
+Route::middleware('auth:sanctum')->get('/importar-excel-5', function () {
     // 1. CAMBIA AQUÍ el nombre de tu archivo CSV de Energías
     $path = storage_path('app/energia_2.csv'); 
     if (!file_exists($path)) return "No se encuentra el archivo en storage/app/";
@@ -317,10 +439,15 @@ Route::get('/importar-excel-5', function () {
             'centro_educativo'  => 'IES Aguas Nuevas', 
         ]);
 
-        // 4. Asignamos la Familia Profesional
+        // 4. Asignamos la Familia Profesional (con FK normalizada)
+        $familiaImport5 = 'Energía y Agua';
+        $familiaId5 = \App\Models\Familia::where('nombre', $familiaImport5)->value('id');
         \Illuminate\Support\Facades\DB::table('empresa_familia')->insert([
             'empresa_id' => $empresa->id,
-            'familia'    => 'Energía y Agua' 
+            'familia'    => $familiaImport5,
+            'familia_id' => $familiaId5,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $contador++;
