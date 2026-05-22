@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
     foreach ([
         'microreto_tokens', 'microretos',
         'resultados_aprendizaje', 'criterios_evaluacion',
-        'modulos', 'centro_ciclo',
+        'modulos', 'familias', 'centro_ciclo',
         'ciclos_formativos', 'empresa_familia',
         'empresas', 'centro_educativo', 'demos',
     ] as $tabla) {

@@ -13,7 +13,7 @@ jobs:
       security-events: write
 
     steps:
-      # ─── 1. CHECKOUT ───────────────────────────────────────────────────────
+      # ─── 1. CHECKOUT ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
