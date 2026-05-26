@@ -17,6 +17,7 @@ class Microproyecto extends Model
         'fundamentacion', 'diseno_reto', 'diseno_microproyecto', 'resumen',
         'objetivos', 'kpis', 'validacion_empresa',
         'paso_actual', 'estado', 'token_empresa', 'empresa_validado',
+        'empresa_no_valida_aun', 'enviado_a_empresa_mail',
     ];
 
     protected $casts = [
@@ -32,7 +33,9 @@ class Microproyecto extends Model
         'objetivos'              => 'array',
         'kpis'                   => 'array',
         'validacion_empresa'     => 'array',
-        'empresa_validado'       => 'boolean',
+        'empresa_validado'        => 'boolean',
+        'empresa_no_valida_aun'   => 'boolean',
+        'enviado_a_empresa_mail'  => 'boolean',
     ];
 
     protected static function booted(): void
