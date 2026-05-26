@@ -155,8 +155,8 @@ function getEtiqueta(p) {
 function getColor(p) {
   if (p.estado === 'borrador')  return 'bg-amber-50 border-amber-200 text-amber-700';
   if (p.estado === 'archivado') return 'bg-gray-100 border-gray-200 text-gray-400';
-  if (p.empresa_validado)       return 'bg-blue-50 border-blue-200 text-blue-700';
-  return 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]';
+  if (p.empresa_validado)       return 'bg-[#00A859]/10 border-[#00A859]/30 text-[#00A859]';  // Validado → verde
+  return 'bg-blue-50 border-blue-200 text-blue-700';  // Propuesta → azul
 }
 
 const filtroOpciones = ['todos', 'borrador', 'propuesta', 'proyecto', 'archivado'];
@@ -467,13 +467,63 @@ function mostrarSnack(mensaje, accion = null) {
                   </svg>
                   {{ p.centro_nombre }}
                 </div>
-                <div v-if="p.empresa_validado" class="flex items-center gap-1.5 text-[#00A859] font-bold">
-                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div v-if="p.empresa_validado"
+                     class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                            bg-[#00A859]/10 border border-[#00A859]/30 text-[#00A859]">
+                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                   </svg>
-                  Validado por empresa
+                  <span class="text-[9px] font-black uppercase tracking-wider leading-tight">
+                    Validado por empresa
+                  </span>
                 </div>
               </div>
+
+              <!-- ── Etiquetas de sub-estado en miniatura ───────────────── -->
+              <div v-if="p.estado === 'publicado' && !p.empresa_validado"
+                   class="flex flex-col gap-1.5 mt-1">
+
+                <!-- Propuesta NO enviada por mail aún -->
+                <div v-if="!p.enviado_a_empresa_mail && !p.empresa_no_valida_aun"
+                     class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                            bg-violet-50 border border-violet-300 text-violet-700">
+                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <span class="text-[9px] font-black uppercase tracking-wider leading-tight">
+                    Pendiente de enviar a empresa
+                  </span>
+                </div>
+
+                <!-- Enviada por mail, esperando respuesta -->
+                <div v-if="p.enviado_a_empresa_mail && !p.empresa_no_valida_aun"
+                     class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                            bg-blue-50 border border-blue-200 text-blue-600">
+                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <span class="text-[9px] font-black uppercase tracking-wider leading-tight">
+                    Enviado a empresa · Sin respuesta
+                  </span>
+                </div>
+
+                <!-- Empresa contestó "No validar aún" — requiere atención -->
+                <div v-if="p.empresa_no_valida_aun"
+                     class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                            bg-red-50 border border-red-300 text-red-700">
+                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <span class="text-[9px] font-black uppercase tracking-wider leading-tight">
+                    Empresa: "No validar aún" · Revisar
+                  </span>
+                </div>
+
+              </div>
+              <!-- ── Fin etiquetas de sub-estado ────────────────────────── -->
             </div>
 
             <!-- Acciones -->

@@ -53,7 +53,7 @@ class MicroproyectoController extends Controller
             'datos_empresa', 'datos_centro', 'equipo', 'modulos_seleccionados', 'ra_ce',
             'fundamentacion', 'diseno_reto', 'diseno_microproyecto', 'resumen',
             'objetivos', 'kpis', 'validacion_empresa',
-            'paso_actual', 'estado',
+            'paso_actual', 'estado', 'enviado_a_empresa_mail',
         ];
 
         $data = $request->only($allowed);
@@ -141,8 +141,9 @@ class MicroproyectoController extends Controller
                 'que_necesitan' => $mr->que_necesitan,
                 'dificultades'  => $mr->dificultades,
             ] : null,
-            'empresa_validado'   => $proyecto->empresa_validado,
-            'validacion_empresa' => $proyecto->validacion_empresa,
+            'empresa_validado'      => $proyecto->empresa_validado,
+            'empresa_no_valida_aun' => $proyecto->empresa_no_valida_aun,
+            'validacion_empresa'    => $proyecto->validacion_empresa,
         ]);
     }
 
@@ -153,16 +154,28 @@ class MicroproyectoController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
+            'decision'   => 'required|in:validar,no_validar_aun',
             'respuestas' => 'required|array',
             'comentarios'=> 'nullable|string|max:2000',
         ]);
 
-        $proyecto->update([
-            'validacion_empresa' => $data,
-            'empresa_validado'   => true,
-        ]);
+        if ($data['decision'] === 'validar') {
+            // La empresa valida: guardar respuestas, marcar validado, limpiar flag "no validar"
+            $proyecto->update([
+                'validacion_empresa'    => ['respuestas' => $data['respuestas'], 'comentarios' => $data['comentarios'] ?? null],
+                'empresa_validado'      => true,
+                'empresa_no_valida_aun' => false,
+            ]);
+        } else {
+            // La empresa responde "no validar aún": guardar respuestas pero NO validar
+            $proyecto->update([
+                'validacion_empresa'    => ['respuestas' => $data['respuestas'], 'comentarios' => $data['comentarios'] ?? null],
+                'empresa_validado'      => false,
+                'empresa_no_valida_aun' => true,
+            ]);
+        }
 
-        return response()->json(['ok' => true]);
+        return response()->json(['ok' => true, 'decision' => $data['decision']]);
     }
 
     // --- IA: sugerencia de RA/CE ---
@@ -247,8 +260,10 @@ class MicroproyectoController extends Controller
             'curso'            => $p->curso,
             'estado'           => $p->estado,
             'paso_actual'      => $p->paso_actual,
-            'empresa_validado' => $p->empresa_validado,
-            'token_empresa'    => $p->token_empresa,
+            'empresa_validado'      => $p->empresa_validado,
+            'empresa_no_valida_aun' => $p->empresa_no_valida_aun,
+            'enviado_a_empresa_mail'=> $p->enviado_a_empresa_mail,
+            'token_empresa'         => $p->token_empresa,
             'empresa_id'       => $p->empresa_id,
             'empresa_nombre'   => $p->empresa?->nombre_comercial,
             'centro_id'        => $p->centro_id,

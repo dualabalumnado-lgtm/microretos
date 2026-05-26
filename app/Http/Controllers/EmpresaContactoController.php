@@ -115,6 +115,9 @@ class EmpresaContactoController extends Controller
                  ->subject("Validación de microproyecto: {$proyecto->titulo}");
         });
 
+        // Marcar el proyecto como "enviado a empresa por mail" para mostrar la etiqueta en la miniatura
+        $proyecto->update(['enviado_a_empresa_mail' => true]);
+
         return response()->json(['success' => true]);
     }
 }

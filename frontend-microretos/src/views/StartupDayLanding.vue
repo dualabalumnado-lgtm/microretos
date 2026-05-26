@@ -21,6 +21,7 @@ const respuestas = ref({
   viabilidad:          '',
 });
 const comentarios = ref('');
+const decision    = ref('');   // 'validar' | 'no_validar_aun' — campo obligatorio
 
 onMounted(async () => {
   setTimeout(() => { isLoaded.value = true; }, 80);
@@ -35,13 +36,16 @@ onMounted(async () => {
 });
 
 async function enviarValidacion() {
+  if (!decision.value) return; // el select es obligatorio, HTML ya lo valida, doble seguro
   enviando.value = true;
   try {
-    await api.post(`/startup/landing/${route.params.token}/validar`, {
-      respuestas: respuestas.value,
+    const res = await api.post(`/startup/landing/${route.params.token}/validar`, {
+      decision:    decision.value,
+      respuestas:  respuestas.value,
       comentarios: comentarios.value,
     });
-    enviado.value = true;
+    // Guardamos la decisión para mostrar el mensaje de confirmación correcto
+    enviado.value = res.data.decision ?? decision.value;
   } finally {
     enviando.value = false;
   }
@@ -123,22 +127,42 @@ function youtubeId(url) {
           <p class="text-gray-500 text-sm font-medium">El enlace no es válido o ha expirado.</p>
         </div>
 
-        <!-- Confirmación enviada -->
-        <div v-else-if="enviado"
+        <!-- Confirmación enviada — "Validar propuesta" -->
+        <div v-else-if="enviado === 'validar'"
              class="text-center py-16 bg-white rounded-[2rem] border border-gray-100 shadow-sm">
           <div class="w-20 h-20 rounded-full bg-[#00A859]/10 border border-[#00A859]/20 flex items-center justify-center mx-auto mb-6">
             <svg class="w-10 h-10 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
             </svg>
           </div>
-          <h2 class="text-xl font-black text-[#121212] mb-2">¡Validación enviada!</h2>
+          <h2 class="text-xl font-black text-[#121212] mb-2">¡Propuesta validada!</h2>
           <p class="text-gray-400 text-sm max-w-sm mx-auto">
-            Muchas gracias por revisar el proyecto. El equipo docente recibirá vuestra valoración
-            y os trasladará los próximos pasos.
+            Muchas gracias por vuestra confianza. El equipo docente recibirá vuestra validación
+            y se pondrá en contacto para los próximos pasos.
           </p>
           <div class="mt-6 flex items-center justify-center gap-2">
             <span class="w-1.5 h-1.5 rounded-full bg-[#00A859]"/>
             <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">DuaLab · Gracias por colaborar</span>
+          </div>
+        </div>
+
+        <!-- Confirmación enviada — "No validar aún" -->
+        <div v-else-if="enviado === 'no_validar_aun'"
+             class="text-center py-16 bg-white rounded-[2rem] border border-amber-100 shadow-sm">
+          <div class="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h2 class="text-xl font-black text-[#121212] mb-2">Respuesta registrada</h2>
+          <p class="text-gray-400 text-sm max-w-sm mx-auto">
+            Hemos registrado vuestra respuesta de "no validar aún". El equipo docente la recibirá
+            y se pondrá en contacto con vosotros para resolver cualquier duda antes de continuar.
+          </p>
+          <div class="mt-6 flex items-center justify-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"/>
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-500">DuaLab · Gracias por vuestra respuesta</span>
           </div>
         </div>
 
@@ -517,15 +541,27 @@ function youtubeId(url) {
             </div>
           </div>
 
-          <!-- Formulario validación (solo si no está ya validado) -->
+          <!-- Formulario validación (solo si no está ya validado por empresa) -->
           <form v-if="!proyecto.empresa_validado" @submit.prevent="enviarValidacion"
                 class="bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 space-y-6">
 
             <div class="pb-4 border-b border-gray-100">
-              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859] mb-1">Validación empresa</p>
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#00A859] mb-1">Valoración empresa</p>
               <p class="text-sm text-gray-400">Por favor, responded las siguientes preguntas sobre el proyecto.</p>
+              <!-- Aviso si ya habían respondido "no validar aún" antes -->
+              <div v-if="proyecto.empresa_no_valida_aun"
+                   class="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-xs text-amber-700 font-medium">
+                  Ya habíais indicado "No validar aún". Podéis cambiar vuestra respuesta rellenando el formulario de nuevo.
+                </p>
+              </div>
             </div>
 
+            <!-- Preguntas de valoración -->
             <div v-for="preg in preguntas" :key="preg.key" class="space-y-2.5">
               <label class="text-sm text-[#1F2937] font-medium block">{{ preg.label }}</label>
               <div class="flex flex-wrap gap-3">
@@ -543,6 +579,7 @@ function youtubeId(url) {
               </div>
             </div>
 
+            <!-- Comentarios -->
             <div>
               <label class="text-sm text-[#1F2937] font-medium block mb-2">
                 Comentarios adicionales <span class="text-gray-400 font-normal">(opcional)</span>
@@ -556,16 +593,83 @@ function youtubeId(url) {
               />
             </div>
 
-            <button type="submit" :disabled="enviando"
-                    class="w-full py-3 bg-[#00A859] rounded-full text-xs font-black uppercase tracking-widest
-                           text-white shadow-sm hover:bg-[#00A859]/90
-                           hover:shadow-[0_0_0_3px_rgba(0,168,89,0.2)]
-                           transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
-              {{ enviando ? 'Enviando...' : 'Enviar validación' }}
+            <!-- ── DECISIÓN (obligatoria) ─────────────────────────────────── -->
+            <div class="pt-2 border-t border-gray-100">
+              <label class="text-sm text-[#1F2937] font-medium block mb-2">
+                Decisión sobre la propuesta
+                <span class="text-red-400 ml-1" title="Campo obligatorio">*</span>
+              </label>
+              <p class="text-xs text-gray-400 mb-3">
+                Seleccionad si validáis la propuesta tal como está o si aún necesitáis más tiempo o información.
+              </p>
+              <div class="relative">
+                <select
+                  v-model="decision"
+                  required
+                  class="w-full appearance-none bg-white border rounded-2xl px-4 py-3 text-sm
+                         font-medium shadow-sm transition-colors cursor-pointer
+                         focus:outline-none pr-10"
+                  :class="decision === 'validar'
+                    ? 'border-[#00A859]/40 text-[#00A859] bg-[#00A859]/5 focus:border-[#00A859]'
+                    : decision === 'no_validar_aun'
+                      ? 'border-amber-300 text-amber-700 bg-amber-50 focus:border-amber-400'
+                      : 'border-gray-200 text-gray-400 focus:border-[#00A859]'"
+                >
+                  <option value="" disabled>— Selecciona una opción —</option>
+                  <option value="validar">✅ Validar propuesta</option>
+                  <option value="no_validar_aun">⏳ No validar propuesta aún</option>
+                </select>
+                <!-- Icono chevron decorativo -->
+                <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Ayuda contextual según selección -->
+              <Transition name="slide-guide">
+                <div v-if="decision === 'validar'"
+                     class="mt-2.5 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[#00A859]/5 border border-[#00A859]/20">
+                  <svg class="w-3.5 h-3.5 text-[#00A859] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  <p class="text-[11px] text-[#00A859] font-medium leading-snug">
+                    El proyecto quedará marcado como validado por vuestra empresa. El equipo docente recibirá la notificación.
+                  </p>
+                </div>
+                <div v-else-if="decision === 'no_validar_aun'"
+                     class="mt-2.5 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <svg class="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <p class="text-[11px] text-amber-700 font-medium leading-snug">
+                    El equipo docente sabrá que habéis revisado la propuesta pero que aún no podéis validarla.
+                    Se pondrán en contacto con vosotros para resolver cualquier duda.
+                  </p>
+                </div>
+              </Transition>
+            </div>
+            <!-- ── FIN DECISIÓN ───────────────────────────────────────────── -->
+
+            <button type="submit" :disabled="enviando || !decision"
+                    class="w-full py-3.5 rounded-full text-xs font-black uppercase tracking-widest
+                           text-white shadow-sm transition-all active:scale-[0.99]
+                           disabled:opacity-40 disabled:cursor-not-allowed"
+                    :class="decision === 'validar'
+                      ? 'bg-[#00A859] hover:bg-[#00A859]/90 hover:shadow-[0_0_0_3px_rgba(0,168,89,0.2)]'
+                      : decision === 'no_validar_aun'
+                        ? 'bg-amber-500 hover:bg-amber-500/90 hover:shadow-[0_0_0_3px_rgba(245,158,11,0.2)]'
+                        : 'bg-gray-400 cursor-not-allowed'">
+              <span v-if="enviando">Enviando respuesta...</span>
+              <span v-else-if="decision === 'validar'">✓ Enviar respuesta — Validar propuesta</span>
+              <span v-else-if="decision === 'no_validar_aun'">Enviar respuesta — No validar aún</span>
+              <span v-else>Selecciona una decisión para continuar</span>
             </button>
 
             <p class="text-center text-[10px] text-gray-400">
-              Tu valoración llegará directamente al equipo docente.
+              Vuestra valoración llegará directamente al equipo docente.
               No hay respuestas correctas o incorrectas — lo que más ayuda es vuestra opinión sincera.
             </p>
           </form>

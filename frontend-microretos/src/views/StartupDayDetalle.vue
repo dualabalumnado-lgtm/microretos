@@ -37,9 +37,15 @@ function abrirConfirmEnvio() {
   modalConfirmEnvio.value = true;
 }
 
-function confirmarEnvio() {
+async function confirmarEnvio() {
   if (!confirmEnvioValido.value) return;
   modalConfirmEnvio.value = false;
+  if (proyecto.value?.uuid) {
+    try {
+      await api.put(`/startup/proyectos/${proyecto.value.uuid}`, { enviado_a_empresa_mail: true });
+      proyecto.value.enviado_a_empresa_mail = true;
+    } catch { /* no crítico */ }
+  }
 }
 
 async function copiarUrlModal() {
@@ -76,20 +82,27 @@ onMounted(async () => {
   }
 });
 
-const estadoColor = {
-  borrador:  'bg-amber-50 border-amber-200 text-amber-700',
-  archivado: 'bg-gray-100 border-gray-200 text-gray-400',
-  propuesta: 'bg-[#00A859]/10 border-[#00A859]/20 text-[#00A859]',
-  proyecto:  'bg-blue-50 border-blue-200 text-blue-700',
-};
+// ── Badge de estado principal (cubre todos los sub-estados) ────────────────
+function getEstadoBadge(p) {
+  if (!p || p.estado === 'borrador')
+    return { label: 'Borrador', cls: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-400' };
+  if (p.estado === 'archivado')
+    return { label: 'Archivado', cls: 'bg-gray-100 border-gray-200 text-gray-400', dot: 'bg-gray-400' };
+  if (p.empresa_validado)
+    return { label: 'Validado', cls: 'bg-[#00A859]/10 border-[#00A859]/30 text-[#00A859]', dot: 'bg-[#00A859]' };
+  // publicado sin validar
+  if (p.enviado_a_empresa_mail)
+    return { label: 'Propuesta · SÍ enviada por mail', cls: 'bg-blue-50 border-blue-200 text-blue-700', dot: 'bg-blue-400' };
+  return { label: 'Propuesta · NO enviada por mail', cls: 'bg-violet-50 border-violet-300 text-violet-700', dot: 'bg-violet-400' };
+}
 
+// Mantener compat con modal-borrador (que comprueba estado directo)
 function getEstadoKey(p) {
   if (!p) return 'borrador';
   if (p.estado === 'borrador')  return 'borrador';
   if (p.estado === 'archivado') return 'archivado';
   return p.empresa_validado ? 'proyecto' : 'propuesta';
 }
-const estadoLabel = { borrador: 'Borrador', archivado: 'Archivado', propuesta: 'Propuesta', proyecto: 'Validado' };
 
 const landingUrl = computed(() => {
   if (!proyecto.value?.token_empresa) return '';
@@ -156,21 +169,32 @@ async function archivar() {
         <!-- Cabecera -->
         <header class="mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <div class="flex items-center gap-3 mb-3">
+            <div class="flex flex-wrap items-center gap-2 mb-3">
               <button @click="router.push({ name: 'startup-day' })"
                       class="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center
-                             text-gray-400 hover:text-[#00A859] hover:border-[#00A859]/30 transition-all">
+                             text-gray-400 hover:text-[#00A859] hover:border-[#00A859]/30 transition-all shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                 </svg>
               </button>
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full
-                          bg-[#00A859]/10 border border-[#00A859]/20">
+                          bg-[#00A859]/10 border border-[#00A859]/20 shrink-0">
                 <span class="w-2 h-2 rounded-full bg-[#00A859]" />
                 <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">StartUp Day</span>
               </div>
-              <span :class="['text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border', estadoColor[getEstadoKey(proyecto)]]">
-                {{ estadoLabel[getEstadoKey(proyecto)] }}
+              <!-- Badge estado principal -->
+              <span :class="['inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border shrink-0', getEstadoBadge(proyecto).cls]">
+                <span :class="['w-1.5 h-1.5 rounded-full shrink-0', getEstadoBadge(proyecto).dot]" />
+                {{ getEstadoBadge(proyecto).label }}
+              </span>
+              <!-- Alerta "empresa no valida aún" -->
+              <span v-if="proyecto.empresa_no_valida_aun && !proyecto.empresa_validado"
+                    class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest
+                           px-2.5 py-1 rounded-full border bg-red-50 border-red-300 text-red-700 shrink-0">
+                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Empresa contestó: No validar aún
               </span>
             </div>
             <h1 class="text-2xl md:text-3xl font-black tracking-tight text-[#121212]">{{ proyecto.titulo }}</h1>
@@ -214,42 +238,115 @@ async function archivar() {
           </div>
         </header>
 
-        <!-- Link empresa (solo si publicado) -->
-        <div v-if="proyecto.estado === 'publicado'"
-             class="bg-[#00A859]/5 border border-[#00A859]/20 rounded-2xl p-5 mb-6">
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[10px] font-black uppercase tracking-widest text-[#00A859] mb-1">Enlace de validación empresa</p>
-              <p class="text-xs text-gray-400 break-all">{{ landingUrl }}</p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button v-if="proyecto.empresa_id && !proyecto.empresa_validado"
-                      @click="router.push({ name: 'empresas', query: { empresa_id: proyecto.empresa_id, proyecto_uuid: proyecto.uuid, panel: 'validacion' } })"
-                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase
-                             tracking-wider border bg-amber-50 text-amber-700 border-amber-200
-                             hover:bg-amber-100 transition-all">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                </svg>
-                Enviar a empresa
-              </button>
+        <!-- ── Panel de estado de envío / respuesta empresa (si publicado) ── -->
+        <div v-if="proyecto.estado === 'publicado'" class="mb-6 space-y-3">
+
+          <!-- Bloque enlace -->
+          <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Enlace de validación empresa</p>
+            <div class="flex items-center gap-2">
+              <p class="flex-1 text-xs text-gray-400 truncate font-mono bg-gray-50 border border-gray-100
+                         rounded-xl px-3 py-2 min-w-0">{{ landingUrl }}</p>
               <button @click="copiarUrl"
-                      :class="['px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border',
+                      :class="['shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all',
                                 urlCopiada
                                   ? 'bg-[#00A859]/10 text-[#00A859] border-[#00A859]/20'
                                   : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]']">
-                {{ urlCopiada ? '¡Copiado!' : 'Copiar enlace' }}
+                {{ urlCopiada ? '¡Copiado!' : 'Copiar' }}
               </button>
             </div>
           </div>
 
-          <div v-if="proyecto.empresa_validado" class="flex items-center gap-2 mt-3 pt-3 border-t border-[#00A859]/15">
-            <svg class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm font-bold text-[#00A859]">La empresa ha validado el proyecto</p>
+          <!-- Estado: Validado por empresa ✅ -->
+          <div v-if="proyecto.empresa_validado"
+               class="flex items-center gap-3 px-4 py-3.5 rounded-2xl
+                      bg-[#00A859]/8 border border-[#00A859]/25 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-[#00A859]/15 border border-[#00A859]/25
+                        flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-black text-[#00A859]">La empresa ha validado el proyecto</p>
+              <p class="text-[10px] text-[#00A859]/70 mt-0.5">
+                {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre }}
+                respondió con validación positiva.
+              </p>
+            </div>
           </div>
+
+          <!-- Estado: Empresa contestó "No validar aún" 🔴 -->
+          <div v-else-if="proyecto.empresa_no_valida_aun"
+               class="flex items-start gap-3 px-4 py-3.5 rounded-2xl
+                      bg-red-50 border border-red-300 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-red-100 border border-red-200
+                        flex items-center justify-center shrink-0 mt-0.5">
+              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-black text-red-700">La empresa contestó: "No validar aún"</p>
+              <p class="text-[10px] text-red-500 mt-0.5">
+                {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre }} revisó el proyecto
+                pero indicó que aún no puede validarlo. Contacta con la empresa para resolver las dudas.
+              </p>
+            </div>
+          </div>
+
+          <!-- Estado: Propuesta SÍ enviada por mail, pendiente de respuesta 🔵 -->
+          <div v-else-if="proyecto.enviado_a_empresa_mail"
+               class="flex items-center gap-3 px-4 py-3.5 rounded-2xl
+                      bg-blue-50 border border-blue-200 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-blue-100 border border-blue-200
+                        flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-black text-blue-700">Enlace enviado a la empresa · Pendiente de respuesta</p>
+              <p class="text-[10px] text-blue-500 mt-0.5 truncate">
+                Esperando que {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre || 'la empresa' }} acceda y responda.
+              </p>
+            </div>
+            <button v-if="!authStore.isEmpresa"
+                    @click="abrirConfirmEnvio"
+                    class="shrink-0 px-3 py-2 rounded-xl text-xs font-bold border
+                           bg-white text-blue-600 border-blue-200 hover:bg-blue-50 transition-all">
+              Reenviar
+            </button>
+          </div>
+
+          <!-- Estado: Propuesta NO enviada por mail aún 🟣 -->
+          <div v-else
+               class="flex items-center gap-3 px-4 py-3.5 rounded-2xl
+                      bg-violet-50 border border-violet-300 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-white border border-violet-200
+                        flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-black text-violet-700">Propuesta pendiente de enviar a empresa</p>
+              <p class="text-[10px] text-gray-400 mt-0.5">
+                El enlace está generado pero aún no se ha confirmado el envío a
+                {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre || 'la empresa' }}.
+              </p>
+            </div>
+            <button v-if="!authStore.isEmpresa"
+                    @click="abrirConfirmEnvio"
+                    class="shrink-0 px-3 py-2 rounded-xl text-xs font-bold border
+                           bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200 transition-all">
+              Enviar
+            </button>
+          </div>
+
         </div>
 
         <!-- Secciones del proyecto -->
@@ -389,24 +486,7 @@ async function archivar() {
             </ul>
           </div>
 
-          <!-- Validación empresa -->
-          <div v-if="proyecto.validacion_empresa?.respuestas" class="card-section sm:col-span-2">
-            <p class="section-label text-[#00A859]">Respuestas empresa</p>
-            <div class="grid sm:grid-cols-2 gap-3">
-              <div v-for="(val, key) in proyecto.validacion_empresa.respuestas" :key="key"
-                   class="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
-                <p class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{{ key.replace(/_/g, ' ') }}</p>
-                <p class="text-sm font-bold"
-                   :class="val === 'Sí' ? 'text-[#00A859]' : val === 'No' ? 'text-red-500' : 'text-amber-600'">
-                  {{ val }}
-                </p>
-              </div>
-            </div>
-            <p v-if="proyecto.validacion_empresa.comentarios"
-               class="mt-3 text-sm text-gray-500 italic border-t border-gray-100 pt-3">
-              "{{ proyecto.validacion_empresa.comentarios }}"
-            </p>
-          </div>
+          <!-- (feedback empresa — movido debajo del grid) -->
 
           <!-- Resumen -->
           <div v-if="proyecto.resumen?.texto" class="card-section sm:col-span-2">
@@ -509,7 +589,123 @@ async function archivar() {
             </Transition>
           </div>
 
+        </div><!-- /grid -->
+
+        <!-- ══ FEEDBACK DE LA EMPRESA ══════════════════════════════════════ -->
+        <div v-if="proyecto.validacion_empresa?.respuestas" class="mt-6">
+
+          <!-- Cabecera del bloque -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                   :class="proyecto.empresa_validado
+                     ? 'bg-[#00A859]/10 border border-[#00A859]/20'
+                     : 'bg-red-50 border border-red-200'">
+                <svg class="w-5 h-5"
+                     :class="proyecto.empresa_validado ? 'text-[#00A859]' : 'text-red-500'"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path v-if="proyecto.empresa_validado"
+                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                        d="M5 13l4 4L19 7"/>
+                  <path v-else
+                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Feedback de la empresa</p>
+                <p class="text-sm font-black text-[#121212]">
+                  {{ proyecto.empresa_nombre || proyecto.datos_empresa?.nombre || 'Empresa' }}
+                </p>
+              </div>
+            </div>
+            <!-- Badge decisión -->
+            <span v-if="proyecto.empresa_validado"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border
+                         text-[10px] font-black uppercase tracking-widest
+                         bg-[#00A859]/10 border-[#00A859]/30 text-[#00A859]">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+              Decisión: Validó la propuesta
+            </span>
+            <span v-else-if="proyecto.empresa_no_valida_aun"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border
+                         text-[10px] font-black uppercase tracking-widest
+                         bg-red-50 border-red-300 text-red-700">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Decisión: No validar aún
+            </span>
+          </div>
+
+          <!-- Preguntas y respuestas -->
+          <div class="bg-white border rounded-[1.5rem] shadow-sm overflow-hidden"
+               :class="proyecto.empresa_validado
+                 ? 'border-[#00A859]/20'
+                 : proyecto.empresa_no_valida_aun
+                   ? 'border-red-200'
+                   : 'border-gray-100'">
+
+            <div class="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+              <div v-for="(val, key) in proyecto.validacion_empresa.respuestas" :key="key"
+                   class="px-5 py-4 flex items-start gap-4">
+                <!-- Icono respuesta -->
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                     :class="val === 'Sí'
+                       ? 'bg-[#00A859]/10 border border-[#00A859]/20'
+                       : val === 'No'
+                         ? 'bg-red-50 border border-red-200'
+                         : 'bg-amber-50 border border-amber-200'">
+                  <svg class="w-4 h-4"
+                       :class="val === 'Sí' ? 'text-[#00A859]' : val === 'No' ? 'text-red-500' : 'text-amber-500'"
+                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path v-if="val === 'Sí'"
+                          stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    <path v-else-if="val === 'No'"
+                          stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    <path v-else
+                          stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-0.5">
+                    {{ key === 'reto_comprensible'   ? '¿El reto es comprensible y realista?'
+                     : key === 'objetivos_alineados' ? '¿Los objetivos se alinean con la empresa?'
+                     : key === 'equipo_adecuado'     ? '¿El perfil del equipo es adecuado?'
+                     : key === 'viabilidad'           ? '¿El proyecto es viable en la empresa?'
+                     : key.replace(/_/g, ' ') }}
+                  </p>
+                  <p class="text-base font-black"
+                     :class="val === 'Sí' ? 'text-[#00A859]' : val === 'No' ? 'text-red-500' : 'text-amber-600'">
+                    {{ val }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comentarios -->
+            <div v-if="proyecto.validacion_empresa.comentarios"
+                 class="px-5 py-4 border-t border-gray-100 bg-gray-50 flex items-start gap-3">
+              <svg class="w-4 h-4 text-gray-300 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+              </svg>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Comentarios adicionales</p>
+                <p class="text-sm text-gray-600 leading-relaxed italic">
+                  "{{ proyecto.validacion_empresa.comentarios }}"
+                </p>
+              </div>
+            </div>
+
+          </div>
         </div>
+        <!-- ══ FIN FEEDBACK EMPRESA ══════════════════════════════════════════ -->
+
       </template>
     </div>
   </div>
@@ -620,7 +816,7 @@ async function archivar() {
           Proyecto en propuesta
         </h3>
         <p class="text-sm text-gray-500 text-center mb-6 leading-relaxed">
-          Este proyecto fue enviado a la empresa y está pendiente de su validación.
+          Este proyecto está preparado para ser enviado a la empresa y que esta la valide.
           El enlace único ya está generado — asegúrate de que la empresa lo haya recibido.
         </p>
 
