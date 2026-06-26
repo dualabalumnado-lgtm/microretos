@@ -308,7 +308,7 @@ const totalReunion     = computed(() => estadisticasContacto.value['Reunión fij
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12 md:pt-12">
+  <div class="min-h-screen font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Fondo decorativo -->
     <div class="fixed top-0 right-0 w-150 h-100

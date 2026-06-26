@@ -966,7 +966,7 @@ async function guardarEstadoGen(nuevoEstado) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden pt-12 md:pt-12">
+  <div class="min-h-screen p-4 md:p-12 transition-colors duration-500 font-sans text-[#1F2937] overflow-x-hidden pt-12 md:pt-12">
     
     <!-- ══════════ TOUR OVERLAY ════════════════════════════════════════════ -->
   <Transition name="sp-fade">

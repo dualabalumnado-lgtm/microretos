@@ -16,8 +16,7 @@ class AdminUserController extends Controller
 
         $query = User::with('centroEducativo')
             ->whereNot('id', $auth->id)
-            ->orderBy('role')
-            ->orderBy('name');
+            ->orderByDesc('created_at');
 
         if ($auth->isAdmin()) {
             // Admin de centro: solo ve docentes de su propio centro
@@ -270,6 +269,7 @@ class AdminUserController extends Controller
             'is_active'           => $user->email_verified_at !== null,
             'centro_educativo_id' => $user->centro_educativo_id,
             'centro_nombre'       => $user->centroEducativo?->nombre,
+            'centro_img'          => $user->centroEducativo?->img,
             'empresa_id'          => $user->empresa_id,
             'empresa_nombre'      => $user->empresa?->nombre_comercial,
             'created_at'          => $user->created_at?->toDateTimeString(),

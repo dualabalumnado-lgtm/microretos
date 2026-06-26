@@ -15,16 +15,17 @@ export const ROLE_ROUTES = {
   [ROLE_SUPERADMIN]: ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
                       'sesiones-registradas', 'startup-day', 'startup-day-crear',
                       'startup-day-editar', 'startup-day-detalle', 'base-datos', 'papelera',
-                      'empresas', 'gestion-usuarios', 'inicio-docente'],
+                      'empresas', 'gestion-usuarios', 'inicio-docente', 'mi-usuario'],
   [ROLE_ADMIN]:      ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
                       'sesiones-registradas', 'startup-day', 'startup-day-crear',
                       'startup-day-editar', 'startup-day-detalle', 'gestion-usuarios',
-                      'papelera', 'inicio-docente'],
+                      'papelera', 'inicio-docente', 'mi-usuario'],
   [ROLE_DOCENTE]:    ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
                       'sesiones-registradas', 'startup-day', 'startup-day-crear',
-                      'startup-day-editar', 'startup-day-detalle', 'empresas', 'inicio-docente'],
+                      'startup-day-editar', 'startup-day-detalle', 'empresas', 'inicio-docente',
+                      'mi-usuario'],
   [ROLE_EMPRESA]:    ['biblioteca', 'detalle-microreto',
-                      'startup-day', 'startup-day-detalle'],
+                      'startup-day', 'startup-day-detalle', 'mi-usuario'],
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -40,6 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_name')
     localStorage.removeItem('user_centro_id')
     localStorage.removeItem('user_centro_nombre')
+    localStorage.removeItem('user_centro_img')
   }
 
   const isAuthenticated  = ref(!!localStorage.getItem('admin_token'))
@@ -47,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userName         = ref(localStorage.getItem('user_name') || 'Administrador')
   const userCentroId     = ref(Number(localStorage.getItem('user_centro_id') || 0) || null)
   const userCentroNombre = ref(localStorage.getItem('user_centro_nombre') || '')
+  const userCentroImg    = ref(localStorage.getItem('user_centro_img') || '')
   const refreshing       = ref(false)
 
   // Reloj reactivo: se actualiza cada minuto
@@ -80,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
     return allowed.includes(routeName)
   }
 
-  const login = (token, role = ROLE_SUPERADMIN, name = 'Administrador', centroId = null, centroNombre = '') => {
+  const login = (token, role = ROLE_SUPERADMIN, name = 'Administrador', centroId = null, centroNombre = '', centroImg = '') => {
     localStorage.setItem('admin_token', token)
     localStorage.setItem('admin_token_created_at', String(Date.now()))
     localStorage.setItem('user_role', String(role))
@@ -89,6 +92,8 @@ export const useAuthStore = defineStore('auth', () => {
     else          localStorage.removeItem('user_centro_id')
     if (centroNombre) localStorage.setItem('user_centro_nombre', centroNombre)
     else              localStorage.removeItem('user_centro_nombre')
+    if (centroImg) localStorage.setItem('user_centro_img', centroImg)
+    else           localStorage.removeItem('user_centro_img')
     // Inicializar el timer de seguridad de BD: el login cuenta como verificación
     sessionStorage.setItem('db_security_verified_at', String(Date.now()))
     isAuthenticated.value  = true
@@ -96,6 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
     userName.value         = name
     userCentroId.value     = centroId
     userCentroNombre.value = centroNombre || ''
+    userCentroImg.value    = centroImg || ''
   }
 
   const logout = () => {
@@ -105,11 +111,24 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_name')
     localStorage.removeItem('user_centro_id')
     localStorage.removeItem('user_centro_nombre')
+    localStorage.removeItem('user_centro_img')
     isAuthenticated.value  = false
     userRole.value         = ROLE_SUPERADMIN
     userName.value         = 'Administrador'
     userCentroId.value     = null
     userCentroNombre.value = ''
+    userCentroImg.value    = ''
+  }
+
+  const updateName = (name) => {
+    userName.value = name
+    localStorage.setItem('user_name', name)
+  }
+
+  const updateCentroImg = (img) => {
+    userCentroImg.value = img || ''
+    if (img) localStorage.setItem('user_centro_img', img)
+    else     localStorage.removeItem('user_centro_img')
   }
 
   const refresh = async () => {
@@ -127,8 +146,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    isAuthenticated, userRole, userName, userCentroId, userCentroNombre, refreshing,
+    isAuthenticated, userRole, userName, userCentroId, userCentroNombre, userCentroImg, refreshing,
     isSuperAdmin, isAdmin, isDocente, isEmpresa, roleLabel,
-    minutosRestantes, login, logout, refresh, canAccess,
+    minutosRestantes, login, logout, refresh, updateName, updateCentroImg, canAccess,
   }
 })

@@ -131,7 +131,7 @@ const usuariosFiltrados = computed(() => {
 })
 
 const totalActivos  = computed(() => usuarios.value.length)
-const totalDocentes = computed(() => usuarios.value.filter(u => u.role === 2).length)
+const totalDocentes = computed(() => usuarios.value.filter(u => u.role === 2 || u.role === 4).length)
 const totalEmpresas = computed(() => usuarios.value.filter(u => u.role === 3).length)
 const totalPapelera = computed(() => papelera.value.length)
 
@@ -344,6 +344,18 @@ async function activar(usuario) {
   }
 }
 
+async function activarEnModal() {
+  if (!usuarioEditando.value) return
+  try {
+    const { data } = await api.patch(`/admin/usuarios/${usuarioEditando.value.id}/activar`)
+    reemplazar(usuarios.value, data.data)
+    usuarioEditando.value = data.data
+    mostrarToast('Cuenta activada correctamente.')
+  } catch (e) {
+    mostrarToast(e.response?.data?.message ?? 'Error al activar.', false)
+  }
+}
+
 async function toggleBloquear(usuario) {
   const accion = usuario.is_blocked ? 'desbloquear' : 'bloquear'
   pedirConfirmacion(
@@ -503,7 +515,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-[#121212] px-4 py-8 lg:px-8 pt-12 md:pt-12">
+  <div class="min-h-screen text-[#121212] px-4 py-8 lg:px-8 pt-12 md:pt-12">
 
     <!-- ── Cabecera ────────────────────────────────────────── -->
     <div class="max-w-5xl mx-auto mb-8 flex flex-col sm:flex-row sm:items-end gap-4">
@@ -561,7 +573,7 @@ onMounted(async () => {
             d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
         </svg>
         <span class="font-black text-xl text-red-500">{{ totalPapelera }}</span>
-        <span class="text-xs font-semibold text-red-400 uppercase tracking-wider">reciclados</span>
+        <span class="text-xs font-semibold text-red-400 uppercase tracking-wider">En Papelera</span>
       </div>
     </div>
 
@@ -665,7 +677,7 @@ onMounted(async () => {
                     Bloqueada
                   </span>
                 </div>
-                <p class="text-xs text-gray-400 truncate mt-0.5">{{ u.email }}</p>
+                <p class="text-xs text-gray-400 break-all mt-0.5">{{ u.email }}</p>
                 <!-- Centro asociado (docentes y admins de centro) -->
                 <p v-if="[2,4].includes(u.role) && u.centro_nombre"
                    class="text-[10px] text-blue-500 mt-0.5 flex items-center gap-1">
@@ -792,7 +804,7 @@ onMounted(async () => {
           </div>
 
           <!-- Fila secundaria: asociar centro (solo docentes activos) -->
-          <div v-if="vista === 'activos' && u.role === 2" class="border-t border-gray-100 pt-2.5">
+          <div v-if="vista === 'activos' && [2,4].includes(u.role)" class="border-t border-gray-100 pt-2.5">
             <button @click="abrirModalCentro(u)"
               class="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider
                      text-gray-400 hover:text-blue-600 transition-colors">
@@ -1155,31 +1167,36 @@ onMounted(async () => {
            @click.self="modalEditar = false">
         <Transition name="modal-scale">
           <div v-if="modalEditar"
-               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl w-full max-w-md p-8">
+               class="relative bg-white border border-gray-200 rounded-[1.75rem] shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
 
-            <!-- Aviso de seguridad -->
-            <div class="mb-5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
-              <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              </svg>
-              <div>
-                <p class="text-xs font-black text-amber-600 uppercase tracking-wider mb-0.5">Edición de cuenta sensible</p>
-                <p class="text-xs text-gray-500">Estás modificando los datos de <span class="text-[#1F2937] font-bold">{{ usuarioEditando?.name }}</span>. Cualquier cambio tendrá efecto inmediato.</p>
-              </div>
-            </div>
-
+            <!-- Botón cerrar -->
             <button @click="modalEditar = false"
               class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200
-                     flex items-center justify-center text-gray-400 hover:text-gray-600 transition-all">
+                     flex items-center justify-center text-gray-400 hover:text-gray-600 transition-all z-10">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
             </button>
 
-            <h2 class="text-lg font-black mb-1 text-[#121212]">Editar cuenta</h2>
-            <p class="text-xs text-gray-500 mb-6">Modifica los datos de la cuenta. Deja la contraseña en blanco para no cambiarla.</p>
+            <!-- Cabecera fija -->
+            <div class="px-8 pt-8 pb-4 shrink-0">
+              <!-- Aviso de seguridad -->
+              <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
+                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <div>
+                  <p class="text-xs font-black text-amber-600 uppercase tracking-wider mb-0.5">Edición de cuenta sensible</p>
+                  <p class="text-xs text-gray-500">Estás modificando los datos de <span class="text-[#1F2937] font-bold">{{ usuarioEditando?.name }}</span>. Cualquier cambio tendrá efecto inmediato.</p>
+                </div>
+              </div>
+              <h2 class="text-lg font-black mb-1 text-[#121212]">Editar cuenta</h2>
+              <p class="text-xs text-gray-500">Modifica los datos de la cuenta. Deja la contraseña en blanco para no cambiarla.</p>
+            </div>
 
+            <!-- Cuerpo scrollable -->
+            <div class="overflow-y-auto px-8 pb-8 pt-1">
             <form @submit.prevent="guardarEdicion" class="space-y-4">
               <!-- Nombre -->
               <div>
@@ -1309,6 +1326,28 @@ onMounted(async () => {
                 <p v-if="formEditarErrors.empresa_id" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.empresa_id }}</p>
               </div>
 
+              <!-- Switch de activación -->
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Activar aquí</label>
+                <div class="flex items-center gap-3">
+                  <button type="button"
+                    @click="!usuarioEditando?.is_active && activarEnModal()"
+                    :class="usuarioEditando?.is_active
+                      ? 'bg-[#00A859] cursor-default'
+                      : 'bg-orange-400 hover:bg-orange-500 cursor-pointer'"
+                    class="relative w-12 h-6 rounded-full transition-all duration-200 shrink-0">
+                    <span
+                      :class="usuarioEditando?.is_active ? 'translate-x-6' : 'translate-x-1'"
+                      class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 block">
+                    </span>
+                  </button>
+                  <span :class="usuarioEditando?.is_active ? 'text-[#00A859]' : 'text-orange-500'"
+                        class="text-xs font-bold">
+                    {{ usuarioEditando?.is_active ? 'Activada' : 'Sin activar' }}
+                  </span>
+                </div>
+              </div>
+
               <p v-if="msgEditar" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {{ msgEditar }}
               </p>
@@ -1319,6 +1358,7 @@ onMounted(async () => {
                 {{ editando ? 'Guardando...' : 'Guardar cambios' }}
               </button>
             </form>
+            </div>
           </div>
         </Transition>
       </div>

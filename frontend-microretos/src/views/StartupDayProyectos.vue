@@ -221,7 +221,7 @@ function mostrarSnack(mensaje, accion = null) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-10 font-sans text-[#1F2937] pt-12 md:pt-12">
+  <div class="min-h-screen p-4 md:p-10 font-sans text-[#1F2937] pt-12 md:pt-12">
 
     <!-- Modal bienvenida -->
     <BienvenidaStartupDayModal :show="guiaBienvenida" @seleccionar="seleccionarOpcionBienvenida" />

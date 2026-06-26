@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Http\Requests\UpdatePerfilRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -57,6 +58,7 @@ class AdminAuthController extends Controller
             'name'                => $user->name,
             'centro_educativo_id' => $user->centro_educativo_id,
             'centro_nombre'       => $user->centroEducativo?->nombre,
+            'centro_img'          => $user->centroEducativo?->img,
             'message'             => 'Acceso concedido.',
         ]);
     }
@@ -93,6 +95,58 @@ class AdminAuthController extends Controller
         return response()->json([
             'success' => true,
             'token'   => $token,
+        ]);
+    }
+
+    public function getPerfil(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+                'role'  => $user->role,
+            ],
+        ]);
+    }
+
+    public function updatePerfil(UpdatePerfilRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validated();
+
+        $user->name = $data['name'];
+
+        $passwordChanged = !empty($data['password']);
+
+        if ($passwordChanged) {
+            $user->password = $data['password'];
+        }
+
+        $user->save();
+
+        if ($passwordChanged) {
+            // Revocar todos los tokens en todos los dispositivos
+            $user->tokens()->delete();
+
+            return response()->json([
+                'success'          => true,
+                'password_changed' => true,
+                'message'          => 'Contraseña actualizada. Por seguridad, vuelve a iniciar sesión.',
+            ]);
+        }
+
+        return response()->json([
+            'success'          => true,
+            'password_changed' => false,
+            'message'          => 'Perfil actualizado correctamente.',
+            'data'             => [
+                'name'  => $user->name,
+                'email' => $user->email,
+            ],
         ]);
     }
 }

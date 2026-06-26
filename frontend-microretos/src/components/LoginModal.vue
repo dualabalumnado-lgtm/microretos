@@ -154,7 +154,8 @@ async function handleLogin() {
         response.data.role,
         response.data.name,
         response.data.centro_educativo_id ?? null,
-        response.data.centro_nombre ?? ''
+        response.data.centro_nombre ?? '',
+        response.data.centro_img ?? ''
       )
       emit('login-success', response.data)
       emit('update:modelValue', false)

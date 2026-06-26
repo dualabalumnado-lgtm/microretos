@@ -194,6 +194,7 @@ class DatosFPController extends Controller
             return [
                 'id'     => $centro->id,
                 'nombre' => $centro->nombre,
+                'img'    => $centro->img,
                 'ciclos' => $ciclos,
             ];
         }));
@@ -234,10 +235,13 @@ class DatosFPController extends Controller
             'nombre'      => 'required|string|max:255|unique:centro_educativo,nombre,' . $id,
             'ciclosIds'   => 'required|array|min:1',
             'ciclosIds.*' => 'integer|exists:ciclos_formativos,id',
+            'img'         => 'sometimes|nullable|string|max:2048',
         ]);
 
         $nombreAnterior = $centro->nombre;
-        $centro->update(['nombre' => $request->nombre]);
+        $update = ['nombre' => $request->nombre];
+        if ($request->has('img')) $update['img'] = $request->img;
+        $centro->update($update);
 
         // Si cambió el nombre, actualizar el campo legacy en empresas y en centro_ciclo
         if ($nombreAnterior !== $request->nombre) {
@@ -275,9 +279,10 @@ class DatosFPController extends Controller
             'nombre'      => 'required|string|max:255|unique:centro_educativo,nombre',
             'ciclosIds'   => 'required|array|min:1',
             'ciclosIds.*' => 'integer|exists:ciclos_formativos,id',
+            'img'         => 'sometimes|nullable|string|max:2048',
         ]);
 
-        $centro = CentroEducativo::create(['nombre' => $request->nombre]);
+        $centro = CentroEducativo::create($request->only(['nombre', 'img']));
 
         $rows = collect($request->ciclosIds)->map(fn($cicloId) => [
             'centro_id'        => $centro->id,

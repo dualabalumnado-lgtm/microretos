@@ -33,8 +33,8 @@ class MicroretoIAController extends Controller
         ->orderByDesc('created_at')
         ->limit($limit);
 
-        // Docentes solo ven microretos de su centro educativo
-        if ($user->isDocente() && $user->centro_educativo_id) {
+        // Docentes y admins docentes solo ven microretos de su centro educativo
+        if (($user->isDocente() || $user->isAdmin()) && $user->centro_educativo_id) {
             $centroId     = $user->centro_educativo_id;
             $centroNombre = $user->centroEducativo?->nombre;
             $query->whereHas('empresa', function ($q) use ($centroId, $centroNombre) {
@@ -85,7 +85,7 @@ class MicroretoIAController extends Controller
         return response()->json($microretos);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         // Acepta UUID (formato preferido, IDOR-safe) o ID entero (legacy: sesiones antiguas
         // guardadas antes de que el frontend migrara a uuid).
@@ -93,6 +93,19 @@ class MicroretoIAController extends Controller
             'empresa.centroEducativo',
             'empresa.familias',
         ]);
+
+        // Docentes y admins docentes solo pueden ver microretos de su centro
+        $user = $request->user();
+        if (($user->isDocente() || $user->isAdmin()) && $user->centro_educativo_id) {
+            $centroId     = $user->centro_educativo_id;
+            $centroNombre = $user->centroEducativo?->nombre;
+            $query->whereHas('empresa', function ($q) use ($centroId, $centroNombre) {
+                $q->where('centro_id', $centroId);
+                if ($centroNombre) {
+                    $q->orWhere('centro_educativo', $centroNombre);
+                }
+            });
+        }
 
         $reto = is_numeric($id)
             ? $query->findOrFail((int) $id)

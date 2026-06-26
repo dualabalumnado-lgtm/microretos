@@ -7,6 +7,7 @@ import SidePanel from './components/SidePanel.vue'
 import AppCredit from './components/AppCredit.vue'
 import { useAuthStore } from './stores/auth'
 import { useIdleTimer } from './composables/useIdleTimer'
+import api from './api.js'
 
 const router    = useRouter()
 const route     = useRoute()
@@ -26,8 +27,19 @@ const handleTokenExpired = () => {
   }
 }
 
-onMounted(() => window.addEventListener('auth:token-expired', handleTokenExpired))
+onMounted(() => {
+  window.addEventListener('auth:token-expired', handleTokenExpired)
+  if (!authStore.userCentroImg && authStore.userCentroId) cargarCentroImg()
+})
 onUnmounted(() => window.removeEventListener('auth:token-expired', handleTokenExpired))
+
+async function cargarCentroImg() {
+  try {
+    const { data } = await api.get('/centros')
+    const centro = data.find(c => c.id === authStore.userCentroId)
+    if (centro?.img) authStore.updateCentroImg(centro.img)
+  } catch { /* silencioso */ }
+}
 
 // ── Idle timeout ──────────────────────────────────────────────────────────────
 const showIdleWarning = ref(false)
@@ -81,9 +93,17 @@ const cerrarSesionIdle = () => {
 </script>
 
 <template>
+  <!-- Fondo del centro educativo (visible en todas las vistas autenticadas) -->
+  <template v-if="authStore.userCentroImg && !isPublicRetoRoute">
+    <div aria-hidden="true" class="fixed inset-0 bg-cover"
+         :style="`background-image: url('${authStore.userCentroImg}'); background-position: center 30%; z-index: 0;`"></div>
+    <div aria-hidden="true" class="fixed inset-0 pointer-events-none"
+         style="background: linear-gradient(to bottom, rgba(248,250,252,0) 0%, rgba(248,250,252,0.4) 20%, rgba(248,250,252,0.8) 45%, rgba(248,250,252,0.97) 65%, rgba(248,250,252,1) 80%); z-index: 0;"></div>
+  </template>
+
   <TopBar v-if="!isPublicRetoRoute" />
   <SidePanel v-if="!isPublicRetoRoute" />
-  <div :class="!isPublicRetoRoute ? 'lg:pl-64' : ''">
+  <div :class="!isPublicRetoRoute ? 'lg:pl-64' : ''" class="relative" style="z-index: 1;">
     <RouterView />
   </div>
   <AppCredit />

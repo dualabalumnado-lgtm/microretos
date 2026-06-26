@@ -65,6 +65,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('throttle:5,1')
         ->post('/admin/verify-password', [AdminAuthController::class, 'verifyPassword']);
 
+    // Perfil propio (accesible por todos los roles autenticados)
+    Route::get('/perfil',   [AdminAuthController::class, 'getPerfil']);
+    Route::patch('/perfil', [AdminAuthController::class, 'updatePerfil']);
+
     // Biblioteca de microretos (requiere login — protege contra enumeración IDOR)
     // Los IDs en URL son UUIDs, no secuenciales
     Route::middleware('throttle:60,1')->group(function () {

@@ -34,6 +34,9 @@ const busqueda          = ref('');
 const empresaFiltroAbierto = ref(false);
 const infoFiltroAbierto    = ref(false);
 
+// Docentes y admins docentes solo pueden ver su propio centro
+const esCentroRestringido = computed(() => authStore.isDocente || authStore.isAdmin);
+
 const centrosDisponibles = computed(() => centros.value.map(c => c.nombre).sort());
 
 // Total de microretos del centro seleccionado (para mostrar en el botón de descarga)
@@ -164,7 +167,11 @@ const cargarDatos = async () => {
     );
     centros.value = resCentros.data;
     await nextTick();
-    if (centrosDisponibles.value.length > 0) filtroCentro.value = centrosDisponibles.value[0];
+    if (esCentroRestringido.value && authStore.userCentroNombre) {
+      filtroCentro.value = authStore.userCentroNombre;
+    } else if (centrosDisponibles.value.length > 0) {
+      filtroCentro.value = centrosDisponibles.value[0];
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       accionPendiente.value = { tipo: 'cargar' };
@@ -326,7 +333,7 @@ function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] p-4 md:p-12 font-sans text-[#1F2937] relative overflow-hidden pt-12 md:pt-12">
+  <div class="min-h-screen p-4 md:p-12 font-sans text-[#1F2937] relative overflow-hidden pt-12 md:pt-12">
 
     <div
       class="absolute top-[-10%] left-1/2 transform -translate-x-1/2 w-[800px] h-[500px] bg-[#99CC33] blur-[120px] rounded-full pointer-events-none transition-opacity duration-1000"
@@ -389,20 +396,28 @@ function mostrarSnack(mensaje, tipo = 'ok', accion = null) {
                 </span>
               </label>
               <div class="flex flex-wrap items-center gap-2 flex-1">
-                <button
-                  v-for="centro in centrosDisponibles"
-                  :key="centro"
-                  @click="seleccionarCentro(centro)"
-                  class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 border"
-                  :class="filtroCentro === centro
-                    ? 'bg-[#00A859] text-white border-[#00A859] shadow-md'
-                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'">
-                  {{ centro }}
-                </button>
+                <!-- Superadmin y empresa: selector completo de centros -->
+                <template v-if="!esCentroRestringido">
+                  <button
+                    v-for="centro in centrosDisponibles"
+                    :key="centro"
+                    @click="seleccionarCentro(centro)"
+                    class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 border"
+                    :class="filtroCentro === centro
+                      ? 'bg-[#00A859] text-white border-[#00A859] shadow-md'
+                      : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'">
+                    {{ centro }}
+                  </button>
+                </template>
+                <!-- Docente / Admin docente: solo badge de su propio centro -->
+                <span v-else
+                  class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-[#00A859] text-white border border-[#00A859] shadow-md">
+                  {{ authStore.userCentroNombre || filtroCentro }}
+                </span>
 
-                <!-- Descarga de todos los microretos del centro seleccionado -->
+                <!-- Descarga de todos los microretos del centro: solo superadmin -->
                 <button
-                  v-if="filtroCentro && countCentroActual > 0 && !cargando"
+                  v-if="authStore.isSuperAdmin && filtroCentro && countCentroActual > 0 && !cargando"
                   @click="descargarGrupoCentro"
                   :disabled="generandoPDFGrupo"
                   class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all duration-200"

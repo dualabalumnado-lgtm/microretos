@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'
-import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth'
+import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA, ROLE_ADMIN } from '../stores/auth'
 import { useUIState } from '../composables/useUIState.js'
 import { useCredits } from '../composables/useCredits.js'
 import { useLoginModal } from '../composables/useLoginModal.js'
@@ -55,7 +55,7 @@ const onLoginSuccess = (data) => {
 function rolHome(role) {
   if (role === ROLE_DOCENTE || role === ROLE_ADMIN) return '/inicio-docente'
   if (role === ROLE_EMPRESA) return '/microretos'
-  return '/microretos'
+  return '/admin/usuarios'
 }
 
 </script>
@@ -89,6 +89,24 @@ function rolHome(role) {
             <span>Panel docente</span>
           </button>
           <div class="sp-tooltip">Tu panel de inicio con resumen de actividad<div class="sp-tooltip-arrow"/></div>
+        </div>
+
+        <!-- ═══ Mi usuario ═══ -->
+        <div v-if="authStore.isAuthenticated" class="group/tip relative">
+          <button
+            @click="irA('/mi-usuario')"
+            title="Ver y editar mi perfil"
+            class="nav-item w-full text-left"
+            :class="isActive('/mi-usuario') ? 'nav-item--active' : 'nav-item--idle'"
+          >
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+            <span>Mi usuario</span>
+          </button>
+          <div class="sp-tooltip">Edita tu nombre y contraseña<div class="sp-tooltip-arrow"/></div>
         </div>
 
         <!-- ═══ GRUPO: MICRORETOS + TALLER DE IDEAS ═══ -->
@@ -339,6 +357,7 @@ function rolHome(role) {
 
           </div>
         </template>
+
 
       </nav>
 

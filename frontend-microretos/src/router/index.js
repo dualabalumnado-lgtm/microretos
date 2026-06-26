@@ -15,6 +15,7 @@ import EmpresasView from '../views/EmpresasView.vue'
 import PapeleraBaseDatos from '../views/PapeleraBaseDatos.vue'
 import GestionUsuarios from '../views/GestionUsuarios.vue'
 import InicioDocente from '../views/InicioDocente.vue'
+import MiUsuario from '../views/MiUsuario.vue'
 import { ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth.js'
 
 const SA = ROLE_SUPERADMIN  // 1
@@ -125,6 +126,12 @@ const router = createRouter({
       name: 'inicio-docente',
       component: InicioDocente,
       meta: { requiresAuth: true, roles: [SA, AD, DO] }
+    },
+    {
+      path: '/mi-usuario',
+      name: 'mi-usuario',
+      component: MiUsuario,
+      meta: { requiresAuth: true, roles: [SA, AD, DO, EM] }
     }
   ]
 })

@@ -125,6 +125,21 @@ const cerrarSesion = async () => {
         </span>
       </div>
 
+      <!-- Mi usuario -->
+      <button
+        @click="router.push('/mi-usuario')"
+        title="Mi usuario"
+        class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0
+               text-white/40 hover:text-white/80 hover:bg-white/10
+               transition-all duration-150"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+      </button>
+
       <!-- Logout -->
       <button
         @click="cerrarSesion"

@@ -271,7 +271,7 @@ const guardar = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-[#0a0c10] p-4 md:p-12 transition-colors duration-500 font-sans text-slate-900 dark:text-slate-200">
+  <div class="min-h-screen dark:bg-[#0a0c10] p-4 md:p-12 transition-colors duration-500 font-sans text-slate-900 dark:text-slate-200">
     <div class="max-w-6xl mx-auto">
       
       <header class="mb-10 text-center">

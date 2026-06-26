@@ -544,7 +544,7 @@ function formatFecha(isoDate) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC] font-sans text-[#1F2937] pt-12">
+  <div class="min-h-screen font-sans text-[#1F2937] pt-12">
 
     <!-- ══════════ MODAL BIENVENIDA "¿QUÉ NECESITAS?" ══════════════════════════ -->
     <BienvenidaModal :show="guiaBienvenida" @seleccionar="seleccionarOpcionBienvenida" />
