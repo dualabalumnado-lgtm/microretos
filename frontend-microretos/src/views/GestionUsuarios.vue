@@ -1,6 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import api from '../api.js'
+import { useAuthStore } from '../stores/auth.js'
+
+const authStore = useAuthStore()
 
 // ── Estado principal ────────────────────────────────────────────────
 const usuarios    = ref([])
@@ -12,7 +15,7 @@ const filtroRol   = ref(0)
 // ── Modal: crear cuenta ─────────────────────────────────────────────
 const modalCrear  = ref(false)
 const creando     = ref(false)
-const form        = ref({ name: '', email: '', password: '', role: '2' })
+const form        = ref({ name: '', email: '', password: '', role: '2', centro_educativo_id: null, empresa_id: null })
 const formErrors  = ref({})
 const msgCrear    = ref('')
 
@@ -30,21 +33,48 @@ let   highlightTimer   = null
 const modalEditar        = ref(false)
 const editando           = ref(false)
 const usuarioEditando    = ref(null)
-const formEditar         = ref({ name: '', email: '', password: '', role: '2' })
+const formEditar         = ref({ name: '', email: '', password: '', role: '2', centro_educativo_id: null, empresa_id: null })
+const formEmailLocal       = ref('')   // parte antes del @ en el form crear
+const formEditarEmailLocal = ref('')   // parte antes del @ en el form editar
 const formEditarErrors   = ref({})
 const msgEditar          = ref('')
 
-function abrirModalEditar(usuario) {
-  usuarioEditando.value  = usuario
-  formEditar.value       = { name: usuario.name, email: usuario.email, password: '', role: String(usuario.role) }
+async function abrirModalEditar(usuario) {
+  usuarioEditando.value      = usuario
+  formEditarEmailLocal.value = usuario.email?.includes('@') ? usuario.email.split('@')[0] : (usuario.email || '')
+  formEditar.value           = {
+    name:                 usuario.name,
+    email:                usuario.email,
+    password:             '',
+    role:                 String(usuario.role),
+    centro_educativo_id:  usuario.centro_educativo_id ?? null,
+    empresa_id:           usuario.empresa_id ?? null,
+  }
   formEditarErrors.value = {}
   msgEditar.value        = ''
   modalEditar.value      = true
+
+  if (authStore.isSuperAdmin) {
+    await Promise.all([
+      centros.value.length === 0 ? api.get('/centros').then(r => { centros.value = r.data }) : Promise.resolve(),
+      empresasList.value.length === 0 ? api.get('/empresas').then(r => { empresasList.value = r.data }) : Promise.resolve(),
+    ])
+  }
 }
 
 async function guardarEdicion() {
   formEditarErrors.value = {}
   msgEditar.value        = ''
+
+  if (authStore.isSuperAdmin && ['2', '4'].includes(formEditar.value.role) && !formEditar.value.centro_educativo_id) {
+    formEditarErrors.value.centro_educativo_id = 'Debes asignar un centro educativo.'
+    return
+  }
+  if (authStore.isSuperAdmin && formEditar.value.role === '3' && !formEditar.value.empresa_id) {
+    formEditarErrors.value.empresa_id = 'Debes asignar una empresa.'
+    return
+  }
+
   editando.value         = true
   try {
     const payload = {
@@ -53,6 +83,12 @@ async function guardarEdicion() {
       role:  formEditar.value.role,
     }
     if (formEditar.value.password) payload.password = formEditar.value.password
+    if (authStore.isSuperAdmin && ['2', '4'].includes(formEditar.value.role)) {
+      payload.centro_educativo_id = formEditar.value.centro_educativo_id
+    }
+    if (authStore.isSuperAdmin && formEditar.value.role === '3') {
+      payload.empresa_id = formEditar.value.empresa_id
+    }
     const { data } = await api.patch(`/admin/usuarios/${usuarioEditando.value.id}`, payload)
     reemplazar(usuarios.value, data.data)
     modalEditar.value = false
@@ -78,6 +114,10 @@ const centros           = ref([])
 const cargandoCentros   = ref(false)
 const busquedaCentro    = ref('')
 const asociandoCentro   = ref(false)
+
+// ── Listas auxiliares en modales ────────────────────────────────────
+const empresasList      = ref([])
+const cargandoEmpresas  = ref(false)
 
 // ── Confirmación + Toast ────────────────────────────────────────────
 const confirm = ref({ show: false, title: '', body: '', action: null, danger: true })
@@ -107,6 +147,85 @@ const centrosFiltrados = computed(() => {
   )
 })
 
+// ── Email automático por centro ─────────────────────────────────────
+function centroSlug(nombre) {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+// Dominio por centro educativo (docente/admin)
+const emailDomain = computed(() => {
+  // Admin de centro: el dominio es siempre el de su propio centro (no necesita la lista)
+  if (authStore.isAdmin && authStore.userCentroNombre) {
+    return centroSlug(authStore.userCentroNombre) + '.dualab'
+  }
+  const id = form.value.centro_educativo_id
+  if (!id) return null
+  const c = centros.value.find(c => c.id === id)
+  return c ? centroSlug(c.nombre) + '.dualab' : null
+})
+const emailEditarDomain = computed(() => {
+  if (authStore.isAdmin && authStore.userCentroNombre) {
+    return centroSlug(authStore.userCentroNombre) + '.dualab'
+  }
+  const id = formEditar.value.centro_educativo_id
+  if (!id) return null
+  const c = centros.value.find(c => c.id === id)
+  return c ? centroSlug(c.nombre) + '.dualab' : null
+})
+
+// Dominio por empresa (role 3)
+const emailEmpresaDomain = computed(() => {
+  const id = form.value.empresa_id
+  if (!id) return null
+  const e = empresasList.value.find(e => e.id === id)
+  return e ? centroSlug(e.nombre_comercial) + '.dualab' : null
+})
+const emailEditarEmpresaDomain = computed(() => {
+  const id = formEditar.value.empresa_id
+  if (!id) return null
+  const e = empresasList.value.find(e => e.id === id)
+  return e ? centroSlug(e.nombre_comercial) + '.dualab' : null
+})
+
+// Dominio activo (centro tiene prioridad; si no hay, empresa)
+const activeEmailDomain       = computed(() => emailDomain.value || emailEmpresaDomain.value)
+const activeEmailEditarDomain = computed(() => emailEditarDomain.value || emailEditarEmpresaDomain.value)
+
+// ── Watchers de composición de email ────────────────────────────────
+
+// CREAR: cuando el dominio activo aparece/cambia → siembra local part desde el nombre
+watch(activeEmailDomain, (domain) => {
+  if (domain) {
+    formEmailLocal.value = centroSlug(form.value.name) || formEmailLocal.value
+    form.value.email = formEmailLocal.value + '@' + domain
+  }
+})
+// CREAR: el usuario edita el local part → recompone el email
+watch(formEmailLocal, (local) => {
+  if (activeEmailDomain.value) form.value.email = local + '@' + activeEmailDomain.value
+})
+// CREAR: el nombre cambia con dominio activo → actualiza el local part
+watch(() => form.value.name, (nombre) => {
+  if (activeEmailDomain.value) formEmailLocal.value = centroSlug(nombre)
+})
+
+// EDITAR: cuando el dominio activo aparece/cambia → preserva local part o siembra desde email
+watch(activeEmailEditarDomain, (domain) => {
+  if (domain) {
+    if (!formEditarEmailLocal.value && formEditar.value.email?.includes('@')) {
+      formEditarEmailLocal.value = formEditar.value.email.split('@')[0]
+    }
+    formEditar.value.email = formEditarEmailLocal.value + '@' + domain
+  }
+})
+// EDITAR: el usuario edita el local part → recompone el email
+watch(formEditarEmailLocal, (local) => {
+  if (activeEmailEditarDomain.value) formEditar.value.email = local + '@' + activeEmailEditarDomain.value
+})
+
 // ── API: usuarios ───────────────────────────────────────────────────
 async function cargar() {
   cargando.value = true
@@ -126,13 +245,24 @@ async function cargar() {
 async function crearUsuario() {
   formErrors.value = {}
   msgCrear.value   = ''
+
+  if (authStore.isSuperAdmin && ['2', '4'].includes(form.value.role) && !form.value.centro_educativo_id) {
+    formErrors.value.centro_educativo_id = 'Debes asignar un centro educativo antes de crear la cuenta.'
+    return
+  }
+  if (authStore.isSuperAdmin && form.value.role === '3' && !form.value.empresa_id) {
+    formErrors.value.empresa_id = 'Debes asignar una empresa antes de crear la cuenta.'
+    return
+  }
+
   creando.value    = true
   try {
     const { data } = await api.post('/admin/usuarios', form.value)
     usuarios.value.push(data.data)
     modalCrear.value      = false
     cuentaRecienCreada.value = data.data
-    form.value = { name: '', email: '', password: '', role: '2' }
+    form.value       = { name: '', email: '', password: '', role: '2', centro_educativo_id: null, empresa_id: null }
+    formEmailLocal.value = ''
     // Pequeño delay para que el DOM renderice la nueva fila antes del modal
     await nextTick()
     modalExito.value = true
@@ -147,6 +277,20 @@ async function crearUsuario() {
     }
   } finally {
     creando.value = false
+  }
+}
+
+async function abrirModalCrear() {
+  form.value = { name: '', email: '', password: '', role: '2', centro_educativo_id: null, empresa_id: null }
+  formEmailLocal.value = ''
+  formErrors.value = {}
+  msgCrear.value = ''
+  modalCrear.value = true
+  if (authStore.isSuperAdmin) {
+    const [, ] = await Promise.all([
+      centros.value.length === 0 ? api.get('/centros').then(r => { centros.value = r.data }) : Promise.resolve(),
+      empresasList.value.length === 0 ? api.get('/empresas').then(r => { empresasList.value = r.data }) : Promise.resolve(),
+    ])
   }
 }
 
@@ -331,11 +475,12 @@ function cambiarVista(v) {
 
 // ── Formato ─────────────────────────────────────────────────────────
 const ROLE_COLORS = {
-  2: { bg: 'bg-blue-50 text-blue-600 border-blue-200',    label: 'Docente' },
-  3: { bg: 'bg-amber-50 text-amber-600 border-amber-200', label: 'Empresa' },
+  2: { bg: 'bg-blue-50 text-blue-600 border-blue-200',       label: 'Docente' },
+  3: { bg: 'bg-amber-50 text-amber-600 border-amber-200',    label: 'Empresa' },
+  4: { bg: 'bg-purple-50 text-purple-600 border-purple-200', label: 'Admin' },
 }
 function roleChip(role) {
-  return ROLE_COLORS[role] ?? { bg: 'bg-gray-100 text-gray-500 border-gray-200', label: 'Admin' }
+  return ROLE_COLORS[role] ?? { bg: 'bg-gray-100 text-gray-500 border-gray-200', label: 'Superadmin' }
 }
 function fmtDate(d) {
   if (!d) return '—'
@@ -368,7 +513,7 @@ onMounted(async () => {
         <p class="text-sm text-gray-500 mt-1">Crea, activa, bloquea y elimina cuentas de docentes y empresas.</p>
       </div>
       <button
-        @click="modalCrear = true"
+        @click="abrirModalCrear()"
         class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00A859] hover:bg-[#009950]
                text-white font-black text-xs uppercase tracking-widest transition-all shrink-0"
       >
@@ -439,7 +584,11 @@ onMounted(async () => {
         </button>
       </div>
       <div class="flex gap-1 p-1 bg-gray-100 border border-gray-200 rounded-xl">
-        <button v-for="f in [{ val: 0, label: 'Todos' }, { val: 2, label: 'Docentes' }, { val: 3, label: 'Empresas' }]"
+        <button v-for="f in [
+            { val: 0, label: 'Todos' },
+            { val: 2, label: 'Docentes' },
+            ...(authStore.isSuperAdmin ? [{ val: 4, label: 'Admins Docentes' }, { val: 3, label: 'Empresas' }] : [])
+          ]"
           :key="f.val" @click="filtroRol = f.val"
           :class="filtroRol === f.val ? 'bg-white text-[#1F2937] shadow-sm' : 'text-gray-400 hover:text-gray-600'"
           class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
@@ -473,19 +622,41 @@ onMounted(async () => {
             <!-- Avatar + info -->
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <div class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-black text-sm"
-                   :class="u.role === 2 ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'">
+                   :class="[2,4].includes(u.role) ? 'bg-blue-100 text-blue-600' : u.role === 3 ? 'bg-amber-100 text-amber-600' : 'bg-gray-200 text-gray-500'">
                 {{ u.name.charAt(0).toUpperCase() }}
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="font-bold text-sm text-[#1F2937] truncate">{{ u.name }}</span>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                  <!-- Chip Docente siempre visible para roles 2 y 4 -->
+                  <span v-if="[2,4].includes(u.role)"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border
+                               bg-blue-50 text-blue-600 border-blue-200">
+                    Docente
+                  </span>
+                  <!-- Chip Admin adicional solo para role 4 -->
+                  <span v-if="u.role === 4"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border
+                               bg-purple-50 text-purple-600 border-purple-200">
+                    Admin
+                  </span>
+                  <!-- Chip para empresa y otros roles -->
+                  <span v-if="![2,4].includes(u.role)"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
                         :class="roleChip(u.role).bg">
                     {{ roleChip(u.role).label }}
                   </span>
-                  <span v-if="!u.is_active"
+                  <span v-if="u.is_active"
                         class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider
-                               bg-yellow-50 text-yellow-600 border border-yellow-200">
+                               bg-green-50 text-green-600 border border-green-200 flex items-center gap-1">
+                    <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Activada
+                  </span>
+                  <span v-else
+                        class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider
+                               bg-orange-50 text-orange-500 border border-orange-200">
                     Sin activar
                   </span>
                   <span v-if="u.is_blocked"
@@ -495,8 +666,8 @@ onMounted(async () => {
                   </span>
                 </div>
                 <p class="text-xs text-gray-400 truncate mt-0.5">{{ u.email }}</p>
-                <!-- Centro asociado (solo docentes) -->
-                <p v-if="u.role === 2 && u.centro_nombre"
+                <!-- Centro asociado (docentes y admins de centro) -->
+                <p v-if="[2,4].includes(u.role) && u.centro_nombre"
                    class="text-[10px] text-blue-500 mt-0.5 flex items-center gap-1">
                   <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -544,9 +715,9 @@ onMounted(async () => {
                   @click="onActivarClick(u)"
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black
                          uppercase tracking-wider transition-all
-                         bg-[#00A859]/15 text-[#00A859] border border-[#00A859]/30
-                         hover:bg-[#00A859]/25"
-                  :class="highlightId === u.id ? 'ring-2 ring-[#00A859]/60 ring-offset-1 ring-offset-white animate-pulse-soft' : ''"
+                         bg-orange-50 text-orange-500 border border-orange-200
+                         hover:bg-orange-100"
+                  :class="highlightId === u.id ? 'ring-2 ring-orange-400/60 ring-offset-1 ring-offset-white animate-pulse-soft' : ''"
                 >
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
@@ -663,38 +834,72 @@ onMounted(async () => {
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nombre</label>
                 <input v-model="form.name" type="text" placeholder="Nombre completo"
+                  maxlength="255"
                   class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formErrors.name ? 'border-red-400' : 'border-gray-200'" />
-                <p v-if="formErrors.name" class="text-[10px] text-red-500 mt-1">{{ formErrors.name }}</p>
+                <div class="flex justify-between items-center mt-1">
+                  <p v-if="formErrors.name" class="text-[10px] text-red-500">{{ formErrors.name }}</p>
+                  <span v-else></span>
+                  <span class="text-[10px]" :class="(form.name || '').length >= 245 ? 'text-amber-500' : 'text-gray-300'">{{ (form.name || '').length }}/255</span>
+                </div>
               </div>
 
-              <!-- Email -->
+              <!-- Correo electrónico -->
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Correo electrónico</label>
-                <input v-model="form.email" type="email" placeholder="correo@ejemplo.com"
+                <!-- Docente/Admin sin centro aún -->
+                <div v-if="authStore.isSuperAdmin && ['2','4'].includes(form.role) && !activeEmailDomain"
+                  class="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-600">
+                  Selecciona un centro educativo para generar el correo
+                </div>
+                <!-- Empresa sin empresa asignada aún -->
+                <div v-else-if="authStore.isSuperAdmin && form.role === '3' && !activeEmailDomain"
+                  class="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-600">
+                  Selecciona una empresa para generar el correo
+                </div>
+                <!-- Con dominio (centro o empresa): input dividido -->
+                <div v-else-if="activeEmailDomain"
+                  class="flex items-center bg-gray-50 border rounded-xl overflow-hidden transition-all
+                         focus-within:border-[#00A859]/50 focus-within:ring-2 focus-within:ring-[#00A859]/10"
+                  :class="formErrors.email ? 'border-red-400' : 'border-gray-200'">
+                  <input v-model="formEmailLocal" type="text" placeholder="nombreusuario"
+                    class="flex-1 min-w-0 bg-transparent px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300 outline-none" />
+                  <span class="pr-4 text-sm text-gray-400 whitespace-nowrap select-none shrink-0">@{{ activeEmailDomain }}</span>
+                </div>
+                <!-- Fallback: input libre (no superadmin) -->
+                <input v-else v-model="form.email" type="email" placeholder="correo@ejemplo.com"
+                  maxlength="254"
                   class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formErrors.email ? 'border-red-400' : 'border-gray-200'" />
-                <p v-if="formErrors.email" class="text-[10px] text-red-500 mt-1">{{ formErrors.email }}</p>
+                <div class="flex justify-between items-center mt-1">
+                  <p v-if="formErrors.email" class="text-[10px] text-red-500">{{ formErrors.email }}</p>
+                  <span v-else></span>
+                  <span v-if="activeEmailDomain" class="text-[10px]" :class="(form.email || '').length >= 244 ? 'text-amber-500' : 'text-gray-300'">{{ (form.email || '').length }}/254</span>
+                </div>
               </div>
 
               <!-- Contraseña -->
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Contraseña temporal</label>
                 <input v-model="form.password" type="password" placeholder="Mín. 8 caracteres, mayúsculas y números"
+                  maxlength="128"
                   class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formErrors.password ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formErrors.password" class="text-[10px] text-red-500 mt-1">{{ formErrors.password }}</p>
+                <p v-else class="text-[10px] text-gray-400 mt-1">Mín. 8 · máx. 128 · mayúscula + número</p>
               </div>
 
-              <!-- Rol -->
-              <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Rol</label>
+              <!-- Tipo de cuenta (solo visible para superadmin; admin de centro siempre crea docentes) -->
+              <div v-if="authStore.isSuperAdmin">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Tipo de cuenta</label>
                 <div class="flex gap-3">
-                  <button type="button" @click="form.role = '2'"
-                    :class="form.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                  <!-- Docente: activo si role es 2 (docente) o 4 (admin de centro) -->
+                  <button type="button"
+                    @click="form.role = ['2','4'].includes(form.role) ? form.role : '2'"
+                    :class="['2','4'].includes(form.role) ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -702,7 +907,7 @@ onMounted(async () => {
                     </svg>
                     Docente
                   </button>
-                  <button type="button" @click="form.role = '3'"
+                  <button type="button" @click="form.role = '3'; form.centro_educativo_id = null"
                     :class="form.role === '3' ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -712,7 +917,57 @@ onMounted(async () => {
                     Empresa
                   </button>
                 </div>
+
+                <!-- Sub-opción anidada: ¿es admin del centro? Solo si Docente está seleccionado -->
+                <div v-if="['2','4'].includes(form.role)"
+                  class="mt-2 px-3.5 py-3 bg-gray-50 border border-gray-200 rounded-xl">
+                  <label class="flex items-start gap-3 cursor-pointer select-none">
+                    <input type="checkbox"
+                      :checked="form.role === '4'"
+                      @change="form.role = $event.target.checked ? '4' : '2'; if (!$event.target.checked) form.centro_educativo_id = null"
+                      class="mt-0.5 w-4 h-4 rounded accent-purple-600 shrink-0" />
+                    <div>
+                      <span class="text-xs font-bold text-gray-700">Administrador del centro</span>
+                      <p class="text-[10px] text-gray-400 mt-0.5">Gestiona los docentes de su centro educativo</p>
+                    </div>
+                  </label>
+                </div>
+
                 <p v-if="formErrors.role" class="text-[10px] text-red-500 mt-1">{{ formErrors.role }}</p>
+              </div>
+
+              <!-- Centro educativo (requerido para docente/admin) -->
+              <div v-if="authStore.isSuperAdmin && ['2','4'].includes(form.role)">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                  Centro educativo
+                  <span class="text-red-400 ml-0.5">*</span>
+                </label>
+                <div v-if="cargandoCentros" class="text-xs text-gray-400 py-2">Cargando centros…</div>
+                <select v-else v-model="form.centro_educativo_id"
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937]
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formErrors.centro_educativo_id ? 'border-red-400' : 'border-gray-200'">
+                  <option :value="null">— Selecciona un centro —</option>
+                  <option v-for="c in centros" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                </select>
+                <p v-if="formErrors.centro_educativo_id" class="text-[10px] text-red-500 mt-1">{{ formErrors.centro_educativo_id }}</p>
+              </div>
+
+              <!-- Empresa (requerida para role empresa) -->
+              <div v-if="authStore.isSuperAdmin && form.role === '3'">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                  Empresa
+                  <span class="text-red-400 ml-0.5">*</span>
+                </label>
+                <div v-if="cargandoEmpresas" class="text-xs text-gray-400 py-2">Cargando empresas…</div>
+                <select v-else v-model="form.empresa_id"
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937]
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formErrors.empresa_id ? 'border-red-400' : 'border-gray-200'">
+                  <option :value="null">— Selecciona una empresa —</option>
+                  <option v-for="e in empresasList" :key="e.id" :value="e.id">{{ e.nombre_comercial }}</option>
+                </select>
+                <p v-if="formErrors.empresa_id" class="text-[10px] text-red-500 mt-1">{{ formErrors.empresa_id }}</p>
               </div>
 
               <p v-if="msgCrear" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -930,38 +1185,62 @@ onMounted(async () => {
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nombre</label>
                 <input v-model="formEditar.name" type="text" placeholder="Nombre completo"
+                  maxlength="255"
                   class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formEditarErrors.name ? 'border-red-400' : 'border-gray-200'" />
-                <p v-if="formEditarErrors.name" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.name }}</p>
+                <div class="flex justify-between items-center mt-1">
+                  <p v-if="formEditarErrors.name" class="text-[10px] text-red-500">{{ formEditarErrors.name }}</p>
+                  <span v-else></span>
+                  <span class="text-[10px]" :class="(formEditar.name || '').length >= 245 ? 'text-amber-500' : 'text-gray-300'">{{ (formEditar.name || '').length }}/255</span>
+                </div>
               </div>
 
-              <!-- Email -->
+              <!-- Correo electrónico -->
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Correo electrónico</label>
-                <input v-model="formEditar.email" type="email" placeholder="correo@ejemplo.com"
+                <!-- Con dominio (centro o empresa): input dividido -->
+                <div v-if="activeEmailEditarDomain"
+                  class="flex items-center bg-gray-50 border rounded-xl overflow-hidden transition-all
+                         focus-within:border-[#00A859]/50 focus-within:ring-2 focus-within:ring-[#00A859]/10"
+                  :class="formEditarErrors.email ? 'border-red-400' : 'border-gray-200'">
+                  <input v-model="formEditarEmailLocal" type="text" placeholder="nombreusuario"
+                    class="flex-1 min-w-0 bg-transparent px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300 outline-none" />
+                  <span class="pr-4 text-sm text-gray-400 whitespace-nowrap select-none shrink-0">@{{ activeEmailEditarDomain }}</span>
+                </div>
+                <!-- Sin dominio: input libre -->
+                <input v-else v-model="formEditar.email" type="email" placeholder="correo@ejemplo.com"
+                  maxlength="254"
                   class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formEditarErrors.email ? 'border-red-400' : 'border-gray-200'" />
-                <p v-if="formEditarErrors.email" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.email }}</p>
+                <div class="flex justify-between items-center mt-1">
+                  <p v-if="formEditarErrors.email" class="text-[10px] text-red-500">{{ formEditarErrors.email }}</p>
+                  <span v-else></span>
+                  <span class="text-[10px]" :class="(formEditar.email || '').length >= 244 ? 'text-amber-500' : 'text-gray-300'">{{ (formEditar.email || '').length }}/254</span>
+                </div>
               </div>
 
               <!-- Nueva contraseña (opcional) -->
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5">Nueva contraseña <span class="normal-case text-gray-400 font-normal">(opcional)</span></label>
                 <input v-model="formEditar.password" type="password" placeholder="Dejar en blanco para no cambiar"
+                  maxlength="128"
                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#1F2937] placeholder-gray-300
                          outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
                   :class="formEditarErrors.password ? 'border-red-400' : 'border-gray-200'" />
                 <p v-if="formEditarErrors.password" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.password }}</p>
+                <p v-else-if="formEditar.password" class="text-[10px] text-gray-400 mt-1">Mín. 8 · máx. 128 · mayúscula + número</p>
               </div>
 
-              <!-- Rol -->
-              <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Rol</label>
+              <!-- Tipo de cuenta (solo visible para superadmin) -->
+              <div v-if="authStore.isSuperAdmin">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Tipo de cuenta</label>
                 <div class="flex gap-3">
-                  <button type="button" @click="formEditar.role = '2'"
-                    :class="formEditar.role === '2' ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
+                  <!-- Docente: activo si role es 2 (docente) o 4 (admin de centro) -->
+                  <button type="button"
+                    @click="formEditar.role = ['2','4'].includes(formEditar.role) ? formEditar.role : '2'"
+                    :class="['2','4'].includes(formEditar.role) ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600'"
                     class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -979,6 +1258,55 @@ onMounted(async () => {
                     Empresa
                   </button>
                 </div>
+
+                <!-- Sub-opción anidada: ¿es admin del centro? Solo si Docente está seleccionado -->
+                <div v-if="['2','4'].includes(formEditar.role)"
+                  class="mt-2 px-3.5 py-3 bg-gray-50 border border-gray-200 rounded-xl">
+                  <label class="flex items-start gap-3 cursor-pointer select-none">
+                    <input type="checkbox"
+                      :checked="formEditar.role === '4'"
+                      @change="formEditar.role = $event.target.checked ? '4' : '2'"
+                      class="mt-0.5 w-4 h-4 rounded accent-purple-600 shrink-0" />
+                    <div>
+                      <span class="text-xs font-bold text-gray-700">Administrador del centro</span>
+                      <p class="text-[10px] text-gray-400 mt-0.5">Gestiona los docentes de su centro educativo</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Centro educativo (visible para cualquier docente) -->
+              <div v-if="authStore.isSuperAdmin && ['2','4'].includes(formEditar.role)">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                  Centro educativo
+                  <span class="text-red-400 ml-0.5">*</span>
+                </label>
+                <div v-if="cargandoCentros" class="text-xs text-gray-400 py-2">Cargando centros…</div>
+                <select v-else v-model="formEditar.centro_educativo_id"
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937]
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formEditarErrors.centro_educativo_id ? 'border-red-400' : 'border-gray-200'">
+                  <option :value="null">— Selecciona un centro —</option>
+                  <option v-for="c in centros" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                </select>
+                <p v-if="formEditarErrors.centro_educativo_id" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.centro_educativo_id }}</p>
+              </div>
+
+              <!-- Empresa (requerida para role empresa) -->
+              <div v-if="authStore.isSuperAdmin && formEditar.role === '3'">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                  Empresa
+                  <span class="text-red-400 ml-0.5">*</span>
+                </label>
+                <div v-if="cargandoEmpresas" class="text-xs text-gray-400 py-2">Cargando empresas…</div>
+                <select v-else v-model="formEditar.empresa_id"
+                  class="w-full bg-gray-50 border rounded-xl px-4 py-2.5 text-sm text-[#1F2937]
+                         outline-none transition-all focus:border-[#00A859]/50 focus:ring-2 focus:ring-[#00A859]/10"
+                  :class="formEditarErrors.empresa_id ? 'border-red-400' : 'border-gray-200'">
+                  <option :value="null">— Selecciona una empresa —</option>
+                  <option v-for="e in empresasList" :key="e.id" :value="e.id">{{ e.nombre_comercial }}</option>
+                </select>
+                <p v-if="formEditarErrors.empresa_id" class="text-[10px] text-red-500 mt-1">{{ formEditarErrors.empresa_id }}</p>
               </div>
 
               <p v-if="msgEditar" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">

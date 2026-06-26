@@ -6,8 +6,10 @@ import MicroretoModal from '../components/MicroretoModal.vue'
 import BienvenidaModal from '../components/BienvenidaModal_DashboardDocente.vue'
 import EliminarSesionModal from '../components/EliminarSesionModal.vue'
 import { useUIState } from '../composables/useUIState.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const { tourActivo } = useUIState()
+const authStore = useAuthStore()
 
 const route  = useRoute()
 const router = useRouter()
@@ -671,17 +673,39 @@ function formatFecha(isoDate) {
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
         <!-- ─── COLUMNA IZQUIERDA: Formulario ───────────────────────────── -->
-        <div class="lg:col-span-3 space-y-4">
+        <div class="lg:col-span-3">
+          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
 
-          <!-- Header sección izquierda -->
-          <div class="flex items-center gap-2.5">
-            <div class="w-1 h-5 rounded-full bg-[#00A859]" />
-            <h2 class="text-sm font-black uppercase tracking-[0.15em] text-[#1F2937]">Creación de sesión</h2>
-          </div>
+          <!-- Header sección izquierda — banner de creación -->
+          <Transition name="creation-hero" appear>
+            <div class="relative overflow-hidden border-b border-[#00A859]/20
+                        bg-gradient-to-br from-[#00A859]/10 via-[#00A859]/5 to-[#99CC33]/8 px-6 py-5">
+              <!-- Fondo decorativo -->
+              <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full
+                          bg-[#00A859]/10 blur-2xl pointer-events-none" />
+              <div class="relative flex items-center gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[#00A859] flex items-center justify-center shadow-sm flex-shrink-0">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                             M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="w-2 h-2 rounded-full bg-[#00A859]" />
+                    <span class="text-[10px] font-black uppercase tracking-widest text-[#00A859]">Nueva sesión</span>
+                  </div>
+                  <h2 class="text-xl font-black text-[#1F2937] tracking-tight leading-tight">Creación de sesión</h2>
+                  <p class="text-xs text-gray-500 mt-0.5 font-medium">Selecciona un reto y registra los datos del grupo</p>
+                </div>
+              </div>
+            </div>
+          </Transition>
 
           <!-- ══ SELECTOR DE MICRORETO ══════════════════════════════════════ -->
           <div ref="refMicroreto"
-               class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden"
+               class="overflow-hidden border-b border-gray-100"
                :class="{
                  'tour-active':      tourTargetActivo === 'refMicroreto',
                  'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'microreto'
@@ -1004,8 +1028,7 @@ function formatFecha(isoDate) {
           </div>
 
           <!-- ══ DATOS DE LA SESIÓN ══════════════════════════════════════════ -->
-          <div class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden"
-               :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'datos' }">
+          <div :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'datos' }">
             <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
               <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
                 Datos de la sesión
@@ -1114,10 +1137,31 @@ function formatFecha(isoDate) {
                           class="field-input resize-none" />
               </div>
 
+              <!-- Campo cuenta docente — asignado automáticamente al guardar -->
+              <div class="flex items-center gap-3 px-4 py-3 rounded-xl
+                          bg-[#00A859]/5 border border-[#00A859]/15">
+                <div class="w-8 h-8 rounded-xl bg-[#00A859]/10 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-[#00A859]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[9px] font-black uppercase tracking-widest text-[#00A859] mb-0.5">
+                    Cuenta docente asociada
+                  </p>
+                  <p class="text-sm font-bold text-[#1F2937] truncate">{{ authStore.userName }}</p>
+                </div>
+                <span class="flex-shrink-0 text-[9px] font-black uppercase tracking-widest
+                             px-2 py-0.5 rounded-full bg-[#00A859]/10 text-[#00A859]">
+                  Auto
+                </span>
+              </div>
+
             </div>
 
             <div ref="refBtnGuardar"
-                 class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4 rounded-b-[1.5rem] transition-all"
+                 class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4 transition-all"
                  :class="{ 'tour-active': tourTargetActivo === 'refBtnGuardar' }">
               <p class="text-[10px] text-gray-400 font-medium">
                 La sesión se guarda en la base de datos.
@@ -1146,33 +1190,49 @@ function formatFecha(isoDate) {
             </div>
           </div>
 
+          </div><!-- /card creación -->
         </div>
 
         <!-- ─── COLUMNA DERECHA: Historial ──────────────────────────────── -->
         <div class="lg:col-span-2 transition-all"
              :class="{ 'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'sesiones' }">
 
-          <!-- Header sección derecha -->
-          <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-1 h-5 rounded-full bg-[#99CC33]" />
-            <h2 class="text-sm font-black uppercase tracking-[0.15em] text-[#1F2937]">Resumen de sesiones creadas</h2>
-          </div>
-
           <div ref="refSesiones"
                class="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden sticky top-[4.5rem]"
                :class="{ 'tour-active': tourTargetActivo === 'refSesiones' }">
 
-            <!-- Cabecera -->
-            <div class="px-5 py-4 border-b border-gray-50">
-              <div class="flex items-center justify-between mb-3">
-                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
-                  Sesiones registradas
-                </p>
-                <span class="text-[10px] font-black bg-[#00A859]/10 text-[#00A859]
-                             px-2 py-0.5 rounded-full uppercase tracking-widest">
+            <!-- Cabecera — banner azul -->
+            <div class="relative overflow-hidden border-b border-blue-100
+                        bg-gradient-to-br from-blue-50 via-blue-50/60 to-indigo-50/40 px-5 py-4">
+              <!-- Fondo decorativo -->
+              <div class="absolute -right-4 -top-4 w-20 h-20 rounded-full
+                          bg-blue-100 blur-2xl pointer-events-none" />
+              <div class="relative flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-blue-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                             M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span class="text-[10px] font-black uppercase tracking-widest text-blue-500">Historial</span>
+                  </div>
+                  <h2 class="text-base font-black text-[#1F2937] tracking-tight leading-tight truncate">
+                    Resumen de sesiones
+                  </h2>
+                </div>
+                <span class="flex-shrink-0 text-[10px] font-black bg-blue-100 text-blue-600
+                             px-2.5 py-1 rounded-full uppercase tracking-widest">
                   {{ sesiones.length }}
                 </span>
               </div>
+            </div>
+
+            <!-- Acciones rápidas -->
+            <div class="px-5 py-3 border-b border-gray-100">
               <!-- Botón Ver sesiones — prominente -->
               <button @click="router.push('/dashboard/sesiones')"
                       class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
@@ -1510,6 +1570,16 @@ function formatFecha(isoDate) {
 </template>
 
 <style scoped>
+/* ── Animación de entrada del banner "Creación de sesión" ── */
+.creation-hero-enter-active {
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.creation-hero-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+}
+
 .field-label {
   display: block;
   font-size: 0.6875rem;

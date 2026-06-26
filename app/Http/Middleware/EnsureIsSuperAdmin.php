@@ -6,16 +6,16 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureIsAdmin
+class EnsureIsSuperAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (!$user || (!$user->isSuperAdmin() && !$user->isAdmin())) {
+        if (!$user || !$user->isSuperAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Acceso restringido a administradores.',
+                'message' => 'Acceso restringido a superadministradores.',
             ], 403);
         }
 

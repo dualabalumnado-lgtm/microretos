@@ -5,21 +5,26 @@ import api from '../api.js'
 // Duración del token en minutos (debe coincidir con config/sanctum.php → expiration)
 const TOKEN_DURATION_MINUTES = 1440
 
-export const ROLE_ADMIN   = 1
-export const ROLE_DOCENTE = 2
-export const ROLE_EMPRESA = 3
+export const ROLE_SUPERADMIN = 1
+export const ROLE_DOCENTE    = 2
+export const ROLE_EMPRESA    = 3
+export const ROLE_ADMIN      = 4
 
 // Rutas permitidas por rol (nombre de ruta de Vue Router)
 export const ROLE_ROUTES = {
-  [ROLE_ADMIN]:   ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
-                   'sesiones-registradas', 'startup-day', 'startup-day-crear',
-                   'startup-day-editar', 'startup-day-detalle', 'base-datos', 'papelera',
-                   'empresas', 'gestion-usuarios'],
-  [ROLE_DOCENTE]: ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
-                   'sesiones-registradas', 'startup-day', 'startup-day-crear',
-                   'startup-day-editar', 'startup-day-detalle', 'empresas'],
-  [ROLE_EMPRESA]: ['biblioteca', 'detalle-microreto',
-                   'startup-day', 'startup-day-detalle'],
+  [ROLE_SUPERADMIN]: ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
+                      'sesiones-registradas', 'startup-day', 'startup-day-crear',
+                      'startup-day-editar', 'startup-day-detalle', 'base-datos', 'papelera',
+                      'empresas', 'gestion-usuarios', 'inicio-docente'],
+  [ROLE_ADMIN]:      ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
+                      'sesiones-registradas', 'startup-day', 'startup-day-crear',
+                      'startup-day-editar', 'startup-day-detalle', 'gestion-usuarios',
+                      'papelera', 'inicio-docente'],
+  [ROLE_DOCENTE]:    ['microretos', 'biblioteca', 'detalle-microreto', 'dashboard-docente',
+                      'sesiones-registradas', 'startup-day', 'startup-day-crear',
+                      'startup-day-editar', 'startup-day-detalle', 'empresas', 'inicio-docente'],
+  [ROLE_EMPRESA]:    ['biblioteca', 'detalle-microreto',
+                      'startup-day', 'startup-day-detalle'],
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -38,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const isAuthenticated  = ref(!!localStorage.getItem('admin_token'))
-  const userRole         = ref(Number(localStorage.getItem('user_role') || ROLE_ADMIN))
+  const userRole         = ref(Number(localStorage.getItem('user_role') || ROLE_SUPERADMIN))
   const userName         = ref(localStorage.getItem('user_name') || 'Administrador')
   const userCentroId     = ref(Number(localStorage.getItem('user_centro_id') || 0) || null)
   const userCentroNombre = ref(localStorage.getItem('user_centro_nombre') || '')
@@ -58,14 +63,16 @@ export const useAuthStore = defineStore('auth', () => {
     return Math.max(0, Math.floor(TOKEN_DURATION_MINUTES - elapsed))
   })
 
-  const isAdmin   = computed(() => userRole.value === ROLE_ADMIN)
-  const isDocente = computed(() => userRole.value === ROLE_DOCENTE)
-  const isEmpresa = computed(() => userRole.value === ROLE_EMPRESA)
+  const isSuperAdmin = computed(() => userRole.value === ROLE_SUPERADMIN)
+  const isAdmin      = computed(() => userRole.value === ROLE_ADMIN)
+  const isDocente    = computed(() => userRole.value === ROLE_DOCENTE)
+  const isEmpresa    = computed(() => userRole.value === ROLE_EMPRESA)
 
   const roleLabel = computed(() => {
-    if (userRole.value === ROLE_DOCENTE) return 'Docente'
-    if (userRole.value === ROLE_EMPRESA) return 'Empresa'
-    return 'Administrador'
+    if (userRole.value === ROLE_DOCENTE)    return 'Docente'
+    if (userRole.value === ROLE_EMPRESA)    return 'Empresa'
+    if (userRole.value === ROLE_ADMIN)      return 'Administrador'
+    return 'Superadministrador'
   })
 
   const canAccess = (routeName) => {
@@ -73,7 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
     return allowed.includes(routeName)
   }
 
-  const login = (token, role = ROLE_ADMIN, name = 'Administrador', centroId = null, centroNombre = '') => {
+  const login = (token, role = ROLE_SUPERADMIN, name = 'Administrador', centroId = null, centroNombre = '') => {
     localStorage.setItem('admin_token', token)
     localStorage.setItem('admin_token_created_at', String(Date.now()))
     localStorage.setItem('user_role', String(role))
@@ -99,7 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_centro_id')
     localStorage.removeItem('user_centro_nombre')
     isAuthenticated.value  = false
-    userRole.value         = ROLE_ADMIN
+    userRole.value         = ROLE_SUPERADMIN
     userName.value         = 'Administrador'
     userCentroId.value     = null
     userCentroNombre.value = ''
@@ -121,7 +128,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     isAuthenticated, userRole, userName, userCentroId, userCentroNombre, refreshing,
-    isAdmin, isDocente, isEmpresa, roleLabel,
+    isSuperAdmin, isAdmin, isDocente, isEmpresa, roleLabel,
     minutosRestantes, login, logout, refresh, canAccess,
   }
 })

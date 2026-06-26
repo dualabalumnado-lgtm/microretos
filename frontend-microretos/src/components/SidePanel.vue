@@ -1,10 +1,11 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LoginModal from './LoginModal.vue'
 import { useAuthStore, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth'
 import { useUIState } from '../composables/useUIState.js'
 import { useCredits } from '../composables/useCredits.js'
+import { useLoginModal } from '../composables/useLoginModal.js'
 
 const authStore = useAuthStore()
 const { tourActivo, showWelcome, welcomeRole, welcomeName, triggerWelcome } = useUIState()
@@ -16,92 +17,79 @@ watch(showWelcome, (val) => {
   if (val) { _welShown = true }
   else if (_welShown) { _welShown = false; setTimeout(abrirCreditos, 450) }
 })
-const isOpen    = ref(false)
-const logoError = ref(false)
 const route     = useRoute()
 const router    = useRouter()
 
-const showLogin        = ref(false)
-const destinoTrasLogin = ref('/')
+const { showLogin, destinoTrasLogin, openLogin } = useLoginModal()
 
 // ─── Modal de información ─────────────────────────────────
 const mostrarInfo = ref(false)
 
-const toggle = () => { isOpen.value = !isOpen.value }
-const close  = () => { isOpen.value = false }
-
-const closeOnMobile = () => {
-  if (window.innerWidth < 1024) isOpen.value = false
-}
-
 const isActive = (path) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
-
-onMounted(() => { isOpen.value = route.path !== '/' })
-watch(() => route.path, () => close())
 
 watch(
   () => route.query.redirect,
   (redirect) => {
-    if (redirect && !authStore.isAuthenticated) {
-      destinoTrasLogin.value = String(redirect)
-      showLogin.value = true
-    }
+    if (redirect && !authStore.isAuthenticated) openLogin(String(redirect))
   },
   { immediate: true }
 )
 
 const irA = (ruta) => {
-  closeOnMobile()
   if (authStore.isAuthenticated) {
     const yaEstoy = route.path === ruta || route.path.startsWith(ruta + '/')
     router.push(yaEstoy ? { path: ruta, query: { _t: Date.now() } } : ruta)
   } else {
-    destinoTrasLogin.value = ruta
-    showLogin.value = true
+    openLogin(ruta)
   }
 }
 
 const onLoginSuccess = (data) => {
   const role    = data?.role ?? authStore.userRole
   const destino = destinoTrasLogin.value || rolHome(role)
-  destinoTrasLogin.value = '/'
-  isOpen.value = false
-  // Esperar a que la navegación final termine (incluyendo posibles redirects
-  // del guard de roles) antes de mostrar el toast, para evitar que una
-  // doble navegación lo descarte antes de que el usuario lo vea.
+  destinoTrasLogin.value = null
   router.push(destino).finally(() => triggerWelcome(role, authStore.userName))
 }
 
 function rolHome(role) {
-  if (role === ROLE_DOCENTE) return '/biblioteca'
+  if (role === ROLE_DOCENTE || role === ROLE_ADMIN) return '/inicio-docente'
   if (role === ROLE_EMPRESA) return '/microretos'
   return '/microretos'
 }
 
-defineExpose({ isOpen, toggle, close })
 </script>
 
 <template>
-  <!-- Overlay móvil -->
-  <Transition name="sp-fade">
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 bg-black/50 lg:bg-transparent z-30"
-      @click="close"
-    />
-  </Transition>
-
   <!-- Panel lateral (también oculto durante el tour) -->
-  <Transition name="sp-slide">
-    <aside
-      v-if="isOpen && !tourActivo"
-      class="fixed top-12 left-0 h-[calc(100vh-5rem)] w-64 max-w-[85vw] z-40 flex flex-col
+  <aside
+      v-if="!tourActivo"
+      class="fixed top-12 left-0 h-[calc(100vh-5rem)] w-64 z-40 hidden lg:flex flex-col
              bg-[#1F2937] border-r border-[#333333]
              shadow-[6px_0_32px_rgba(0,0,0,0.25)]"
     >
       <!-- ── Navegación ── -->
       <nav class="flex-1 min-h-0 px-3 py-3 space-y-1 overflow-y-auto overscroll-contain">
+
+        <!-- ═══ Panel docente (solo ROLE_DOCENTE) ═══ -->
+        <div v-if="authStore.isDocente || authStore.isAdmin" class="group/tip relative">
+          <button
+            @click="irA('/inicio-docente')"
+            title="Panel de inicio para docentes"
+            class="nav-item w-full text-left"
+            :class="isActive('/inicio-docente') ? 'nav-item--active' : 'nav-item--idle'"
+          >
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span>Panel docente</span>
+          </button>
+          <div class="sp-tooltip">Tu panel de inicio con resumen de actividad<div class="sp-tooltip-arrow"/></div>
+        </div>
 
         <!-- ═══ GRUPO: MICRORETOS + TALLER DE IDEAS ═══ -->
         <div
@@ -206,7 +194,7 @@ defineExpose({ isOpen, toggle, close })
                     <rect x="9" y="3" width="6" height="4" rx="1"/>
                     <path d="M9 12l2 2 4-4"/>
                   </svg>
-                  <span>Dashboard docente</span>
+                  <span>Sesiones</span>
                 </button>
                 <div class="sp-tooltip">Registra sesiones de trabajo con retos<div class="sp-tooltip-arrow"/></div>
               </div>
@@ -416,8 +404,7 @@ defineExpose({ isOpen, toggle, close })
         </div>
       </div>
 
-    </aside>
-  </Transition>
+  </aside>
 
   <!-- ══════════════ MODAL: ¿QUÉ ES DUALAB? ══════════════════ -->
   <Transition name="sp-fade">
@@ -622,11 +609,7 @@ nav::-webkit-scrollbar-track  { background: transparent; }
 nav::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 99px; }
 nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-/* ─── Panel slide / fade ─────────────────────────────────────── */
-.sp-slide-enter-active,
-.sp-slide-leave-active { transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1); }
-.sp-slide-enter-from,
-.sp-slide-leave-to     { transform: translateX(-100%); }
+/* ─── Fade para modales ─────────────────────────────────────── */
 .sp-fade-enter-active,
 .sp-fade-leave-active  { transition: opacity 250ms ease; }
 .sp-fade-enter-from,

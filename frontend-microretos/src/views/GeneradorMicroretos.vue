@@ -71,6 +71,11 @@ const centrosDisponibles = computed(() => {
   return [...new Set(centros)].sort();
 });
 
+const sectoresDisponibles = computed(() => {
+  const sectores = empresas.value.map(e => e.sector).filter(Boolean);
+  return [...new Set(sectores)].sort();
+});
+
 const todasLasFamilias = ref([]);
 
 const seleccion = ref({
@@ -145,9 +150,22 @@ const charInfo = (field) => {
   return { len, max, isWarning: len >= warn, isOver: len >= max };
 };
 
-const popupActivo = ref(null); 
+const popupActivo = ref(null);
 const abrirPopup = (tipo, id) => { popupActivo.value = { tipo, id }; };
 const cerrarPopup = () => { popupActivo.value = null; };
+
+// Solo permite https:// y http://. Cualquier otro protocolo (javascript:, data:, vbscript:)
+// se reemplaza por '#' para evitar XSS almacenado vía campo Web de empresa.
+const safeUrl = (url) => {
+  if (!url) return '#';
+  return /^https?:\/\//i.test(url) ? url : '#';
+};
+
+const empresaWebEsValida = computed(() => {
+  const url = seleccion.value.empresaWeb;
+  if (!url) return true;
+  return /^https?:\/\//i.test(url);
+});
 
 const ayudas = {
   1: { 
@@ -257,6 +275,18 @@ watch(buscadorEmpresa, (val) => {
   }
 });
 
+// Si el usuario cambia de centro después de haber elegido empresa, la empresa
+// queda huérfana (pertenece al centro anterior). Limpiarla para forzar una nueva elección.
+watch(centroFiltro, (newVal, oldVal) => {
+  if (oldVal !== newVal && (seleccion.value.empresaId || buscadorEmpresa.value)) {
+    seleccion.value.empresaId = '';
+    seleccion.value.empresaNombre = '';
+    buscadorEmpresa.value = '';
+    empresaDetalle.value = null;
+    mostrarDropdownEmpresas.value = false;
+  }
+});
+
 // --- FUNCIÓN LIMPIAR FORMULARIO (BOTÓN ROJO) ---
 const limpiarFormulario = () => {
   if(confirm("¿Estás seguro de que quieres vaciar el formulario y empezar de cero?")) {
@@ -273,6 +303,8 @@ const limpiarFormulario = () => {
     esInfoSimulada.value = false;
     cargandoSimulacion.value = false;
     modulosSeleccionados.value = [];
+    sectorEsLibre.value = false;
+    mostrarDropdownSector.value = false;
     
     seleccion.value = {
       empresaId: '', empresaNombre: '', empresaCentro: '', empresaSector: '',
@@ -366,7 +398,7 @@ const generarRetoDemo = async () => {
 };
 
 const paso1Valido = computed(() => seleccion.value.empresaNombre && seleccion.value.empresaSector && seleccion.value.empresaTamano);
-const paso2Valido = computed(() => seleccion.value.diaANormal && seleccion.value.friccionProblema);
+const paso2Valido = computed(() => seleccion.value.diaANormal && seleccion.value.friccionProblema && seleccion.value.expectativasAlumno);
 const paso3Valido = computed(() => {
   if (esModoDemo.value) return !!seleccion.value.familia;
   return !!(seleccion.value.familia && seleccion.value.cicloId && seleccion.value.cursoSeleccionado);
@@ -374,12 +406,29 @@ const paso3Valido = computed(() => {
 
 // Cierra el dropdown al hacer clic fuera
 const buscadorRef = ref(null);
+const sectorRef = ref(null);
+const mostrarDropdownSector = ref(false);
+const sectorEsLibre = ref(false);
+
+const seleccionarSector = (sector) => {
+  seleccion.value.empresaSector = sector;
+  mostrarDropdownSector.value = false;
+};
+const activarSectorLibre = () => {
+  seleccion.value.empresaSector = '';
+  mostrarDropdownSector.value = false;
+  sectorEsLibre.value = true;
+};
+
 const cerrarDropdownFuera = (e) => {
   if (buscadorRef.value && !buscadorRef.value.contains(e.target)) {
     mostrarDropdownEmpresas.value = false;
   }
   if (demoSelectorRef.value && !demoSelectorRef.value.contains(e.target)) {
     mostrarSelectorDemo.value = false;
+  }
+  if (sectorRef.value && !sectorRef.value.contains(e.target)) {
+    mostrarDropdownSector.value = false;
   }
   estadoDropdownGenAbierto.value = false;
 };
@@ -449,8 +498,10 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
   seleccion.value.familia = ''; ciclos.value = []; seleccion.value.cicloId = ''; modulos.value = [];
   modulosSeleccionados.value = []; familiasFiltradas.value = [];
   empresaDetalle.value = null; crmActualizado.value = false; diagnosticoRecuperado.value = false;
-  microretosGenerados.value = []; 
-  
+  microretosGenerados.value = [];
+  sectorEsLibre.value = false;
+  mostrarDropdownSector.value = false;
+
   if (!nuevoId) return;
 
   const emp = empresas.value.find(e => String(e.id) === String(nuevoId));
@@ -480,14 +531,21 @@ watch(() => seleccion.value.empresaId, async (nuevoId) => {
 });
 
 watch(() => seleccion.value.familia, async (val) => {
+  // Limpiar siempre los campos dependientes al cambiar familia, incluso si el nuevo valor es vacío
+  ciclos.value = [];
+  seleccion.value.cicloId = '';
+  modulos.value = [];
+  modulosSeleccionados.value = [];
+
   if (!val) return;
-  const url = seleccion.value.empresaCentro 
+
+  const url = seleccion.value.empresaCentro
     ? `/familias/${encodeURIComponent(val)}/ciclos?centro=${encodeURIComponent(seleccion.value.empresaCentro)}`
     : `/familias/${encodeURIComponent(val)}/ciclos`;
 
   const res = await api.get(url);
   ciclos.value = res.data;
-  
+
   if (autoSelectDemoCycle && ciclos.value.length > 0) {
     const nombreBuscado = demoCicloNombre.value;
     const match = ciclos.value.find(c => c.nombre === nombreBuscado)
@@ -495,11 +553,7 @@ watch(() => seleccion.value.familia, async (val) => {
                || ciclos.value[0];
     seleccion.value.cicloId = match.id;
     autoSelectDemoCycle = false;
-  } else {
-    seleccion.value.cicloId = '';
   }
-  
-  modulos.value = []; modulosSeleccionados.value = [];
 });
 
 watch(() => seleccion.value.cicloId, async (val) => {
@@ -920,7 +974,7 @@ async function guardarEstadoGen(nuevoEstado) {
 
       <!-- ── PASO 2: modal explicativo centrado ── -->
       <template v-if="pasoActual === 2">
-        <div class="absolute inset-0 bg-black/50 pointer-events-auto" />
+        <div class="absolute inset-x-0 top-12 bottom-0 bg-black/50 pointer-events-auto" />
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index:9992">
           <div class="pointer-events-auto w-[380px] max-w-[calc(100vw-2rem)] bg-[#1a2332] border border-white/15 rounded-3xl shadow-2xl p-7 text-white" @click.stop>
             <!-- Cabecera -->
@@ -957,7 +1011,8 @@ async function guardarEstadoGen(nuevoEstado) {
       <!-- ── PASO 1 & 3: bocadillo spotlight ── -->
       <template v-else>
         <!-- Backdrop bloqueante transparente — bloquea interacción sin oscurecer el elemento activo -->
-        <div class="absolute inset-0 pointer-events-auto" />
+        <!-- top-12 para no tapar el TopBar (h-12) y que el logo siga siendo clickable -->
+        <div class="absolute inset-x-0 top-12 bottom-0 pointer-events-auto" />
 
         <div class="absolute pointer-events-auto"
              :style="{ top: bocadilloPos.top + 'px', left: bocadilloPos.left + 'px', width: '272px', zIndex: 9992 }">
@@ -1426,7 +1481,11 @@ async function guardarEstadoGen(nuevoEstado) {
                 <div v-if="empresaDetalle.actividad || empresaDetalle.web">
                   <p class="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-1">Actividad / Web</p>
                   <p v-if="empresaDetalle.actividad" class="text-sm text-gray-600 line-clamp-2" :title="empresaDetalle.actividad">{{ empresaDetalle.actividad }}</p>
-                  <a v-if="empresaDetalle.web" :href="empresaDetalle.web" target="_blank" class="text-[#00A859] hover:underline font-bold text-sm truncate flex items-center gap-1 mt-1">
+                  <a v-if="empresaDetalle.web"
+                     :href="safeUrl(empresaDetalle.web)"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="text-[#00A859] hover:underline font-bold text-sm truncate flex items-center gap-1 mt-1">
                     {{ empresaDetalle.web.replace(/^https?:\/\//, '') }}
                   </a>
                 </div>
@@ -1456,7 +1515,70 @@ async function guardarEstadoGen(nuevoEstado) {
                 
                 <div>
                   <label class="label-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'text-red-500' : ''">Sector de Actividad *</label>
-                  <input v-model="seleccion.empresaSector" :disabled="esModoDemo" class="input-style" :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 placeholder:text-red-400 focus:border-red-500 focus:bg-red-900/40' : ''" placeholder="¡FALTA INFO! Rellénalo por favor..." />
+
+                  <!-- Modo demo: input bloqueado -->
+                  <input v-if="esModoDemo" :value="seleccion.empresaSector" disabled class="input-style opacity-70 cursor-not-allowed bg-gray-50" />
+
+                  <!-- Modo libre: campo de texto con vuelta al listado -->
+                  <div v-else-if="sectorEsLibre" class="flex gap-2">
+                    <input
+                      v-model="seleccion.empresaSector"
+                      class="input-style flex-1"
+                      placeholder="Escribe el sector de actividad..."
+                      autofocus
+                    />
+                    <button
+                      type="button"
+                      @click="sectorEsLibre = false"
+                      class="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 text-xs font-bold hover:bg-gray-50 transition-all whitespace-nowrap"
+                    >← Lista</button>
+                  </div>
+
+                  <!-- Modo dropdown -->
+                  <div v-else class="relative" ref="sectorRef">
+                    <button
+                      type="button"
+                      @click="mostrarDropdownSector = !mostrarDropdownSector"
+                      class="input-style w-full text-left flex items-center justify-between gap-2"
+                      :class="!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'border-red-500 bg-red-900/30 text-red-400' : ''"
+                    >
+                      <span :class="seleccion.empresaSector ? 'text-[#1F2937]' : (!seleccion.empresaSector && (seleccion.empresaId || seleccion.empresaNombre) ? 'text-red-400' : 'text-gray-400')">
+                        {{ seleccion.empresaSector || '¡FALTA INFO! Selecciona...' }}
+                      </span>
+                      <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="mostrarDropdownSector ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+
+                    <Transition name="dropdown">
+                      <div v-if="mostrarDropdownSector"
+                        class="absolute w-full mt-2 bg-[#1F2937] border border-[#374151] rounded-2xl shadow-2xl max-h-64 overflow-y-auto z-50">
+                        <button
+                          v-for="sector in sectoresDisponibles"
+                          :key="sector"
+                          type="button"
+                          @mousedown.prevent="seleccionarSector(sector)"
+                          class="w-full text-left px-6 py-3 border-b border-[#374151] hover:bg-[#374151] transition-colors last:border-0 flex items-center justify-between"
+                          :class="sector === seleccion.empresaSector ? 'bg-[#374151]' : ''"
+                        >
+                          <span class="font-semibold text-white text-sm">{{ sector }}</span>
+                          <svg v-if="sector === seleccion.empresaSector" class="w-4 h-4 text-[#00A859] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          @mousedown.prevent="activarSectorLibre"
+                          class="w-full text-left px-6 py-3 hover:bg-[#374151] transition-colors flex items-center gap-2 border-t border-[#374151]"
+                        >
+                          <svg class="w-4 h-4 text-[#99CC33] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                          </svg>
+                          <span class="text-[#99CC33] text-sm font-bold uppercase tracking-widest">Escribir</span>
+                        </button>
+                      </div>
+                    </Transition>
+                  </div>
                 </div>
 
                 <div>
@@ -1471,8 +1593,19 @@ async function guardarEstadoGen(nuevoEstado) {
                 </div>
 
                 <div class="col-span-2">
-                  <label class="label-style">Web (Opcional)</label>
-                  <input v-model="seleccion.empresaWeb" :disabled="esModoDemo" class="input-style" placeholder="https://..." />
+                  <label class="label-style" :class="seleccion.empresaWeb && !empresaWebEsValida ? 'text-red-500' : ''">
+                    Web (Opcional)
+                  </label>
+                  <input
+                    v-model="seleccion.empresaWeb"
+                    :disabled="esModoDemo"
+                    class="input-style"
+                    :class="seleccion.empresaWeb && !empresaWebEsValida ? 'border-red-500 focus:border-red-500' : ''"
+                    placeholder="https://..."
+                  />
+                  <p v-if="seleccion.empresaWeb && !empresaWebEsValida" class="text-red-500 text-[10px] font-bold mt-1 pl-1">
+                    La URL debe empezar por https:// o http://
+                  </p>
                 </div>
               </div>
             </section>
@@ -1670,12 +1803,12 @@ async function guardarEstadoGen(nuevoEstado) {
                   </div>
                 </div>
 
-                <div ref="refExpectativas" class="bg-gray-50 p-6 rounded-3xl border border-gray-100"
-                     :class="{ 'tour-active': tourTargetActivo === 'refExpectativas' }">
+                <div ref="refExpectativas" class="bg-gray-50 p-6 rounded-3xl border"
+                     :class="[!seleccion.expectativasAlumno && !esModoDemo ? 'border-red-200' : 'border-gray-100', tourTargetActivo === 'refExpectativas' ? 'tour-active' : '']">
                   <div class="flex items-center gap-2 mb-3">
-                    <label class="label-style !mb-0 flex items-center gap-2">
+                    <label class="label-style !mb-0 flex items-center gap-2" :class="!seleccion.expectativasAlumno && !esModoDemo ? 'text-red-500' : ''">
                       <span class="bg-[#1F2937] text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]">5</span>
-                      Si tuvieras a un alumno aquí, ¿qué esperas que realice?
+                      Si tuvieras a un alumno aquí, ¿qué esperas que realice? *
                     </label>
                     <button @click="abrirPopup('info', 5)" class="text-gray-400 hover:text-[#00A859] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
                     <button @click="abrirPopup('ejemplo', 5)" class="text-gray-400 hover:text-[#99CC33] transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></button>

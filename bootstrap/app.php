@@ -19,7 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Alias para middleware de rol admin
         $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
+            'admin'      => \App\Http\Middleware\EnsureIsAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureIsSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

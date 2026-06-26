@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { useRouter, onBeforeRouteUpdate } from 'vue-router';
+import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import api from '../api.js';
 import BienvenidaStartupDayModal from '../components/BienvenidaStartupDayModal.vue';
 import EliminarProyectoModal from '../components/EliminarProyectoModal.vue';
@@ -8,6 +8,7 @@ import { useUIState } from '../composables/useUIState.js';
 import { useAuthStore } from '../stores/auth.js';
 
 const router = useRouter();
+const route  = useRoute();
 const { tourActivo } = useUIState();
 const authStore = useAuthStore();
 
@@ -35,7 +36,7 @@ const tourRefs = { refBusqueda, refFiltros, refGrid, refBtnNuevo, refBtnGuia };
 
 const guiaPasosDataBase = [
   { ref: 'refBusqueda', seccion: 'busqueda',  texto: 'Usa el buscador para encontrar proyectos por título, empresa o centro educativo. La búsqueda filtra en tiempo real a medida que escribes.' },
-  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Todos, Borrador (aún en edición), Propuesta (enviada a empresa, pendiente de validación), Validados (validados por empresa) o Archivado. Puedes combinar filtro y buscador a la vez.' },
+  { ref: 'refFiltros',  seccion: 'filtros',   texto: 'Filtra los proyectos por estado: Validados (aprobados por empresa), Pendiente validar (enviados, esperando respuesta), En edición (borradores), Archivados o Todos. Puedes combinar filtro y buscador a la vez.' },
   { ref: 'refGrid',     seccion: 'grid',      texto: 'Aquí aparecen los proyectos registrados. Cada tarjeta muestra título, empresa, ciclo y estado. Pulsa en una tarjeta para ver el detalle completo.' },
   { ref: 'refBtnNuevo', seccion: 'btn-nuevo', texto: 'Pulsa aquí para crear un nuevo proyecto StartUp Day. Necesitarás haber registrado previamente una sesión en el Dashboard Docente para poder vincularlo al reto correspondiente.' },
   { ref: 'refBtnGuia',  seccion: null,        texto: 'Pulsa este botón en cualquier momento para volver a ver esta guía y repasar el funcionamiento de la sección.' },
@@ -125,6 +126,7 @@ function seleccionarOpcionBienvenida(opcion) {
 
 onMounted(async () => {
   setTimeout(() => { isLoaded.value = true; }, 80);
+  if (route.query.filtro) filtroEstado.value = String(route.query.filtro);
   try {
     const res = await api.get('/startup/proyectos');
     proyectos.value = res.data;
@@ -148,9 +150,9 @@ onBeforeRouteUpdate(async () => {
 });
 
 function getEtiqueta(p) {
-  if (p.estado === 'borrador')  return 'Borrador';
+  if (p.estado === 'borrador')  return 'En edición';
   if (p.estado === 'archivado') return 'Archivado';
-  return p.empresa_validado ? 'Validado' : 'Propuesta';
+  return p.empresa_validado ? 'Validado' : 'Pendiente validar';
 }
 function getColor(p) {
   if (p.estado === 'borrador')  return 'bg-amber-50 border-amber-200 text-amber-700';
@@ -159,8 +161,16 @@ function getColor(p) {
   return 'bg-blue-50 border-blue-200 text-blue-700';  // Propuesta → azul
 }
 
-const filtroOpciones = ['todos', 'borrador', 'propuesta', 'proyecto', 'archivado'];
-const filtroLabels   = { todos: 'Todos', borrador: 'Borrador', propuesta: 'Propuesta', proyecto: 'Validados', archivado: 'Archivado' };
+const filtroOpciones = ['proyecto', 'propuesta', 'borrador', 'archivado', 'todos'];
+const filtroLabels   = { todos: 'Todos', borrador: 'En edición', propuesta: 'Pendiente validar', proyecto: 'Validados', archivado: 'Archivado' };
+
+const conteosPorEstado = computed(() => ({
+  proyecto:  proyectos.value.filter(p => !!p.empresa_validado).length,
+  propuesta: proyectos.value.filter(p => p.estado === 'publicado' && !p.empresa_validado).length,
+  borrador:  proyectos.value.filter(p => p.estado === 'borrador').length,
+  archivado: proyectos.value.filter(p => p.estado === 'archivado').length,
+  todos:     proyectos.value.length,
+}));
 
 const proyectosFiltrados = computed(() => {
   let lista = proyectos.value;
@@ -372,16 +382,22 @@ function mostrarSnack(mensaje, accion = null) {
                'tour-active': pasoRefActivo === 'refFiltros',
                'tour-seccion-blur': modoGuia && seccionActiva !== null && seccionActiva !== 'filtros'
              }"
-             class="flex gap-2">
+             class="flex flex-wrap gap-2">
           <button v-for="op in filtroOpciones" :key="op"
                   @click="filtroEstado = op"
                   :class="[
-                    'px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all',
+                    'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all',
                     filtroEstado === op
                       ? 'bg-[#1F2937] text-white border-[#1F2937] shadow-md'
                       : 'bg-white text-gray-500 border-gray-200 hover:border-[#00A859] hover:text-[#00A859]'
                   ]">
             {{ filtroLabels[op] }}
+            <span :class="[
+              'inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] rounded-full text-[9px] font-black transition-all',
+              filtroEstado === op
+                ? 'bg-white/20 text-white'
+                : 'bg-gray-100 text-gray-500 group-hover:bg-[#00A859]/10'
+            ]">{{ conteosPorEstado[op] }}</span>
           </button>
         </div>
 

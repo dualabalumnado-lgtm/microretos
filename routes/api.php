@@ -45,8 +45,10 @@ Route::middleware('throttle:120,1')->group(function () {
 });
 
 Route::get('/demos', [DemoController::class, 'index']);
-Route::get('/demos/{familia}/microretos', [DemoController::class, 'microretos']);
-Route::get('/demos/{familia}', [DemoController::class, 'show']);
+Route::get('/demos/{familia}/microretos', [DemoController::class, 'microretos'])
+    ->where('familia', '[a-zA-ZÀ-ÿ0-9 ,.\-]{1,100}');
+Route::get('/demos/{familia}', [DemoController::class, 'show'])
+    ->where('familia', '[a-zA-ZÀ-ÿ0-9 ,.\-]{1,100}');
 
 // Auth pública — throttle estricto para prevenir fuerza bruta
 Route::middleware('throttle:5,1')
@@ -154,15 +156,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{user}',              [AdminUserController::class, 'destroy']);
         Route::post('/{id}/restaurar',        [AdminUserController::class, 'restaurar']);
         Route::delete('/{id}/destruir',       [AdminUserController::class, 'destruir']);
-        Route::patch('/{user}/centro',        [AdminUserController::class, 'asociarCentro']);
+        Route::patch('/{user}/centro',        [AdminUserController::class, 'asociarCentro'])->middleware('superadmin');
     });
 
     // Papelera — gestión de elementos borrados (soft delete)
     Route::prefix('papelera')->group(function () {
         Route::get('/',                         [PapeleraController::class, 'index']);
         Route::delete('/',                      [PapeleraController::class, 'vaciar']);
-        Route::patch('/{tipo}/{id}/restaurar',  [PapeleraController::class, 'restaurar']);
-        Route::delete('/{tipo}/{id}',           [PapeleraController::class, 'destruir']);
+        Route::patch('/{tipo}/{id}/restaurar',  [PapeleraController::class, 'restaurar'])
+            ->whereNumber('id');
+        Route::delete('/{tipo}/{id}',           [PapeleraController::class, 'destruir'])
+            ->whereNumber('id');
     });
 
 });

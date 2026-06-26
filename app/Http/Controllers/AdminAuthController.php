@@ -34,7 +34,7 @@ class AdminAuthController extends Controller
             ], 403);
         }
 
-        if (!$user->isAdmin() && $user->email_verified_at === null) {
+        if (!$user->isSuperAdmin() && $user->email_verified_at === null) {
             Auth::logout();
             return response()->json([
                 'success' => false,
@@ -42,10 +42,10 @@ class AdminAuthController extends Controller
             ], 403);
         }
 
-        // Limitar a 10 tokens concurrentes: si se supera, borrar los más antiguos
+        // Limitar a 3 tokens concurrentes (móvil + tablet + escritorio): borrar los más antiguos
         $count = $user->tokens()->count();
-        if ($count >= 10) {
-            $user->tokens()->orderBy('created_at')->limit($count - 9)->delete();
+        if ($count >= 3) {
+            $user->tokens()->orderBy('created_at')->limit($count - 2)->delete();
         }
 
         $token = $user->createToken('admin-token')->plainTextToken;

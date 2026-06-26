@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreSesionLoteRequest;
+use App\Http\Requests\StoreSesionRequest;
 use App\Models\Microreto;
 use App\Models\Sesion;
 use Illuminate\Http\Request;
@@ -12,57 +14,41 @@ class SesionController extends Controller
     {
         $user  = $request->user();
         $query = Sesion::with([
+            'docente:id,name',
             'microreto.empresa.centroEducativo',
             'microreto.empresa.familias',
         ])->orderBy('created_at', 'desc');
 
-        // Docentes con centro asociado solo ven sesiones de su centro
-        if ($user?->isDocente() && $user->centro_educativo_id) {
+        if ($user?->isDocente()) {
+            // Docente: solo sus propias sesiones
+            $query->where('user_id', $user->id);
+        } elseif ($user?->isAdmin() && $user->centro_educativo_id) {
+            // Admin: todas las sesiones de su centro educativo
             $nombreCentro = $user->centroEducativo?->nombre;
             if ($nombreCentro) {
                 $query->where('centro_educativo', $nombreCentro);
             }
         }
+        // Superadmin: sin filtro, ve todo
 
         return $query->get();
     }
 
-    public function store(Request $request)
+    public function store(StoreSesionRequest $request)
     {
-        $validated = $request->validate([
-            'microreto_titulo' => 'required|string|max:500',
-            'fecha'            => 'required|date',
-            'microreto_id'     => 'nullable',
-            'centro_educativo' => 'nullable|string|max:255',
-            'ciclo_formativo'  => 'nullable|string|max:255',
-            'curso'            => 'nullable|string|max:10',
-            'grupo'            => 'nullable|string|max:10',
-            'num_alumnos'      => 'nullable|integer|min:1|max:999',
-            'notas'            => 'nullable|string|max:5000',
-        ]);
-
+        $validated = $request->validated();
         $validated['microreto_id'] = $this->resolverMicroretoId($validated['microreto_id'] ?? null);
+        $validated['user_id']      = $request->user()->id;
 
         return response()->json(Sesion::create($validated), 201);
     }
 
-    public function storeLote(Request $request)
+    public function storeLote(StoreSesionLoteRequest $request)
     {
-        $data = $request->validate([
-            'sesiones'                    => 'required|array',
-            'sesiones.*.microreto_titulo' => 'required|string|max:500',
-            'sesiones.*.fecha'            => 'required|date',
-            'sesiones.*.microreto_id'     => 'nullable',
-            'sesiones.*.centro_educativo' => 'nullable|string|max:255',
-            'sesiones.*.ciclo_formativo'  => 'nullable|string|max:255',
-            'sesiones.*.curso'            => 'nullable|string|max:10',
-            'sesiones.*.grupo'            => 'nullable|string|max:10',
-            'sesiones.*.num_alumnos'      => 'nullable|integer|min:1|max:999',
-            'sesiones.*.notas'            => 'nullable|string|max:5000',
-        ]);
-
-        foreach ($data['sesiones'] as $s) {
+        $userId = $request->user()->id;
+        foreach ($request->validated()['sesiones'] as $s) {
             $s['microreto_id'] = $this->resolverMicroretoId($s['microreto_id'] ?? null);
+            $s['user_id']      = $userId;
             Sesion::create($s);
         }
 

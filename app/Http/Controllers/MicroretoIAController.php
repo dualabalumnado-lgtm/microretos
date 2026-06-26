@@ -8,6 +8,7 @@ use App\Models\Microreto;
 use App\Models\Modulo;
 use App\Models\CicloFormativo;
 use App\Models\Empresa;
+use App\Http\Requests\StoreMicroretoRequest;
 
 class MicroretoIAController extends Controller
 {
@@ -421,7 +422,7 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
         return response()->json(['error' => 'Error al contactar con la IA'], 500);
     }
 
-    public function guardarEnBD(Request $request)
+    public function guardarEnBD(StoreMicroretoRequest $request)
     {
         // Docentes solo pueden guardar microretos de empresas de su centro
         $user = $request->user();
@@ -437,7 +438,7 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
         }
 
         try {
-            $datos = $request->except(['_ui_guardado', '_ui_guardando']);
+            $datos = $request->validated();
 
             // Derivar y persistir el curso a partir del módulo y ciclo guardados
             if (empty($datos['curso'])) {
@@ -456,16 +457,51 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
 
     public function guardarLote(Request $request)
     {
-        $request->validate([
-            'microretos' => 'required|array',
+        $validated = $request->validate([
+            'microretos'                        => 'required|array|max:50',
+            'microretos.*.demo_id'              => 'nullable|integer|exists:demos,id',
+            'microretos.*.empresa_id'           => 'nullable|integer|exists:empresas,id',
+            'microretos.*.empresa_nombre'       => 'nullable|string|max:255',
+            'microretos.*.titulo'               => 'nullable|string|max:500',
+            'microretos.*.quien_es'             => 'nullable|string|max:5000',
+            'microretos.*.dia_a_dia'            => 'nullable|string|max:5000',
+            'microretos.*.pregunta_reto'        => 'nullable|string|max:5000',
+            'microretos.*.dificultades'         => 'nullable|array',
+            'microretos.*.dificultades.*'       => 'nullable|string|max:1000',
+            'microretos.*.que_necesitan'        => 'nullable|array',
+            'microretos.*.que_necesitan.*'      => 'nullable|string|max:1000',
+            'microretos.*.limitaciones'         => 'nullable|array',
+            'microretos.*.limitaciones.*'       => 'nullable|string|max:1000',
+            'microretos.*.prototipos'           => 'nullable|array',
+            'microretos.*.prototipos.*'         => 'nullable|string|max:1000',
+            'microretos.*.ods_sugeridos'        => 'nullable|array',
+            'microretos.*.ods_sugeridos.*'      => 'nullable|string|max:255',
+            'microretos.*.soft_skills'          => 'nullable|array',
+            'microretos.*.soft_skills.*'        => 'nullable|string|max:255',
+            'microretos.*.evaluacion_oficial'   => 'nullable|array',
+            'microretos.*.evaluacion_oficial.*' => 'nullable|string|max:2000',
+            'microretos.*.tips_profesorado'     => 'nullable|array',
+            'microretos.*.tips_profesorado.*'   => 'nullable|string|max:2000',
+            'microretos.*.nivel_grupo'          => 'nullable|string|max:100',
+            'microretos.*.curso'                => 'nullable|string|max:100',
+            'microretos.*.ciclo_id'             => 'nullable|integer|exists:ciclos_formativos,id',
+            'microretos.*.ciclo'                => 'nullable|string|max:255',
+            'microretos.*.modulo'               => 'nullable|string|max:255',
+            'microretos.*.duracion'             => 'nullable|string|max:100',
+            'microretos.*.es_simulado'          => 'nullable|boolean',
         ]);
+
+        $textFields = ['empresa_nombre', 'titulo', 'quien_es', 'dia_a_dia', 'pregunta_reto',
+                       'ciclo', 'modulo', 'duracion', 'nivel_grupo', 'curso'];
+        $arrayFields = ['dificultades', 'que_necesitan', 'limitaciones', 'prototipos',
+                        'ods_sugeridos', 'soft_skills', 'evaluacion_oficial', 'tips_profesorado'];
 
         // Docentes solo pueden guardar microretos de empresas de su centro
         $user = $request->user();
         if ($user->isDocente() && $user->centro_educativo_id) {
             $centroId     = $user->centro_educativo_id;
             $centroNombre = $user->centroEducativo?->nombre;
-            foreach ($request->microretos as $retoData) {
+            foreach ($validated['microretos'] as $retoData) {
                 $empresaId = $retoData['empresa_id'] ?? null;
                 if ($empresaId) {
                     $empresa = Empresa::find($empresaId);
@@ -481,8 +517,17 @@ Responde ÚNICAMENTE con este JSON exacto, sin texto adicional:
 
         try {
             $insertados = [];
-            foreach ($request->microretos as $retoData) {
-                unset($retoData['_ui_guardado'], $retoData['_ui_guardando']);
+            foreach ($validated['microretos'] as $retoData) {
+                foreach ($textFields as $field) {
+                    if (isset($retoData[$field]) && is_string($retoData[$field])) {
+                        $retoData[$field] = strip_tags($retoData[$field]);
+                    }
+                }
+                foreach ($arrayFields as $field) {
+                    if (isset($retoData[$field]) && is_array($retoData[$field])) {
+                        $retoData[$field] = array_map('strip_tags', $retoData[$field]);
+                    }
+                }
 
                 if (empty($retoData['curso'])) {
                     $cicloId   = isset($retoData['ciclo_id']) ? (int) $retoData['ciclo_id'] : null;

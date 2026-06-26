@@ -175,6 +175,11 @@ watch(() => seleccion.value.cicloId, async (val) => {
 const avanzarPaso = () => { if (pasoActual.value < totalPasos) pasoActual.value++; window.scrollTo({top: 0, behavior: 'smooth'}); };
 const retrocederPaso = () => { if (pasoActual.value > 1) pasoActual.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
+const safeUrl = (url) => {
+  if (!url) return '#';
+  return /^https?:\/\//i.test(url) ? url : '#';
+};
+
 // --- ACTUALIZAR CRM (AHORA GUARDA PASO 1 Y PASO 2) ---
 const guardarInfoEmpresa = async () => {
   if (!seleccion.value.empresaId) return;
@@ -369,7 +374,11 @@ const guardar = async () => {
                   <div v-if="empresaDetalle.actividad || empresaDetalle.web">
                     <p class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Actividad / Web</p>
                     <p v-if="empresaDetalle.actividad" class="text-sm text-slate-700 dark:text-slate-300 line-clamp-2" :title="empresaDetalle.actividad">{{ empresaDetalle.actividad }}</p>
-                    <a v-if="empresaDetalle.web" :href="empresaDetalle.web" target="_blank" class="text-emerald-500 hover:text-emerald-600 font-bold text-sm truncate flex items-center gap-1 mt-1">
+                    <a v-if="empresaDetalle.web"
+                       :href="safeUrl(empresaDetalle.web)"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-emerald-500 hover:text-emerald-600 font-bold text-sm truncate flex items-center gap-1 mt-1">
                       {{ empresaDetalle.web.replace(/^https?:\/\//, '') }}
                     </a>
                   </div>

@@ -57,7 +57,7 @@ class DatabaseSeeder extends Seeder
         [
             'name'     => 'Administrador DuaLab',
             'password' => bcrypt(config('services.admin.password')),
-            'role'     => \App\Models\User::ROLE_ADMIN,
+            'role'     => \App\Models\User::ROLE_SUPERADMIN,
         ]
     );
 

@@ -11,6 +11,7 @@ class Sesion extends Model
     protected $table = 'sesiones';
 
     protected $fillable = [
+        'user_id',
         'microreto_id',
         'microreto_titulo',
         'fecha',
@@ -27,6 +28,11 @@ class Sesion extends Model
         'num_alumnos'   => 'integer',
         'microreto_id'  => 'integer',
     ];
+
+    public function docente()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
 
     public function microreto()
     {

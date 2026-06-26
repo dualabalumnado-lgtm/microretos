@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreMicroretoRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user() !== null;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $textFields = [
+            'empresa_nombre', 'titulo', 'quien_es', 'dia_a_dia',
+            'pregunta_reto', 'ciclo', 'modulo', 'duracion', 'nivel_grupo', 'curso',
+        ];
+
+        $sanitized = [];
+        foreach ($textFields as $field) {
+            if ($this->has($field) && is_string($this->input($field))) {
+                $sanitized[$field] = strip_tags($this->input($field));
+            }
+        }
+
+        foreach (['dificultades', 'que_necesitan', 'limitaciones', 'prototipos',
+                  'ods_sugeridos', 'soft_skills', 'evaluacion_oficial', 'tips_profesorado'] as $field) {
+            if ($this->has($field) && is_array($this->input($field))) {
+                $sanitized[$field] = array_map('strip_tags', $this->input($field));
+            }
+        }
+
+        if ($sanitized) {
+            $this->merge($sanitized);
+        }
+    }
+
+    public function rules(): array
+    {
+        return [
+            'demo_id'              => 'nullable|integer|exists:demos,id',
+            'empresa_id'           => 'nullable|integer|exists:empresas,id',
+            'empresa_nombre'       => 'nullable|string|max:255',
+            'titulo'               => 'nullable|string|max:500',
+            'quien_es'             => 'nullable|string|max:5000',
+            'dia_a_dia'            => 'nullable|string|max:5000',
+            'pregunta_reto'        => 'nullable|string|max:5000',
+            'dificultades'         => 'nullable|array',
+            'dificultades.*'       => 'nullable|string|max:1000',
+            'que_necesitan'        => 'nullable|array',
+            'que_necesitan.*'      => 'nullable|string|max:1000',
+            'limitaciones'         => 'nullable|array',
+            'limitaciones.*'       => 'nullable|string|max:1000',
+            'prototipos'           => 'nullable|array',
+            'prototipos.*'         => 'nullable|string|max:1000',
+            'ods_sugeridos'        => 'nullable|array',
+            'ods_sugeridos.*'      => 'nullable|string|max:255',
+            'soft_skills'          => 'nullable|array',
+            'soft_skills.*'        => 'nullable|string|max:255',
+            'evaluacion_oficial'   => 'nullable|array',
+            'evaluacion_oficial.*' => 'nullable|string|max:2000',
+            'tips_profesorado'     => 'nullable|array',
+            'tips_profesorado.*'   => 'nullable|string|max:2000',
+            'nivel_grupo'          => 'nullable|string|max:100',
+            'curso'                => 'nullable|string|max:100',
+            'ciclo_id'             => 'nullable|integer|exists:ciclos_formativos,id',
+            'ciclo'                => 'nullable|string|max:255',
+            'modulo'               => 'nullable|string|max:255',
+            'duracion'             => 'nullable|string|max:100',
+            'es_simulado'          => 'nullable|boolean',
+        ];
+    }
+}

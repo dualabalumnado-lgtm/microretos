@@ -16,9 +16,6 @@ const isPublicRetoRoute = computed(() =>
   route.path.startsWith('/reto/') || route.path.startsWith('/startup/landing/')
 )
 
-const sidePanelRef = ref(null)
-const togglePanel  = () => sidePanelRef.value?.toggle()
-
 // ── Expiración de token (401 del servidor) ────────────────────────────────────
 const handleTokenExpired = () => {
   authStore.logout()
@@ -84,9 +81,11 @@ const cerrarSesionIdle = () => {
 </script>
 
 <template>
-  <TopBar v-if="!isPublicRetoRoute" @toggle-panel="togglePanel" />
-  <SidePanel v-if="!isPublicRetoRoute" ref="sidePanelRef" />
-  <RouterView />
+  <TopBar v-if="!isPublicRetoRoute" />
+  <SidePanel v-if="!isPublicRetoRoute" />
+  <div :class="!isPublicRetoRoute ? 'lg:pl-64' : ''">
+    <RouterView />
+  </div>
   <AppCredit />
 
   <!-- Modal idle: ¿Sigues ahí? -->

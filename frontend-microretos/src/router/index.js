@@ -14,7 +14,13 @@ import StartupDayLanding from '../views/StartupDayLanding.vue'
 import EmpresasView from '../views/EmpresasView.vue'
 import PapeleraBaseDatos from '../views/PapeleraBaseDatos.vue'
 import GestionUsuarios from '../views/GestionUsuarios.vue'
-import { ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA, ROLE_ROUTES } from '../stores/auth.js'
+import InicioDocente from '../views/InicioDocente.vue'
+import { ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA } from '../stores/auth.js'
+
+const SA = ROLE_SUPERADMIN  // 1
+const AD = ROLE_ADMIN       // 4
+const DO = ROLE_DOCENTE     // 2
+const EM = ROLE_EMPRESA     // 3
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -28,49 +34,49 @@ const router = createRouter({
       path: '/microretos',
       name: 'microretos',
       component: GeneradorMicroretos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     },
     {
       path: '/biblioteca',
       name: 'biblioteca',
       component: BibliotecaMicroretos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO, EM] }
     },
     {
       path: '/biblioteca/:id',
       name: 'detalle-microreto',
       component: DetalleMicroreto,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO, EM] }
     },
     {
       path: '/base-datos',
       name: 'base-datos',
       component: BaseDatosDashboard,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN] }
+      meta: { requiresAuth: true, roles: [SA] }
     },
     {
       path: '/papelera',
       name: 'papelera',
       component: PapeleraBaseDatos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN] }
+      meta: { requiresAuth: true, roles: [SA, AD] }
     },
     {
       path: '/empresas',
       name: 'empresas',
       component: EmpresasView,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, DO] }
     },
     {
       path: '/dashboard',
       name: 'dashboard-docente',
       component: DashboardDocente,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     },
     {
       path: '/dashboard/sesiones',
       name: 'sesiones-registradas',
       component: SesionesRegistradas,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     },
     {
       // Vista pública para alumnado — acceso mediante token temporal (QR)
@@ -82,25 +88,25 @@ const router = createRouter({
       path: '/startup-day',
       name: 'startup-day',
       component: StartupDayProyectos,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO, EM] }
     },
     {
       path: '/startup-day/crear',
       name: 'startup-day-crear',
       component: StartupDayWizard,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     },
     {
       path: '/startup-day/:uuid/editar',
       name: 'startup-day-editar',
       component: StartupDayWizard,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     },
     {
       path: '/startup-day/:uuid',
       name: 'startup-day-detalle',
       component: StartupDayDetalle,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN, ROLE_DOCENTE, ROLE_EMPRESA] }
+      meta: { requiresAuth: true, roles: [SA, AD, DO, EM] }
     },
     {
       // Vista pública para validación por parte de la empresa
@@ -112,7 +118,13 @@ const router = createRouter({
       path: '/admin/usuarios',
       name: 'gestion-usuarios',
       component: GestionUsuarios,
-      meta: { requiresAuth: true, roles: [ROLE_ADMIN] }
+      meta: { requiresAuth: true, roles: [SA, AD] }
+    },
+    {
+      path: '/inicio-docente',
+      name: 'inicio-docente',
+      component: InicioDocente,
+      meta: { requiresAuth: true, roles: [SA, AD, DO] }
     }
   ]
 })
@@ -143,10 +155,9 @@ router.beforeEach((to, _from, next) => {
   }
 
   // Verificar permiso de rol para esta ruta
-  const role         = Number(localStorage.getItem('user_role') || ROLE_ADMIN)
+  const role         = Number(localStorage.getItem('user_role') || ROLE_SUPERADMIN)
   const allowedRoles = to.meta.roles ?? []
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    // Redirigir al home de cada rol sin mensaje de error (silent redirect)
     next({ path: '/' })
     return
   }
