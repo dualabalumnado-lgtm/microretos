@@ -1,0 +1,17 @@
+name: CI Pipeline
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: Run Tests
+        run: ./vendor/bin/pest
+      - name: Performance Test (k6)
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: performance_test.js
