@@ -106,7 +106,19 @@ jobs:
         id: backend_unit
         run: |
           START=$(date +%s)
-          php vendor/bin/pest 2>&1 | tee pest-output.txt
+          
+          # Buscamos el binario en orden de prioridad para evitar el error 'Could not open input file'
+          if [ -f "./vendor/bin/pest" ]; then
+            echo "Ejecutando Pest mediante binario estándar..."
+            php vendor/bin/pest 2>&1 | tee pest-output.txt
+          elif [ -f "./vendor/pestphp/pest/bin/pest" ]; then
+            echo "Ejecutando Pest apuntando directamente al paquete vendor..."
+            php vendor/pestphp/pest/bin/pest 2>&1 | tee pest-output.txt
+          else
+            echo "Ejecutando Pest usando el helper global de Artisan o fallback alternativo..."
+            php artisan test --parallel 2>&1 | tee pest-output.txt || php artisan test 2>&1 | tee pest-output.txt
+          fi
+          
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
           END=$(date +%s)
           echo "duration=$((END - START))s" >> $GITHUB_OUTPUT
