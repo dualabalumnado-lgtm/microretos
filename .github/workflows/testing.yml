@@ -70,7 +70,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24' # 💡 Actualizado a la versión nativa y segura
           cache: 'npm'
           cache-dependency-path: './frontend/package-lock.json'
 
@@ -203,7 +203,7 @@ jobs:
           import os
 
           def badge(ec):
-              return "✅ PASSED" if str(ec) == "0" else "❌ FAILED"
+              return "PASSED" if str(ec) == "0" else "FAILED"
 
           def read_file(path):
               if os.path.exists(path):
@@ -226,19 +226,19 @@ jobs:
           e2e_log = read_file("frontend/e2e-output.txt")
 
           lines = [
-              "# 🚀 QA Pipeline — Informe Completo Laravel & Vue SPA\n",
+              "# QA Pipeline — Informe Completo Laravel & Vue SPA\n",
               f"> **Commit:** `{os.environ.get('GH_SHA', '?')}` | **Rama:** `{os.environ.get('GH_REF', '?')}`\n",
-              "## 📊 Resumen de Ejecución\n",
+              "## Resumen de Ejecución\n",
               "| Fase de Pruebas | Estado | Duración |",
               "|---|---|---|",
-              f"| 🐘 Backend Unit & Integration (Pest) | {badge(unit_ec)} | {unit_dur} |",
-              f"| 📦 Frontend Unit (Vue/Vite) | {badge(front_ec)} | {front_dur} |",
-              f"| 🎭 End-to-End Tests (Playwright) | {badge(e2e_ec)} | {e2e_dur} |",
-              f"| ⚡ Performance Tests (k6) | {'✅ SUCCESS' if k6_outcome == 'success' else '❌ FAILURE'} | — |",
-              "\n## 🔍 Detalles e Historial de Logs\n",
-              "<details><summary>📦 Ver Logs del Backend (Pest)</summary>\n\n```\n" + pest_log + "\n```\n</details>\n",
-              "<details><summary>💻 Ver Logs del Frontend (Unit)</summary>\n\n```\n" + front_log + "\n```\n</details>\n",
-              "<details><summary>🎭 Ver Logs de Pruebas E2E (Playwright)</summary>\n\n```\n" + e2e_log + "\n```\n</details>\n"
+              f"| Backend Unit & Integration (Pest) | {badge(unit_ec)} | {unit_dur} |",
+              f"| Frontend Unit (Vue/Vite) | {badge(front_ec)} | {front_dur} |",
+              f"| End-to-End Tests (Playwright) | {badge(e2e_ec)} | {e2e_dur} |",
+              f"| Performance Tests (k6) | {'SUCCESS' if k6_outcome == 'success' else 'FAILURE'} | — |",
+              "\n## Detalles e Historial de Logs\n",
+              "<details><summary> Ver Logs del Backend (Pest)</summary>\n\n```\n" + pest_log + "\n```\n</details>\n",
+              "<details><summary> Ver Logs del Frontend (Unit)</summary>\n\n```\n" + front_log + "\n```\n</details>\n",
+              "<details><summary> Ver Logs de Pruebas E2E (Playwright)</summary>\n\n```\n" + e2e_log + "\n```\n</details>\n"
           ]
 
           with open(summary_file, "a") as f:
