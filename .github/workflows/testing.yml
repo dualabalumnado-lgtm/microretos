@@ -5,7 +5,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # ─── SERVICIO MySQL ───────────────────────────────────────────────────────
     services:
       mysql:
         image: mysql:8.0
@@ -21,10 +20,9 @@ jobs:
           --health-retries=5
 
     steps:
-      # ─── 1. CHECKOUT ───────────────────────────────────────────────────────
       - uses: actions/checkout@v4
 
-      # ─── 2. SETUP PHP Y EXTENSIONES ────────────────────────────────────────
+      # ─── 1. SETUP PHP ──────────────────────────────────────────────────────
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -32,20 +30,14 @@ jobs:
           extensions: mbstring, xml, ctype, iconv, mysql, pdo_mysql
           coverage: none
 
-      # ─── 3. INSTALACIÓN DE DEPENDENCIAS (Con flags de desarrollo explícitos)
+      # ─── 2. INSTALACIÓN DE DEPENDENCIAS ────────────────────────────────────
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --dev
 
-      # ─── 4. SOLUCIÓN AL ERROR 127: Forzar permisos y validar binario ───────
-      - name: Fix Binaries Permissions
-        run: |
-          chmod +x ./vendor/bin/* || true
-          ls -la ./vendor/bin/ || echo "La carpeta de binarios está vacía o no existe"
-
-      # ─── 5. PREPARAR ENTORNO DE LA APLICACIÓN ──────────────────────────────
+      # ─── 3. PREPARAR ENTORNO DE LA APLICACIÓN ──────────────────────────────
       - name: Prepare .env
         run: |
-          cp .env.example .env
+          cp .env.example .env || touch .env
           php artisan key:generate
           echo "DB_CONNECTION=mysql"    >> .env
           echo "DB_HOST=127.0.0.1"     >> .env
@@ -59,17 +51,17 @@ jobs:
           echo "MAIL_MAILER=log"       >> .env
           echo "APP_DEBUG=false"       >> .env
 
-      # ─── 6. MIGRACIONES Y SEEDERS ──────────────────────────────────────────
+      # ─── 4. MIGRACIONES Y SEEDERS ──────────────────────────────────────────
       - name: Run migrations and seeders
         run: |
           php artisan migrate --force
           php artisan db:seed --force
 
-      # ─── 7. EJECUTAR PRUEBAS (Llamada alternativa robusta si falla el atajo)
+      # ─── 5. EJECUTAR PRUEBAS (Llamada limpia sin anteponer 'php') ──────────
       - name: Run Tests
-        run: php vendor/pestphp/pest/bin/pest || ./vendor/bin/pest
+        run: ./vendor/bin/pest
 
-      # ─── 8. ARRANCAR APP EN SEGUNDO PLANO PARA LAS PRUEBAS DE k6 ───────────
+      # ─── 6. ARRANCAR APP EN SEGUNDO PLANO PARA LAS PRUEBAS DE k6 ───────────
       - name: Start application
         run: php artisan serve --port=8000 &
 
@@ -87,7 +79,7 @@ jobs:
           echo "Timeout: la app no arrancó"
           exit 1
 
-      # ─── 9. PRUEBAS DE RENDIMIENTO (k6) ────────────────────────────────────
+      # ─── 7. PRUEBAS DE RENDIMIENTO (k6) ────────────────────────────────────
       - name: Performance Test (k6)
         uses: grafana/k6-action@v0.3.1
         with:
