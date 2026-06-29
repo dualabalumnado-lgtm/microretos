@@ -161,23 +161,22 @@ jobs:
       - name: Create Configuration and Dummy Playwright Test if empty
         working-directory: ./frontend-microretos
         run: |
-          # SOLUCIÓN AL ERROR DE CONFIGURACIÓN: Inyectar archivo base de Playwright si falta
+          # SOLUCIÓN COMPATIBLE CON INDENTACIÓN: Inyectar configuración base sin romper EOF
           if [ ! -f "playwright.config.js" ]; then
-            cat << 'EOF' > playwright.config.js
-            import { defineConfig } from '@playwright/test';
-            export default defineConfig({
-              testDir: './e2e-playwright',
-              use: {
-                baseURL: 'http://localhost:3000',
-                screenshot: 'only-on-failure',
-              },
-            });
-            EOF
+            echo "import { defineConfig } from '@playwright/test';" > playwright.config.js
+            echo "export default defineConfig({" >> playwright.config.js
+            echo "  testDir: './e2e-playwright'," >> playwright.config.js
+            echo "  use: {" >> playwright.config.js
+            echo "    baseURL: 'http://localhost:3000'," >> playwright.config.js
+            echo "    screenshot: 'only-on-failure'," >> playwright.config.js
+            echo "  }," >> playwright.config.js
+            echo "});" >> playwright.config.js
           fi
 
           mkdir -p e2e-playwright
           if ! ls e2e-playwright/*.spec.js 2>/dev/null | grep -q spec; then
-            printf "import { test, expect } from '@playwright/test';\ntest('dummy e2e', async ({ page }) => { await page.goto('/'); expect(true).toBe(true); });\n" > e2e-playwright/dummy.spec.js
+            echo "import { test, expect } from '@playwright/test';" > e2e-playwright/dummy.spec.js
+            echo "test('dummy e2e', async ({ page }) => { await page.goto('/'); expect(true).toBe(true); });" >> e2e-playwright/dummy.spec.js
           fi
 
       - name: Run E2E Tests (Playwright)
