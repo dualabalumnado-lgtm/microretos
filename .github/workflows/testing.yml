@@ -1,16 +1,87 @@
 name: CI Pipeline
 on: [push]
+
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # ─── SERVICIO MySQL ───────────────────────────────────────────────────────
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
-      - uses: actions/checkout@v3
+      # ─── 1. CHECKOUT ───────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ─── 2. SETUP PHP Y EXTENSIONES ────────────────────────────────────────
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, mysql, pdo_mysql
+          coverage: none
+
+      # ─── 3. INSTALACIÓN DE DEPENDENCIAS (Soluciona el error 127) ────────────
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # ─── 4. PREPARAR ENTORNO DE LA APLICACIÓN ──────────────────────────────
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "DB_CONNECTION=mysql"    >> .env
+          echo "DB_HOST=127.0.0.1"     >> .env
+          echo "DB_PORT=3306"          >> .env
+          echo "DB_DATABASE=testing"   >> .env
+          echo "DB_USERNAME=root"      >> .env
+          echo "DB_PASSWORD=root"      >> .env
+          echo "CACHE_DRIVER=array"    >> .env
+          echo "SESSION_DRIVER=array"  >> .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+          echo "MAIL_MAILER=log"       >> .env
+          echo "APP_DEBUG=false"       >> .env
+
+      # ─── 5. MIGRACIONES Y SEEDERS ──────────────────────────────────────────
+      - name: Run migrations and seeders
+        run: |
+          php artisan migrate --force
+          php artisan db:seed --force
+
+      # ─── 6. EJECUTAR PRUEBAS UNITARIAS/INTEGRACIÓN (Pest) ──────────────────
       - name: Run Tests
         run: ./vendor/bin/pest
+
+      # ─── 7. ARRANCAR APP EN SEGUNDO PLANO PARA LAS PRUEBAS DE k6 ───────────
+      - name: Start application
+        run: php artisan serve --port=8000 &
+
+      - name: Wait for app to be ready
+        run: |
+          echo "Esperando a que la app esté disponible para k6..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8000 > /dev/null; then
+              echo "App lista"
+              exit 0
+            fi
+            echo "Intento $i..."
+            sleep 3
+          done
+          echo "Timeout: la app no arrancó"
+          exit 1
+
+      # ─── 8. PRUEBAS DE RENDIMIENTO (k6) ────────────────────────────────────
       - name: Performance Test (k6)
         uses: grafana/k6-action@v0.3.1
         with:
